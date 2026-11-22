@@ -81,8 +81,43 @@ void main() {
 
       // Kasada kurye paketi yapma aksiyonu olmamali
       expect(engine.activeInteractionAction, isNull);
-      expect(engine.activeInteractionText, contains('Kasada kurye paketi yapılmaz'));
+      expect(engine.activeInteractionText, contains('No courier packages at the register'));
       expect(engine.carriedBox!.isCourierPackage, isFalse);
+    });
+
+    test('Inek ciftligi (Sut Kovasi), Un tarlasi (Capa) ve Tavuk ciftligi (Tavuk Kovasi) calisir', () {
+      final engine = SimulationEngine();
+      expect(engine.farmProducers.length, 3);
+
+      final barn = engine.farmProducers.firstWhere((f) => f.zoneType == FarmZoneType.barn);
+      final field = engine.farmProducers.firstWhere((f) => f.zoneType == FarmZoneType.field);
+      final coop = engine.farmProducers.firstWhere((f) => f.zoneType == FarmZoneType.coop);
+
+      expect(barn.name, 'İnek Çiftliği');
+      expect(barn.requiredTool, FarmToolType.milkBucket);
+      expect(barn.requiredTool.name, 'Süt Kovası');
+
+      expect(field.name, 'Un Tarlası');
+      expect(field.requiredTool, FarmToolType.scythe);
+      expect(field.requiredTool.name, 'Çapa');
+
+      expect(coop.name, 'Tavuk Çiftliği');
+      expect(coop.requiredTool, FarmToolType.eggBucket);
+      expect(coop.requiredTool.name, 'Tavuk Kovası');
+
+      // Un tarlasina girince Capa eline alinir ve un hasat edilir
+      final cropSpot = field.spots.first;
+      engine.playerX = cropSpot.x;
+      engine.playerY = cropSpot.y;
+      engine.update(0.1);
+      expect(engine.playerTool, FarmToolType.scythe);
+
+      for (int i = 0; i < 15; i++) {
+        engine.update(0.1);
+      }
+      expect(engine.carriedBox, isNotNull);
+      expect(engine.carriedBox!.productType, SimProductType.flour);
+      expect(engine.carriedBox!.isFromFarm, isTrue);
     });
 
     testWidgets('Fazla urunle paketlemeye gidince "Bu fazla!" uyarisi verir ve ona gore paket yapar',
@@ -115,7 +150,7 @@ void main() {
 
       // Otomatik paketlenmemeli, fazla uyarisi vermeli
       expect(engine.carriedBox!.isCourierPackage, isFalse);
-      expect(engine.activeInteractionText, contains('Bu fazla'));
+      expect(engine.activeInteractionText, contains('Too many'));
 
       await tester.pumpWidget(
         MaterialApp(
@@ -136,22 +171,22 @@ void main() {
       await tester.tap(find.text('Ac'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Bu fazla!'), findsOneWidget);
+      expect(find.textContaining('Too many!'), findsOneWidget);
       expect(find.textContaining('5 / 3'), findsOneWidget);
 
       // 2 fazla cikarilana kadar paketle butonu gorunmez
-      expect(find.textContaining('Kurye Paketini Hazırla & Bantla'), findsNothing);
+      expect(find.textContaining('Tape the package'), findsNothing);
 
       // 2 kere "-1" tikla
-      await tester.tap(find.text('1 Fazla Çıkar (-1)'));
+      await tester.tap(find.text('Remove 1'));
       await tester.pump();
-      await tester.tap(find.text('1 Fazla Çıkar (-1)'));
+      await tester.tap(find.text('Remove 1'));
       await tester.pump();
 
       expect(find.textContaining('3 / 3'), findsOneWidget);
-      expect(find.textContaining('Kurye Paketini Hazırla & Bantla'), findsOneWidget);
+      expect(find.textContaining('Tape the package'), findsOneWidget);
 
-      await tester.tap(find.textContaining('Kurye Paketini Hazırla & Bantla'));
+      await tester.tap(find.textContaining('Tape the package'));
       await tester.pumpAndSettle();
 
       // Tam 3 adetlik kurye paketi hazir olmali ve 2 fazla rafa donmus olmali

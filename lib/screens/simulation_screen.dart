@@ -745,10 +745,9 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                   return;
                                 }
 
-                                // Tıklanan yer Çiftlik Üretim Alanı (Ahır, Tarla, Kümes) veya Kova/Tırpan Standı ise
+                                // Tıklanan yer Çiftlik Üretim Alanı (açık veya kilitli) ya da Alet Standı ise
                                 for (var farm in _engine.farmProducers) {
-                                  if (!farm.isUnlocked) continue;
-                                  if ((worldPos - farm.toolStandPos).distance < 48 ||
+                                  if ((farm.isUnlocked && (worldPos - farm.toolStandPos).distance < 48) ||
                                       farm.rect.inflate(10).contains(worldPos)) {
                                     _engine.handleFarmZoneOrToolClick(farm, worldPos);
                                     return;
@@ -1082,6 +1081,18 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
   String _carryLabel(bool compact) {
     final box = _engine.carriedBox!;
     final def = productCatalog[box.productType]!;
+    final insideFarm = _engine.farmProducers.any(
+      (f) => f.rect.inflate(10).contains(Offset(_engine.playerX, _engine.playerY)),
+    );
+    if (insideFarm && box.isFromFarm) {
+      if (box.productType == SimProductType.milk) {
+        return 'Süt Kovası ${box.currentCount}/${box.maxCount}';
+      } else if (box.productType == SimProductType.egg) {
+        return 'Tavuk Kovası ${box.currentCount}/${box.maxCount}';
+      } else if (box.productType == SimProductType.flour) {
+        return 'Un ${box.currentCount}/${box.maxCount}';
+      }
+    }
     final head = box.isCourierPackage ? 'Package' : (compact ? '' : 'Carrying');
     final body = '${def.name} ${box.currentCount}/${box.maxCount}';
     return head.isEmpty ? body : '$head: $body';
@@ -1163,17 +1174,21 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
               child: Row(
                 children: [
                   Text(
-                    _engine.carriedBox != null ? '{box}' : '{hand}',
+                    _engine.playerTool != null
+                        ? _engine.playerTool!.ico
+                        : (_engine.carriedBox != null ? '{box}' : '{hand}'),
                     style: const TextStyle(fontSize: 16),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _engine.carriedBox != null
-                          ? _carryLabel(compact)
+                          ? (_engine.playerTool != null
+                              ? '${_engine.playerTool!.name} • ${_carryLabel(compact)}'
+                              : _carryLabel(compact))
                           : (_engine.playerTool != null
-                              ? 'Equipment: ${_engine.playerTool!.name} (Walk Inside to Harvest)'
-                              : (compact ? 'Hands empty' : 'Hands Empty (Pick Up a Delivery Box)')),
+                              ? 'Elde: ${_engine.playerTool!.name} (Hasat Et)'
+                              : (compact ? 'Hands empty' : 'Hands Empty (Farm / Box)')),
                       style: TextStyle(
                         fontSize: 12,
                         color: (_engine.carriedBox == null && _engine.playerTool == null)

@@ -152,44 +152,55 @@ enum FarmZoneType {
   coop,   // Tavuk Çiftliği (Yumurta Kovası ile içeri girip folluklardan yumurta toplanır)
 }
 
-// Çiftlik Ekipmanları (Ahır için Süt Kovası, Tarla için Tırpan, Kümes için Yumurta Kovası)
+// Çiftlik Ekipmanları (İnek Çiftliği için Süt Kovası, Un Tarlası için Çapa, Tavuk Çiftliği için Tavuk Kovası)
 enum FarmToolType {
-  milkBucket, // 🧺 Süt Kovası
-  scythe,     // 🌾 Hasat Tırpanı
-  eggBucket,  // 🧺 Yumurta Kovası
+  milkBucket, // 🪣 Süt Kovası
+  scythe,     // ⛏️ Çapa (Un Tarlası için)
+  eggBucket,  // 🪣 Tavuk Kovası
 }
 
 extension FarmToolTypeExt on FarmToolType {
   String get name {
     switch (this) {
       case FarmToolType.milkBucket:
-        return 'Milk Bucket';
+        return 'Süt Kovası';
       case FarmToolType.scythe:
-        return 'Harvest Scythe';
+        return 'Çapa';
       case FarmToolType.eggBucket:
-        return 'Egg Bucket';
+        return 'Tavuk Kovası';
+    }
+  }
+
+  String get ico {
+    switch (this) {
+      case FarmToolType.milkBucket:
+        return '{milk_bucket}';
+      case FarmToolType.scythe:
+        return '{hoe}';
+      case FarmToolType.eggBucket:
+        return '{egg_bucket}';
     }
   }
 
   String get emoji {
     switch (this) {
       case FarmToolType.milkBucket:
-        return '🧺';
+        return '🪣';
       case FarmToolType.scythe:
-        return '🌾';
+        return '⛏️';
       case FarmToolType.eggBucket:
-        return '🧺';
+        return '🪣';
     }
   }
 
   String get actionVerb {
     switch (this) {
       case FarmToolType.milkBucket:
-        return 'Milking the Cow';
+        return 'Süt Kovası ile Süt Sağılıyor';
       case FarmToolType.scythe:
-        return 'Cutting with the Scythe';
+        return 'Çapa ile Un Hasat Ediliyor';
       case FarmToolType.eggBucket:
-        return 'Collecting Eggs in the Bucket';
+        return 'Tavuk Kovası ile Yumurta Toplanıyor';
     }
   }
 }
@@ -398,11 +409,11 @@ class CarriedBox {
     if (!isFromFarm) return 'Product Box';
     switch (productType) {
       case SimProductType.milk:
-        return 'Fresh Milk';
+        return 'Süt Kovası (Taze Süt)';
       case SimProductType.egg:
-        return 'Collected Village Eggs';
+        return 'Tavuk Kovası (Yumurta)';
       case SimProductType.flour:
-        return 'Cut Wheat Bundle';
+        return 'Hasat Edilen Un';
       case SimProductType.cheese:
         return 'Fresh Tulum Cheese';
       default:

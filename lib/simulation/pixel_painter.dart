@@ -47,6 +47,7 @@ class PixelPainter extends CustomPainter {
   PixelPainter({required this.engine}) : super(repaint: engine);
 
   static ui.Picture? _staticPicture;
+  static double? _staticWorldH;
   static final Map<String, TextPainter> _textCache = {};
   final Paint _p = Paint()..isAntiAlias = false;
 
@@ -144,20 +145,23 @@ class PixelPainter extends CustomPainter {
     canvas.translate(-camX, -camY);
     canvas.clipRect(Rect.fromLTWH(0, 0, engine.worldWidth, engine.worldHeight));
 
-    if (_staticPicture == null) {
+    if (_staticPicture == null || _staticWorldH != engine.worldHeight) {
       final rec = ui.PictureRecorder();
       _paintStaticWorld(Canvas(rec));
       _staticPicture = rec.endRecording();
+      _staticWorldH = engine.worldHeight;
     }
     canvas.drawPicture(_staticPicture!);
 
+    _paintFarms(canvas);
+    _paintSlidingDoors(canvas);
     _paintAlley(canvas);
     _paintCourierZone(canvas);
-    _paintLockedFloorPlates(canvas);
     _paintSorted(canvas);
     _paintFlyingItems(canvas);
     _paintLighting(canvas);
     _paintLockedExpansion(canvas);
+    _paintLockedFloorPlates(canvas);
     _paintMouseTarget(canvas);
     _paintParticles(canvas);
 
@@ -280,18 +284,605 @@ class PixelPainter extends CustomPainter {
       _wr(c, Rect.fromLTWH(px + 24, 241, 15, 6), const Color(0xFF3E5F63));
     }
 
-    // Back alley ground (truck road)
-    _wr(c, Rect.fromLTWH(0, floorBottom + 20, W, H - floorBottom - 20), Pal.asphalt);
-    for (double x = 0; x < W; x += 120) {
-      _wr(c, Rect.fromLTWH(x + 20, H - 18, 60, 6), Pal.asphaltLine);
+    // Backyard Farm Valley (y: 1010..H) — yol kaldırıldı, doğrudan doğal çimenlik tarla alanı
+    final farmTop = floorBottom + 20;
+    if (H > farmTop) {
+      _wr(c, Rect.fromLTWH(0, farmTop, W, H - farmTop), const Color(0xFF1E562B));
+      for (double y = farmTop; y < H; y += 24) {
+        for (double x = 0; x < W; x += 36) {
+          final h = _hash((x ~/ 36), (y ~/ 24));
+          if (h % 3 == 0) {
+            _wr(c, Rect.fromLTWH(x, y, 36, 24), const Color(0xFF236331));
+          } else if (h % 5 == 0) {
+            _wr(c, Rect.fromLTWH(x, y, 36, 24), const Color(0xFF194B24));
+          }
+          if (h % 7 == 0) {
+            _r(c, x + 12, y + 9, 0, 0, 2, 3, const Color(0xFF3FA13A));
+            _r(c, x + 18, y + 6, 0, 0, 2, 4, const Color(0xFF3FA13A));
+          }
+          if (h % 13 == 0) {
+            _r(c, x + 21, y + 12, 0, 0, 2, 2, const Color(0xFFF2CF4A));
+          }
+        }
+      }
+    }
+  }
+
+  /// Giriş kapısı (ve arka kapı) için yaklaşınca iki yana kayarak açılan otomatik sürgülü cam kapı.
+  void _paintSlidingDoors(Canvas c) {
+    final doorCenter = engine.worldWidth / 2;
+    _drawSingleSlidingDoor(
+      c,
+      centerX: doorCenter,
+      topY: 204,
+      doorH: 48,
+      halfGap: 138,
+      sensorY: 228,
+    );
+    _drawSingleSlidingDoor(
+      c,
+      centerX: doorCenter,
+      topY: 990,
+      doorH: 20,
+      halfGap: 138,
+      sensorY: 998,
+    );
+  }
+
+  void _drawSingleSlidingDoor(
+    Canvas c, {
+    required double centerX,
+    required double topY,
+    required double doorH,
+    required double halfGap,
+    required double sensorY,
+  }) {
+    double minDist = 9999.0;
+    void checkActor(double ax, double ay) {
+      final dx = (ax - centerX).abs();
+      final dy = (ay - sensorY).abs();
+      if (dx < halfGap + 45 && dy < 115) {
+        final d = max(0.0, dx - 30) * 0.45 + dy;
+        if (d < minDist) minDist = d;
+      }
+    }
+
+    checkActor(engine.playerX, engine.playerY);
+    for (final cu in engine.customers) {
+      checkActor(cu.x, cu.y);
+    }
+    if (engine.hasRestocker && engine.isRestockerHired && !engine.restockerAtHome) {
+      checkActor(engine.restocker.x, engine.restocker.y);
+    }
+    for (final t in engine.thieves) {
+      checkActor(t.x, t.y);
+    }
+
+    final openT = ((110.0 - minDist) / 65.0).clamp(0.0, 1.0);
+    final isOpen = openT > 0.05;
+    final panelW = halfGap - 3;
+    final slideDist = openT * (panelW - 18);
+
+    // Üst sensör rayı ve durum ışığı
+    final railRect = Rect.fromCenter(center: Offset(centerX, topY - 3), width: halfGap * 2 + 12, height: 6);
+    _wr(c, railRect, Pal.outline);
+    _wr(c, railRect.deflate(1.5), const Color(0xFF37474F));
+    _wr(
+      c,
+      Rect.fromCenter(center: Offset(centerX, topY - 3), width: 12, height: 4),
+      isOpen ? const Color(0xFF4ADE80) : const Color(0xFF38BDF8),
+    );
+
+    // Sol ve Sağ sürgülü cam kapı kanatları
+    c.save();
+    c.clipRect(Rect.fromLTWH(centerX - halfGap, topY, halfGap * 2, doorH));
+    for (final side in [-1.0, 1.0]) {
+      final left = side < 0
+          ? (centerX - panelW - slideDist)
+          : (centerX + slideDist);
+      final panelRect = Rect.fromLTWH(_snap(left), _snap(topY), _snap(panelW), _snap(doorH));
+
+      // Dış metal/ahşap çerçeve
+      _wr(c, panelRect, Pal.outline);
+      _wr(c, panelRect.deflate(kPx), const Color(0xFF607D8B));
+      // Yarı saydam sürgülü cam yüzeyi
+      final glassRect = panelRect.deflate(2 * kPx);
+      _wr(c, glassRect, const Color(0xAA2C4A52));
+      _wr(
+        c,
+        Rect.fromLTWH(glassRect.left, glassRect.top, glassRect.width, max(kPx, glassRect.height * 0.25)),
+        const Color(0xAA4D7C85),
+      );
+      // Cam parlama şeritleri
+      if (glassRect.width > 24) {
+        _wr(
+          c,
+          Rect.fromLTWH(glassRect.left + 12, glassRect.top + 3, 6, max(kPx, glassRect.height - 6)),
+          const Color(0x44FFFFFF),
+        );
+        _wr(
+          c,
+          Rect.fromLTWH(glassRect.left + 24, glassRect.top + 3, 3, max(kPx, glassRect.height - 6)),
+          const Color(0x28FFFFFF),
+        );
+      }
+      // Kapı kolu (orta birleşim kenarında)
+      final handleX = side < 0 ? (panelRect.right - 3 * kPx) : (panelRect.left + 2 * kPx);
+      final handleH = max(2 * kPx, (doorH * 0.42));
+      final handleY = panelRect.top + (doorH - handleH) / 2;
+      _wr(c, Rect.fromLTWH(handleX - 1, handleY - 1, kPx + 2, handleH + 2), Pal.outline);
+      _wr(c, Rect.fromLTWH(handleX, handleY, kPx, handleH), const Color(0xFFF2CF4A));
+    }
+    c.restore();
+  }
+
+  // ---------------------------------------------------------------------------
+  // backyard farms: İnek Çiftliği, Un Tarlası, Tavuk Çiftliği + 3 Kilitli Tarla (Domates, Biber, Elma)
+  // ---------------------------------------------------------------------------
+  void _paintFarms(Canvas c) {
+    for (final farm in engine.farmProducers) {
+      if (!farm.isUnlocked) {
+        _drawLockedFarmPlot(c, farm);
+        continue;
+      }
+      if (farm.zoneType == FarmZoneType.barn) {
+        _drawCowFarm(c, farm);
+      } else if (farm.zoneType == FarmZoneType.field) {
+        _drawFlourField(c, farm);
+      } else if (farm.zoneType == FarmZoneType.coop) {
+        _drawChickenFarm(c, farm);
+      }
+      _drawToolStand(c, farm);
+    }
+  }
+
+  /// Draws a crisp pixel-art padlock icon (7x8 art pixels) at (wx, wy).
+  void _drawPixelLock(Canvas c, double wx, double wy, {bool unlocked = false}) {
+    final x = _snap(wx);
+    final y = _snap(wy);
+    // Shackle
+    _r(c, x, y, 1, 0, 5, 4, Pal.outline);
+    _r(c, x, y, 2, 1, 3, 2, const Color(0xFFB0BEC5));
+    _r(c, x, y, 3, 2, 1, 2, Pal.outline);
+    // Body
+    _r(c, x, y, 0, 3, 7, 6, Pal.outline);
+    _r(c, x, y, 1, 4, 5, 4, unlocked ? const Color(0xFF4ADE80) : const Color(0xFFF2CF4A));
+    _r(c, x, y, 1, 4, 5, 1, unlocked ? const Color(0xFF86EFAC) : const Color(0xFFFFE98A));
+    // Keyhole
+    _r(c, x, y, 3, 5, 1, 2, Pal.outline);
+  }
+
+  /// Kilitli tarla: kilit işareti + ürün ikonu + tarla/ürün adı
+  void _drawLockedFarmPlot(Canvas c, FarmProducer farm) {
+    final r = farm.rect;
+    final def = productCatalog[farm.primaryProduct]!;
+    final shelf = engine.shelfForProduct(farm.primaryProduct);
+    final canOpenNow = shelf != null && engine.storeLevel >= shelf.zoneLevel;
+
+    // Subtle staked plot border on the grass
+    _p.color = farm.isHovered
+        ? const Color(0xFFFFE066)
+        : (canOpenNow ? const Color(0x994ADE80) : const Color(0x668A6A3C));
+    _p.style = PaintingStyle.stroke;
+    _p.strokeWidth = kPx;
+    c.drawRect(Rect.fromLTWH(_snap(r.left), _snap(r.top), _snap(r.width), _snap(r.height)), _p);
+    _p.style = PaintingStyle.fill;
+
+    // Corner wooden stakes
+    for (final pt in [r.topLeft, r.topRight, r.bottomLeft, r.bottomRight]) {
+      _wr(c, Rect.fromCenter(center: pt, width: 12, height: 12), Pal.outline);
+      _wr(c, Rect.fromCenter(center: pt, width: 6, height: 6), Pal.woodLight);
+    }
+
+    // Center sign board with Lock Icon + Product Icon + Product/Field Name
+    final cx = _snap(r.center.dx);
+    final cy = _snap(r.center.dy);
+    final signRect = Rect.fromCenter(center: Offset(cx, cy), width: 264, height: 64);
+    _wr(c, signRect.inflate(3), Pal.outline);
+    _wr(c, signRect, const Color(0xFF1F1813));
+    _wr(
+      c,
+      Rect.fromLTWH(signRect.left, signRect.top, signRect.width, 4),
+      canOpenNow ? const Color(0xFF4ADE80) : const Color(0xFFF2CF4A),
+    );
+
+    // Pixel lock icon + product icon on the left side of the title
+    _drawPixelLock(c, cx - 114, cy - 22, unlocked: canOpenNow);
+    _icon(c, farm.primaryProduct, cx - 88, cy - 19);
+
+    _text(
+      c,
+      '${farm.name} (${def.name})',
+      cx + 16,
+      cy - 10,
+      size: 13,
+      color: const Color(0xFFFDE68A),
+      plate: false,
+    );
+
+    final subText = shelf != null ? engine.shelfLockReason(shelf) : 'Kilitli';
+    _text(
+      c,
+      subText,
+      cx,
+      cy + 14,
+      size: 12,
+      color: canOpenNow ? const Color(0xFF7CFC9A) : const Color(0xFFCFD8DC),
+      plate: false,
+    );
+  }
+
+  void _drawPixelFence(Canvas c, Rect r, double gateMinX, double gateMaxX) {
+    // Top rail (with open gate gap)
+    _wr(c, Rect.fromLTRB(r.left, r.top - 3, gateMinX, r.top + 6), Pal.outline);
+    _wr(c, Rect.fromLTRB(r.left + 3, r.top, gateMinX - 3, r.top + 3), Pal.wood);
+    _wr(c, Rect.fromLTRB(gateMaxX, r.top - 3, r.right, r.top + 6), Pal.outline);
+    _wr(c, Rect.fromLTRB(gateMaxX + 3, r.top, r.right - 3, r.top + 3), Pal.wood);
+
+    // Bottom, left, right rails
+    _wr(c, Rect.fromLTRB(r.left, r.bottom - 6, r.right, r.bottom + 3), Pal.outline);
+    _wr(c, Rect.fromLTRB(r.left + 3, r.bottom - 3, r.right - 3, r.bottom), Pal.wood);
+    _wr(c, Rect.fromLTRB(r.left - 3, r.top, r.left + 6, r.bottom), Pal.outline);
+    _wr(c, Rect.fromLTRB(r.left, r.top + 3, r.left + 3, r.bottom - 3), Pal.woodDark);
+    _wr(c, Rect.fromLTRB(r.right - 6, r.top, r.right + 3, r.bottom), Pal.outline);
+    _wr(c, Rect.fromLTRB(r.right - 3, r.top + 3, r.right, r.bottom - 3), Pal.woodDark);
+
+    // Fence posts
+    for (double px = r.left; px <= r.right; px += 44) {
+      if (px < gateMinX - 6 || px > gateMaxX + 6) {
+        _wr(c, Rect.fromCenter(center: Offset(px, r.top), width: 12, height: 15), Pal.outline);
+        _wr(c, Rect.fromCenter(center: Offset(px, r.top), width: 6, height: 9), Pal.woodLight);
+      }
+      _wr(c, Rect.fromCenter(center: Offset(px, r.bottom), width: 12, height: 15), Pal.outline);
+      _wr(c, Rect.fromCenter(center: Offset(px, r.bottom), width: 6, height: 9), Pal.woodLight);
+    }
+
+    // Gate pillars
+    for (final gx in [gateMinX, gateMaxX]) {
+      _wr(c, Rect.fromCenter(center: Offset(gx, r.top), width: 15, height: 18), Pal.outline);
+      _wr(c, Rect.fromCenter(center: Offset(gx, r.top), width: 9, height: 12), const Color(0xFFD9A441));
+    }
+  }
+
+  void _drawToolStand(Canvas c, FarmProducer farm) {
+    final pos = farm.toolStandPos;
+    final x = _snap(pos.dx - 30);
+    final y = _snap(pos.dy - 14);
+    final isEquipped = engine.playerTool == farm.requiredTool;
+
+    // Shadow & wooden table
+    _r(c, x, y, 1, 9, 20, 3, Pal.shadow);
+    _r(c, x, y, -1, -1, 22, 11, Pal.outline);
+    _r(c, x, y, 0, 0, 20, 9, Pal.wood);
+    _r(c, x, y, 0, 0, 20, 2, Pal.woodLight);
+    _r(c, x, y, 0, 7, 20, 2, Pal.woodDark);
+
+    // Tool icon(s) resting on the stand
+    if (farm.requiredTool == FarmToolType.milkBucket) {
+      _drawPixelMilkBucket(c, pos.dx - 11, pos.dy - 4, hasMilk: false);
+      _drawPixelMilkBucket(c, pos.dx + 11, pos.dy - 4, hasMilk: true);
+    } else if (farm.requiredTool == FarmToolType.scythe) {
+      _drawPixelHoeIcon(c, pos.dx - 8, pos.dy - 2);
+      _drawPixelHoeIcon(c, pos.dx + 10, pos.dy - 2);
+    } else {
+      _drawPixelEggBucket(c, pos.dx - 11, pos.dy - 4, hasEggs: false);
+      _drawPixelEggBucket(c, pos.dx + 11, pos.dy - 4, hasEggs: true);
+    }
+
+    if (farm.isToolStandHovered || isEquipped) {
+      _p.color = isEquipped ? const Color(0xFF4ADE80) : const Color(0xFFFDE68A);
+      _p.style = PaintingStyle.stroke;
+      _p.strokeWidth = kPx;
+      c.drawRect(Rect.fromLTWH(x - 2 * kPx, y - 2 * kPx, 24 * kPx, 13 * kPx), _p);
+      _p.style = PaintingStyle.fill;
+    }
+
+    final label = isEquipped ? 'Elde: ${farm.requiredTool.name}' : '${farm.requiredTool.name} Al';
+    _text(
+      c,
+      label,
+      pos.dx,
+      pos.dy - 28,
+      size: 11,
+      color: isEquipped ? const Color(0xFF7CFC9A) : const Color(0xFFFDE68A),
+      plate: true,
+    );
+  }
+
+  void _drawCowFarm(Canvas c, FarmProducer farm) {
+    final r = farm.rect;
+    // Pasture grass
+    _wr(c, r, const Color(0xFF287238));
+    for (double y = r.top + 12; y < r.bottom - 18; y += 24) {
+      for (double x = r.left + 12; x < r.right - 24; x += 36) {
+        if (_hash(x ~/ 18, y ~/ 18) % 3 == 0) {
+          _wr(c, Rect.fromLTWH(x, y, 24, 15), const Color(0xFF2E8040));
+        }
+      }
+    }
+
+    // Water trough in center & hay bales on top-right
+    final tx = _snap(r.center.dx - 27), ty = _snap(r.top + 125);
+    _r(c, tx, ty, -1, -1, 20, 10, Pal.outline);
+    _r(c, tx, ty, 0, 0, 18, 8, const Color(0xFF546E7A));
+    _r(c, tx, ty, 2, 2, 14, 4, const Color(0xFF4FC3F7));
+
+    for (final hx in [r.right - 72, r.right - 38]) {
+      final bx = _snap(hx), by = _snap(r.top + 36);
+      _r(c, bx, by, -1, -1, 11, 8, Pal.outline);
+      _r(c, bx, by, 0, 0, 9, 6, const Color(0xFFE2B03B));
+      _r(c, bx, by, 0, 0, 9, 2, const Color(0xFFF5D061));
+      _r(c, bx, by, 2, 0, 1, 6, const Color(0xFF8A5A22));
+      _r(c, bx, by, 6, 0, 1, 6, const Color(0xFF8A5A22));
+    }
+
+    _drawPixelFence(c, r, farm.gateMinX, farm.gateMaxX);
+
+    // 4 Cows
+    for (int i = 0; i < farm.spots.length; i++) {
+      final spot = farm.spots[i];
+      final phase = engine.worldTime * 2.0 + i * 1.7;
+      final ox = _snap(spot.x + sin(phase) * 4);
+      final oy = _snap(spot.y + cos(phase * 0.7) * 2);
+      _drawPixelCow(c, ox, oy, spot);
+      _drawSpotBadge(c, spot, 'Süt Sağ', const Color(0xFF5DADE2));
+    }
+
+    _text(
+      c,
+      'İNEK ÇİFTLİĞİ (Süt Kovası)  ${farm.readySpotCount}/${farm.spots.length}',
+      r.left + 150,
+      r.top - 14,
+      size: 12,
+      color: const Color(0xFF9AD7FF),
+      plate: true,
+    );
+  }
+
+  void _drawPixelCow(Canvas c, double wx, double wy, FarmHarvestSpot spot) {
+    final x = _snap(wx);
+    final y = _snap(wy);
+    final graze = (sin(engine.worldTime * 3 + spot.index) > 0.3) ? 1 : 0;
+    // Shadow
+    _r(c, x, y, -7, 4, 15, 3, Pal.shadow);
+    // Legs
+    for (final lx in [-5, -2, 2, 5]) {
+      _r(c, x, y, lx, 2, 2, 4, Pal.outline);
+      _r(c, x, y, lx, 2, 1.5, 3, const Color(0xFFECEFF1));
+    }
+    // Pink udder
+    if (spot.isReady) {
+      _r(c, x, y, -1, 2, 3, 2, const Color(0xFFF48FB1));
+    }
+    // Body
+    _r(c, x, y, -7, -5, 14, 8, Pal.outline);
+    _r(c, x, y, -6, -4, 12, 6, const Color(0xFFF5F7F8));
+    // Black spots
+    _r(c, x, y, -4, -4, 4, 3, const Color(0xFF1C242B));
+    _r(c, x, y, 1, -2, 3, 3, const Color(0xFF1C242B));
+    // Head + horns + pink snout
+    final hy = -6 + graze;
+    _r(c, x, y, 5, hy - 1, 7, 7, Pal.outline);
+    _r(c, x, y, 6, hy, 5, 5, const Color(0xFFF5F7F8));
+    _r(c, x, y, 6, hy - 2, 1, 2, const Color(0xFFE6C88A));
+    _r(c, x, y, 9, hy - 2, 1, 2, const Color(0xFFE6C88A));
+    _r(c, x, y, 8, hy + 1, 1, 1, const Color(0xFF14100E)); // eye
+    _r(c, x, y, 9, hy + 3, 3, 2, const Color(0xFFF48FB1)); // snout
+  }
+
+  void _drawFlourField(Canvas c, FarmProducer farm) {
+    final r = farm.rect;
+    final isOrchard = farm.primaryProduct == SimProductType.apple;
+    final hasMill = !farm.solidBuildingRect.isEmpty;
+
+    // Plowed soil (or orchard green-soil for Elma Tarlası)
+    _wr(c, r, isOrchard ? const Color(0xFF235D2A) : const Color(0xFF4E301B));
+    final furrowLeft = hasMill ? r.left + 120 : r.left + 20;
+    for (double fy = r.top + 28; fy < r.bottom - 20; fy += 24) {
+      _wr(
+        c,
+        Rect.fromLTRB(furrowLeft, fy, r.right - 18, fy + 9),
+        isOrchard ? const Color(0xFF1B4B20) : const Color(0xFF3B2212),
+      );
+      _wr(
+        c,
+        Rect.fromLTRB(furrowLeft, fy - 3, r.right - 18, fy),
+        isOrchard ? const Color(0xFF2E7336) : const Color(0xFF664026),
+      );
+    }
+
+    _drawPixelFence(c, r, farm.gateMinX, farm.gateMaxX);
+
+    // Windmill / Mill building on the left inside the Flour Field
+    final mr = farm.solidBuildingRect;
+    if (!mr.isEmpty) {
+      final mx = _snap(mr.left), my = _snap(mr.top);
+      final gw = (mr.width / kPx).round(), gh = (mr.height / kPx).round();
+      _r(c, mx, my, 1, gh - 1, gw, 3, Pal.shadow);
+      _r(c, mx, my, -1, -1, gw + 2, gh + 2, Pal.outline);
+      _r(c, mx, my, 0, 0, gw, gh, const Color(0xFF8D867A));
+      _r(c, mx, my, 2, 2, gw - 4, gh - 4, const Color(0xFFA8A092));
+      // Roof
+      _r(c, mx, my, -2, -4, gw + 4, 7, Pal.outline);
+      _r(c, mx, my, -1, -3, gw + 2, 5, const Color(0xFF9A4422));
+      // Door
+      _r(c, mx, my, (gw ~/ 2) - 4, gh - 10, 8, 10, Pal.outline);
+      _r(c, mx, my, (gw ~/ 2) - 3, gh - 9, 6, 9, Pal.woodDark);
+      // Rotating pixel windmill blades
+      final hubX = mr.center.dx;
+      final hubY = mr.top + 22;
+      final ang = engine.worldTime * 1.6;
+      for (int b = 0; b < 4; b++) {
+        final a = ang + b * (pi / 2);
+        for (int k = 2; k <= 12; k++) {
+          final bx = _snap(hubX + cos(a) * k * kPx);
+          final by = _snap(hubY + sin(a) * k * kPx);
+          _r(c, bx, by, 0, 0, 2, 2, k > 4 ? const Color(0xFFF5E6C4) : Pal.woodDark);
+        }
+      }
+      _r(c, _snap(hubX), _snap(hubY), -1, -1, 3, 3, const Color(0xFFD9A441));
+    }
+
+    // Crop / orchard spots
+    for (final spot in farm.spots) {
+      _drawPixelWheatSpot(c, spot);
+      _drawSpotBadge(c, spot, 'Çapa Vur', const Color(0xFFF2CF4A));
+    }
+
+    _text(
+      c,
+      '${farm.name.toUpperCase()} (Çapa)  ${farm.readySpotCount}/${farm.spots.length}',
+      r.left + 145,
+      r.top - 14,
+      size: 12,
+      color: const Color(0xFFFDE68A),
+      plate: true,
+    );
+  }
+
+  void _drawPixelWheatSpot(Canvas c, FarmHarvestSpot spot) {
+    final x = _snap(spot.x);
+    final y = _snap(spot.y);
+    final growth = spot.isReady ? 1.0 : (spot.regrowTimer / spot.regrowDuration).clamp(0.15, 0.95);
+    final sway = (sin(engine.worldTime * 3.5 + spot.index) * 1.5).round();
+
+    for (final dx in [-7, -2, 3, 8]) {
+      for (final dy in [-4, 3]) {
+        if (!spot.isReady) {
+          final h = (2 + 4 * growth).round();
+          _r(c, x, y, dx, dy + 2 - h, 2, h, const Color(0xFF4CAF50));
+          continue;
+        }
+        if (spot.productType == SimProductType.tomato) {
+          // 🍅 Domates fidesi
+          _r(c, x, y, dx - 1, dy - 6, 4, 5, Pal.outline);
+          _r(c, x, y, dx, dy - 5, 3, 4, const Color(0xFF2E7D32));
+          _r(c, x, y, dx + sway, dy - 4, 2, 2, const Color(0xFFE53935));
+        } else if (spot.productType == SimProductType.pepper) {
+          // 🌶️ Biber fidesi
+          _r(c, x, y, dx - 1, dy - 6, 4, 5, Pal.outline);
+          _r(c, x, y, dx, dy - 5, 3, 4, const Color(0xFF1B5E20));
+          _r(c, x, y, dx + sway, dy - 4, 1.5, 3, const Color(0xFF66BB6A));
+        } else if (spot.productType == SimProductType.apple) {
+          // 🍎 Bodur Elma Ağacı ve Kırmızı Elmalar
+          _r(c, x, y, dx, dy - 3, 2, 4, Pal.woodDark);
+          _r(c, x, y, dx - 2, dy - 8, 6, 6, Pal.outline);
+          _r(c, x, y, dx - 1, dy - 7, 4, 4, const Color(0xFF2E7D32));
+          _r(c, x, y, dx + sway, dy - 6, 2, 2, const Color(0xFFD32F2F));
+        } else {
+          // 🌾 Altın Buğday / Un Başakları
+          _r(c, x, y, dx, dy - 4, 2, 6, const Color(0xFFB8861E));
+          _r(c, x, y, dx + sway, dy - 8, 3, 5, Pal.outline);
+          _r(c, x, y, dx + sway, dy - 7, 2, 4, const Color(0xFFF2CF4A));
+        }
+      }
+    }
+  }
+
+  void _drawChickenFarm(Canvas c, FarmProducer farm) {
+    final r = farm.rect;
+    // Warm sandy / straw coop yard
+    _wr(c, r, const Color(0xFF7D5A2A));
+    for (double y = r.top + 12; y < r.bottom - 18; y += 24) {
+      for (double x = r.left + 12; x < r.right - 24; x += 36) {
+        if (_hash(x ~/ 18, y ~/ 18) % 2 == 0) {
+          _wr(c, Rect.fromLTWH(x, y, 21, 12), const Color(0xFF8E6732));
+        }
+      }
+    }
+
+    _drawPixelFence(c, r, farm.gateMinX, farm.gateMaxX);
+
+    // Wooden Chicken Coop house on the right
+    final cr = farm.solidBuildingRect;
+    if (!cr.isEmpty) {
+      final cx = _snap(cr.left), cy = _snap(cr.top);
+      final gw = (cr.width / kPx).round(), gh = (cr.height / kPx).round();
+      _r(c, cx, cy, 1, gh - 1, gw, 3, Pal.shadow);
+      _r(c, cx, cy, -1, -1, gw + 2, gh + 2, Pal.outline);
+      _r(c, cx, cy, 0, 0, gw, gh, Pal.wood);
+      _r(c, cx, cy, 0, 0, gw, 5, const Color(0xFFA93226)); // Red coop roof
+      _r(c, cx, cy, 0, 5, gw, 2, const Color(0xFF7B241C));
+      // Coop ramp on the left wall
+      _r(c, cx, cy, -10, gh ~/ 2 - 4, 10, 8, Pal.outline);
+      _r(c, cx, cy, -9, gh ~/ 2 - 3, 9, 6, Pal.woodLight);
+      _r(c, cx, cy, 0, gh ~/ 2 - 5, 4, 9, const Color(0xFF1A1411));
+    }
+
+    // 4 Nests & Chickens
+    for (int i = 0; i < farm.spots.length; i++) {
+      final spot = farm.spots[i];
+      _drawPixelChickenSpot(c, spot, i);
+      _drawSpotBadge(c, spot, 'Yumurta Al', const Color(0xFFFFB74D));
+    }
+
+    _text(
+      c,
+      'TAVUK ÇİFTLİĞİ (Tavuk Kovası)  ${farm.readySpotCount}/${farm.spots.length}',
+      r.right - 155,
+      r.top - 14,
+      size: 12,
+      color: const Color(0xFFFFE082),
+      plate: true,
+    );
+  }
+
+  void _drawPixelChickenSpot(Canvas c, FarmHarvestSpot spot, int index) {
+    final x = _snap(spot.x);
+    final y = _snap(spot.y);
+
+    // Straw nest
+    _r(c, x, y, -5, -2, 10, 6, Pal.outline);
+    _r(c, x, y, -4, -1, 8, 4, const Color(0xFFD9A441));
+    _r(c, x, y, -3, 0, 6, 2, const Color(0xFFF5D061));
+
+    // Eggs in nest
+    final ratio = spot.isReady ? 1.0 : (spot.regrowTimer / spot.regrowDuration).clamp(0.0, 1.0);
+    final eggCount = spot.isReady ? 3 : (ratio * 3).floor();
+    const offs = [-3, 0, 2];
+    for (int e = 0; e < eggCount; e++) {
+      _r(c, x, y, offs[e], -3, 2, 3, Pal.outline);
+      _r(c, x, y, offs[e], -2, 1.5, 2, const Color(0xFFFFF8E1));
+    }
+
+    // Animated pixel chicken next to the nest
+    final phase = engine.worldTime * 4.0 + index * 2.1;
+    final hx = _snap(spot.x - 22 + cos(phase * 0.6) * 5);
+    final hy = _snap(spot.y - 6 + sin(phase) * 2);
+    final peck = sin(engine.worldTime * 7 + index) > 0.4 ? 1 : 0;
+    _r(c, hx, hy, -3, 3, 7, 2, Pal.shadow);
+    _r(c, hx, hy, -4, -3, 8, 6, Pal.outline);
+    _r(c, hx, hy, -3, -2, 6, 4, const Color(0xFFFDFEFE)); // White body
+    _r(c, hx, hy, 1, -5 + peck, 4, 4, Pal.outline);
+    _r(c, hx, hy, 2, -4 + peck, 3, 3, const Color(0xFFFDFEFE)); // Head
+    _r(c, hx, hy, 2, -6 + peck, 2, 2, const Color(0xFFD33A2C)); // Red comb
+    _r(c, hx, hy, 5, -3 + peck, 2, 1, const Color(0xFFF39C12)); // Beak
+    _r(c, hx, hy, 3, -3 + peck, 1, 1, Pal.outline); // Eye
+  }
+
+  void _drawSpotBadge(Canvas c, FarmHarvestSpot spot, String readyText, Color col) {
+    final bx = _snap(spot.x);
+    final by = _snap(spot.y - 34);
+    if (spot.harvestProgress > 0.01) {
+      final frac = spot.harvestProgress.clamp(0.0, 1.0);
+      _r(c, bx - 9 * kPx, by, 0, 0, 18, 4, Pal.outline);
+      _r(c, bx - 9 * kPx, by, 1, 1, 16, 2, const Color(0xFF263238));
+      _r(c, bx - 9 * kPx, by, 1, 1, (16 * frac).round(), 2, const Color(0xFF4ADE80));
+      _text(c, '%${(frac * 100).toInt()}', bx, by - 10, size: 11, color: const Color(0xFF7CFC9A), plate: true);
+    } else if (spot.isReady) {
+      _text(c, readyText, bx, by, size: 10, color: col, plate: true);
+    } else {
+      final frac = (spot.regrowTimer / spot.regrowDuration).clamp(0.0, 1.0);
+      _r(c, bx - 7 * kPx, by, 0, 0, 14, 3, Pal.outline);
+      _r(c, bx - 7 * kPx, by, 1, 1, (12 * frac).round(), 1, const Color(0xFFF2CF4A));
     }
   }
 
   void _paintAlley(Canvas c) {
-    // Delivery truck driving along the back alley
+    // Delivery truck driving along the front street
     if (!engine.isTruckArriving) return;
     final x = _snap(engine.truckX);
-    const y = 1030.0;
+    const y = 92.0;
     // cargo box
     _r(c, x, y, -24, -10, 28, 16, Pal.outline);
     _r(c, x, y, -23, -9, 26, 14, const Color(0xFFD7D2C4));
@@ -476,6 +1067,9 @@ class PixelPainter extends CustomPainter {
       _r(c, x, y, 3, 4, 2, gh - 9, const Color(0x22FFFFFF));
       _r(c, x, y, 7, 4, 1, gh - 9, const Color(0x14FFFFFF));
     }
+    // Animated double cabinet doors (açılıp kapanan çift kanatlı reyon kapıları)
+    _drawShelfDoors(c, s, x, y, gw, gh, isCooler);
+
     if (s.isHovered) {
       _p.color = const Color(0xAAFFFFFF);
       _p.style = PaintingStyle.stroke;
@@ -487,6 +1081,55 @@ class PixelPainter extends CustomPainter {
     final def = productCatalog[s.assignedProduct]!;
     _text(c, '${def.name}  ${s.currentStock}/${s.maxCapacity}', r.center.dx, r.top - 9,
         size: 9, color: s.currentStock == 0 ? const Color(0xFFFF8A80) : Colors.white, plate: true);
+  }
+
+  /// Draws animated double glass doors with handles on every unlocked shelf using `s.doorOpenProgress`.
+  void _drawShelfDoors(Canvas c, StoreShelf s, double x, double y, int gw, int gh, bool isCooler) {
+    final openT = s.doorOpenProgress.clamp(0.0, 1.0);
+    final innerW = gw - 4;
+    final innerH = gh - 6;
+    final halfW = innerW / 2.0;
+
+    final doorBorder = isCooler ? const Color(0xFF5B7A92) : const Color(0xFFB07A45);
+    final doorGlass = isCooler ? const Color(0x2E80D8FF) : const Color(0x24FFE0B2);
+    final handleCol = isCooler ? const Color(0xFFECEFF1) : const Color(0xFFF2CF4A);
+
+    // As openT goes 0 -> 1, each door wing swings outward to its hinge side and foreshortens
+    final closedFrac = (1.0 - openT * 0.72).clamp(0.28, 1.0);
+    final wingW = max(3, (halfW * closedFrac).round());
+    final swingOut = (openT * 4).round();
+    final handleH = max(4, (innerH * 0.24).round());
+    final handleY = 3 + ((innerH - handleH) ~/ 2);
+
+    // Left door wing (hinged at left x + 2)
+    final leftX = 2 - swingOut;
+    _r(c, x, y, leftX, 3, wingW, innerH, doorGlass);
+    _r(c, x, y, leftX, 3, wingW, 1, doorBorder);
+    _r(c, x, y, leftX, 3 + innerH - 1, wingW, 1, doorBorder);
+    _r(c, x, y, leftX, 3, 1, innerH, doorBorder);
+    _r(c, x, y, leftX + wingW - 1, 3, 1, innerH, Pal.outline);
+    // Left door glass reflection + handle
+    if (wingW > 5) {
+      _r(c, x, y, leftX + 2, 5, 1, innerH - 4, const Color(0x33FFFFFF));
+    }
+    final leftHandleX = leftX + max(1, wingW - 3);
+    _r(c, x, y, leftHandleX - 0.5, handleY - 0.5, 2, handleH + 1, Pal.outline);
+    _r(c, x, y, leftHandleX, handleY, 1, handleH, handleCol);
+
+    // Right door wing (hinged at right x + gw - 2)
+    final rightX = (gw - 2) - wingW + swingOut;
+    _r(c, x, y, rightX, 3, wingW, innerH, doorGlass);
+    _r(c, x, y, rightX, 3, wingW, 1, doorBorder);
+    _r(c, x, y, rightX, 3 + innerH - 1, wingW, 1, doorBorder);
+    _r(c, x, y, rightX + wingW - 1, 3, 1, innerH, doorBorder);
+    _r(c, x, y, rightX, 3, 1, innerH, Pal.outline);
+    // Right door glass reflection + handle
+    if (wingW > 5) {
+      _r(c, x, y, rightX + wingW - 3, 5, 1, innerH - 4, const Color(0x33FFFFFF));
+    }
+    final rightHandleX = rightX + 1;
+    _r(c, x, y, rightHandleX - 0.5, handleY - 0.5, 2, handleH + 1, Pal.outline);
+    _r(c, x, y, rightHandleX, handleY, 1, handleH, handleCol);
   }
 
   void _drawCheckout(Canvas c, Rect r, int index) {
@@ -760,16 +1403,162 @@ class PixelPainter extends CustomPainter {
         pants: const Color(0xFF1F2733),
         hair: const Color(0xFF2A1D16),
         hat: null);
+    if (engine.playerTool != null) {
+      _drawHeldTool(
+        c,
+        px,
+        py,
+        engine.playerFacing,
+        engine.playerTool!,
+        engine.playerActionAnimTimer,
+        engine.activeHarvestSpot != null,
+      );
+      if (engine.carriedBox == null) {
+        _text(c, engine.playerTool!.name, px, py - 92, size: 11, color: const Color(0xFFFDE68A), plate: true);
+      }
+    }
     if (engine.carriedBox != null) {
       final b = engine.carriedBox!;
-      final bx = _snap(px) - 5 * kPx;
-      final by = _snap(py) - 27 * kPx;
-      _r(c, bx, by, -1, 0, 12, 9, Pal.outline);
-      _r(c, bx, by, 0, 1, 10, 7, b.isCourierPackage ? const Color(0xFFE8D6A0) : const Color(0xFFB98A55));
-      _icon(c, b.productType, bx + 2.5 * kPx, by + 2 * kPx);
-      _text(c, '${b.currentCount}/${b.maxCount}', px, py - 92, size: 9);
+      _drawCarriedLoad(c, px, py, b);
     }
     _drawStick(c, px, py);
+  }
+
+  /// Draws either a farm bucket (only while inside the farm) or a product box/sack once outside the farm.
+  void _drawCarriedLoad(Canvas c, double px, double py, CarriedBox b, {bool showLabel = true}) {
+    final bx = _snap(px) - 5 * kPx;
+    final by = _snap(py) - 27 * kPx;
+    final insideFarm = engine.farmProducers.any((f) => f.rect.inflate(10).contains(Offset(px, py)));
+    if (insideFarm && b.isFromFarm && b.productType == SimProductType.milk) {
+      // Çiftliğin içindeyken Süt Kovası
+      _drawPixelMilkBucket(c, _snap(px), by + 4 * kPx, hasMilk: true);
+      if (showLabel) {
+        _text(c, 'Süt Kovası ${b.currentCount}/${b.maxCount}', px, py - 94, size: 11, color: const Color(0xFF9AD7FF), plate: true);
+      }
+      return;
+    }
+    if (insideFarm && b.isFromFarm && b.productType == SimProductType.egg) {
+      // Çiftliğin içindeyken Tavuk Kovası
+      _drawPixelEggBucket(c, _snap(px), by + 4 * kPx, hasEggs: true);
+      if (showLabel) {
+        _text(c, 'Tavuk Kovası ${b.currentCount}/${b.maxCount}', px, py - 94, size: 11, color: const Color(0xFFFFE082), plate: true);
+      }
+      return;
+    }
+    if (b.isFromFarm && b.productType == SimProductType.flour) {
+      // Hasat edilen Un Çuvalı
+      _r(c, bx, by, 0, 0, 10, 9, Pal.outline);
+      _r(c, bx, by, 1, 1, 8, 7, const Color(0xFFE6D6B5));
+      _r(c, bx, by, 2, 0, 6, 2, const Color(0xFFB89E6E));
+      _r(c, bx, by, 2, 2, 6, 1, const Color(0xFF8A5220));
+      _icon(c, SimProductType.flour, bx + 2.5 * kPx, by + 2.5 * kPx);
+      if (showLabel) {
+        _text(c, 'Un ${b.currentCount}/${b.maxCount}', px, py - 94, size: 11, color: const Color(0xFFFDE68A), plate: true);
+      }
+      return;
+    }
+    _r(c, bx, by, -1, 0, 12, 9, Pal.outline);
+    _r(c, bx, by, 0, 1, 10, 7, b.isCourierPackage ? const Color(0xFFE8D6A0) : const Color(0xFFB98A55));
+    _icon(c, b.productType, bx + 2.5 * kPx, by + 2 * kPx);
+    if (showLabel) {
+      _text(c, '${b.currentCount}/${b.maxCount}', px, py - 92, size: 9);
+    }
+  }
+
+  /// Draws the equipped farm tool (Süt Kovası, Çapa, Tavuk Kovası) directly in the character's hand.
+  void _drawHeldTool(
+    Canvas c,
+    double px,
+    double py,
+    int facing,
+    FarmToolType tool,
+    double animTimer,
+    bool isHarvesting,
+  ) {
+    final dir = facing == 1 ? -1.0 : 1.0;
+    final hx = _snap(px) + dir * 7 * kPx;
+    final hy = _snap(py) - 2 * kPx;
+
+    switch (tool) {
+      case FarmToolType.scythe:
+        // ⛏️ ÇAPA (Hoe for Flour Field / Un Tarlası)
+        final swing = isHarvesting ? sin(animTimer * 1.3) * 4 * kPx : 0.0;
+        final tipY = hy - 7 * kPx + swing;
+        // Wooden handle from hand up/outward
+        for (int i = 0; i < 7; i++) {
+          final sx = hx + dir * (i * 0.9) * kPx;
+          final sy = hy + (2 - i) * kPx + (swing * i / 7);
+          _r(c, _snap(sx), _snap(sy), 0, 0, 2, 2, Pal.outline);
+          _r(c, _snap(sx), _snap(sy), 0, 0, 1.5, 1.5, const Color(0xFF9B6A32));
+        }
+        // Angled steel hoe blade (Çapa demiri)
+        final bx = _snap(hx + dir * 5.5 * kPx);
+        final by = _snap(tipY);
+        _r(c, bx, by, dir > 0 ? -1 : -3, 0, 5, 6, Pal.outline);
+        _r(c, bx, by, dir > 0 ? 0 : -2, 1, 3, 4, const Color(0xFFB0BEC5));
+        _r(c, bx, by, dir > 0 ? 1 : -2, 4, 2, 1, const Color(0xFFECEFF1));
+        break;
+
+      case FarmToolType.milkBucket:
+        // 🪣 SÜT KOVASI (Milk Bucket held in hand)
+        final bob = isHarvesting ? sin(animTimer * 1.2) * 1.5 * kPx : 0.0;
+        _drawPixelMilkBucket(c, hx + dir * 2 * kPx, _snap(hy + 2 * kPx + bob), hasMilk: isHarvesting);
+        break;
+
+      case FarmToolType.eggBucket:
+        // 🪣 TAVUK KOVASI (Chicken / Egg Bucket held in hand)
+        final bob = isHarvesting ? sin(animTimer * 1.2) * 1.5 * kPx : 0.0;
+        _drawPixelEggBucket(c, hx + dir * 2 * kPx, _snap(hy + 2 * kPx + bob), hasEggs: isHarvesting);
+        break;
+    }
+  }
+
+  void _drawPixelMilkBucket(Canvas c, double wx, double wy, {bool hasMilk = false}) {
+    final x = _snap(wx);
+    final y = _snap(wy);
+    // Handle arch
+    _r(c, x, y, -3, -5, 6, 1, const Color(0xFFCFD8DC));
+    _r(c, x, y, -4, -4, 1, 2, const Color(0xFF90A4AE));
+    _r(c, x, y, 3, -4, 1, 2, const Color(0xFF90A4AE));
+    // Bucket body
+    _r(c, x, y, -4, -3, 8, 7, Pal.outline);
+    _r(c, x, y, -3, -2, 6, 5, const Color(0xFF2980B9));
+    _r(c, x, y, -3, -2, 2, 5, const Color(0xFF5DADE2));
+    // Top rim / milk inside
+    _r(c, x, y, -3, -2, 6, 2, hasMilk ? const Color(0xFFFDFEFE) : const Color(0xFF1B4F72));
+  }
+
+  void _drawPixelEggBucket(Canvas c, double wx, double wy, {bool hasEggs = false}) {
+    final x = _snap(wx);
+    final y = _snap(wy);
+    // Handle arch
+    _r(c, x, y, -3, -5, 6, 1, const Color(0xFF8A5220));
+    _r(c, x, y, -4, -4, 1, 2, const Color(0xFF6B4423));
+    _r(c, x, y, 3, -4, 1, 2, const Color(0xFF6B4423));
+    // Bucket body (warm golden chicken bucket with red chicken crest)
+    _r(c, x, y, -4, -3, 8, 7, Pal.outline);
+    _r(c, x, y, -3, -2, 6, 5, const Color(0xFFE69A28));
+    _r(c, x, y, -3, -2, 2, 5, const Color(0xFFF5B945));
+    _r(c, x, y, -1, 0, 2, 2, const Color(0xFFD33A2C)); // little chicken crest emblem
+    if (hasEggs) {
+      _r(c, x, y, -3, -3, 2, 2, const Color(0xFFFFF8E1));
+      _r(c, x, y, 0, -3, 3, 2, const Color(0xFFF5E6C4));
+    } else {
+      _r(c, x, y, -3, -2, 6, 1, const Color(0xFF784212));
+    }
+  }
+
+  void _drawPixelHoeIcon(Canvas c, double wx, double wy) {
+    final x = _snap(wx);
+    final y = _snap(wy);
+    // Angled wooden handle + steel hoe head
+    for (int i = -3; i <= 3; i++) {
+      _r(c, x, y, i - 1, -i, 2, 2, Pal.outline);
+      _r(c, x, y, i, -i, 1, 1, const Color(0xFF9B6A32));
+    }
+    _r(c, x, y, 2, -4, 5, 5, Pal.outline);
+    _r(c, x, y, 3, -3, 3, 3, const Color(0xFFCFD8DC));
+    _r(c, x, y, 4, -1, 2, 1, Colors.white);
   }
 
   void _drawStick(Canvas c, double px, double py) {
@@ -922,12 +1711,11 @@ class PixelPainter extends CustomPainter {
         hair: const Color(0xFFD08A2E),
         hat: const Color(0xFFE0A020));
     _text(c, 'STOCKER', _snap(w.x), _snap(w.y) - 31 * kPx - 4, size: 12, color: const Color(0xFFFFD27A), plate: true);
+    if (w.equippedTool != null) {
+      _drawHeldTool(c, w.x, w.y, 2, w.equippedTool!, w.actionAnimTimer, w.actionAnimTimer > 0);
+    }
     if (w.carriedBox != null) {
-      final bx = _snap(w.x) - 5 * kPx;
-      final by = _snap(w.y) - 27 * kPx;
-      _r(c, bx, by, -1, 0, 12, 9, Pal.outline);
-      _r(c, bx, by, 0, 1, 10, 7, const Color(0xFFB98A55));
-      _icon(c, w.carriedBox!.productType, bx + 2.5 * kPx, by + 2 * kPx);
+      _drawCarriedLoad(c, w.x, w.y, w.carriedBox!, showLabel: false);
     }
   }
 
@@ -944,19 +1732,33 @@ class PixelPainter extends CustomPainter {
   }
 
   void _paintLockedFloorPlates(Canvas c) {
-    // closed shelves (whose area is already open) show an outlined floor plate
+    // Reyonlar açılmadığı sürece raf çizilmez; sadece kilit işareti ve adları görünür!
     for (final s in engine.shelves) {
-      if (s.isUnlocked || engine.storeLevel < s.zoneLevel) continue;
+      if (s.isUnlocked) continue;
       final r = s.rect;
-      _p.color = const Color(0x55FBBF24);
-      _p.style = PaintingStyle.stroke;
-      _p.strokeWidth = kPx;
-      c.drawRect(Rect.fromLTWH(_snap(r.left), _snap(r.top), _snap(r.width), _snap(r.height)), _p);
-      _p.style = PaintingStyle.fill;
-      final def = productCatalog[s.assignedProduct]!;
-      _icon(c, s.assignedProduct, _snap(r.center.dx) - 2.5 * kPx, _snap(r.center.dy) - 14);
-      _text(c, def.name, r.center.dx, r.center.dy + 6, size: 9, color: const Color(0xFFFDE68A));
-      _text(c, engine.shelfLockReason(s), r.center.dx, r.center.dy + 20, size: 9, color: const Color(0xFFFFFFFF));
+      final cx = _snap(r.center.dx);
+      final cy = _snap(r.center.dy);
+      final canOpenNow = engine.storeLevel >= s.zoneLevel;
+
+      _drawPixelLock(c, cx - 86, cy - 14, unlocked: canOpenNow);
+      _text(
+        c,
+        s.name,
+        cx + 8,
+        cy - 4,
+        size: 13,
+        color: s.isHovered ? Colors.white : const Color(0xFFFDE68A),
+        plate: true,
+      );
+      _text(
+        c,
+        engine.shelfLockReason(s),
+        cx,
+        cy + 16,
+        size: 11,
+        color: canOpenNow ? const Color(0xFF7CFC9A) : const Color(0xFFCFD8DC),
+        plate: true,
+      );
     }
     for (int i = engine.unlockedCheckoutCount; i < engine.checkoutCounters.length; i++) {
       final r = engine.checkoutCounters[i];
@@ -974,7 +1776,7 @@ class PixelPainter extends CustomPainter {
       if (engine.storeMaxX < engine.worldWidth - 95) Rect.fromLTRB(engine.storeMaxX, top, engine.worldWidth, bottom),
     ];
     for (final z in zones) {
-      _wr(c, z, const Color(0xE60B0F18));
+      _wr(c, z, const Color(0xBF0B0F18));
       for (double y = z.top; y < z.bottom; y += 36) {
         for (double x = z.left + ((y / 36).floor() % 2) * 18; x < z.right; x += 36) {
           _wr(c, Rect.fromLTWH(x, y, 9, 9), const Color(0x14FBBF24));
@@ -986,7 +1788,7 @@ class PixelPainter extends CustomPainter {
         _wr(c, Rect.fromLTWH(edgeX - 3, y, 12, 12), const Color(0xFF6B4423));
       }
       final cx = z.center.dx;
-      final cy = (z.top + z.bottom) / 2;
+      const cy = 415.0;
       _text(c, 'LOCKED AREA', cx, cy - 20, size: 14);
       if (engine.storeLevel < 3) {
         _text(c, 'Expand the store via Manager', cx, cy + 2, size: 10, color: const Color(0xFFFDE68A));

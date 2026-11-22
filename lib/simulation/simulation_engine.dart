@@ -15,9 +15,9 @@ class SimulationEngine with ChangeNotifier {
   bool hasRestocker = false;
   bool isRestockerHired = false;
 
-  // DEVAASA HARİTA BOYUTLARI (2000 x 1900 - Geniş Cadde + Büyük Market + 2 Sıralı Devasa Arka Çiftlik Vadisi)
+  // DEVAASA HARİTA BOYUTLARI (2000 x 1880 - Geniş Cadde + Büyük Market + 2 Sıralı Arka Bahçe Çiftlik Vadisi)
   final double worldWidth = 2000;
-  final double worldHeight = 1060;
+  final double worldHeight = 1880;
 
   // Kamera Takip & Yakınlaştırma (WASD ile hareket ettikçe oyuncuyu yumuşakça takip eder)
   double cameraX = 1000;
@@ -214,109 +214,251 @@ class SimulationEngine with ChangeNotifier {
       // open one by one as the days pass (see unlockDay / zoneLevel).
       StoreShelf(
         id: 'shelf_milk',
-        name: 'Fresh Village Milk Cabinet',
+        name: 'Taze Süt Dolabı',
         assignedProduct: SimProductType.milk,
         rect: const Rect.fromLTWH(540, 540, 145, 175),
         currentStock: 12,
         maxCapacity: 16,
         isUnlocked: true,
+        unlockCost: 0,
         unlockDay: 1,
         zoneLevel: 1,
       ),
       StoreShelf(
         id: 'shelf_flour',
-        name: 'Natural Mill Flour',
+        name: 'Doğal Un Reyonu',
         assignedProduct: SimProductType.flour,
         rect: const Rect.fromLTWH(1150, 560, 210, 120),
-        currentStock: 0,
+        currentStock: 12,
         maxCapacity: 16,
-        isUnlocked: false,
-        unlockDay: 2,
+        isUnlocked: true,
+        unlockCost: 0,
+        unlockDay: 1,
         zoneLevel: 1,
       ),
       StoreShelf(
         id: 'shelf_egg',
-        name: 'Fresh Egg Shelf',
+        name: 'Köy Yumurtası Reyonu',
         assignedProduct: SimProductType.egg,
         rect: const Rect.fromLTWH(540, 780, 155, 155),
-        currentStock: 0,
+        currentStock: 12,
         maxCapacity: 16,
-        isUnlocked: false,
-        unlockDay: 3,
+        isUnlocked: true,
+        unlockCost: 0,
+        unlockDay: 1,
         zoneLevel: 1,
       ),
-      StoreShelf(
-        id: 'shelf_bread',
-        name: 'Bakery Bread Shelf',
-        assignedProduct: SimProductType.bread,
-        rect: const Rect.fromLTWH(1150, 770, 210, 115),
-        currentStock: 0,
-        maxCapacity: 16,
-        isUnlocked: false,
-        unlockDay: 4,
-        zoneLevel: 1,
-      ),
+      // Seviye arttıkça açılabilen 3 ek reyon (açılana kadar sadece adları görünür!)
       StoreShelf(
         id: 'shelf_tomato',
-        name: 'Tomato Stand',
+        name: 'Domates Reyonu',
         assignedProduct: SimProductType.tomato,
-        rect: const Rect.fromLTWH(310, 560, 180, 125),
+        rect: const Rect.fromLTWH(1150, 770, 210, 120),
         currentStock: 0,
         maxCapacity: 16,
         isUnlocked: false,
-        unlockDay: 5,
+        unlockCost: 120,
+        unlockDay: 1,
         zoneLevel: 2,
       ),
       StoreShelf(
         id: 'shelf_pepper',
-        name: 'Pepper Stand',
+        name: 'Biber Reyonu',
         assignedProduct: SimProductType.pepper,
-        rect: const Rect.fromLTWH(1510, 560, 180, 120),
+        rect: const Rect.fromLTWH(310, 560, 180, 125),
         currentStock: 0,
         maxCapacity: 16,
         isUnlocked: false,
-        unlockDay: 6,
+        unlockCost: 160,
+        unlockDay: 1,
         zoneLevel: 2,
       ),
       StoreShelf(
         id: 'shelf_apple',
-        name: 'Apple Stand',
+        name: 'Elma Reyonu',
         assignedProduct: SimProductType.apple,
-        rect: const Rect.fromLTWH(110, 560, 180, 125),
+        rect: const Rect.fromLTWH(1510, 560, 180, 125),
         currentStock: 0,
         maxCapacity: 16,
         isUnlocked: false,
-        unlockDay: 7,
-        zoneLevel: 3,
-      ),
-      StoreShelf(
-        id: 'shelf_cheese',
-        name: 'Cheese Cabinet',
-        assignedProduct: SimProductType.cheese,
-        rect: const Rect.fromLTWH(1710, 560, 180, 120),
-        currentStock: 0,
-        maxCapacity: 16,
-        isUnlocked: false,
-        unlockDay: 8,
+        unlockCost: 220,
+        unlockDay: 1,
         zoneLevel: 3,
       ),
     ];
 
-    // The farm is scrapped for now.
-    farmProducers = [];
+    // Arka Bahçe Çiftlikleri:
+    // 1. Sıra (Başlangıçta Açık): İnek Çiftliği (Süt Kovası), Un Tarlası (Çapa), Tavuk Çiftliği (Tavuk Kovası)
+    // 2. Sıra (Seviye Artınca Açılan 3 Kilitli Tarla): Domates Tarlası, Biber Tarlası, Elma Tarlası
+    farmProducers = [
+      FarmProducer(
+        id: 'farm_barn',
+        name: 'İnek Çiftliği',
+        emoji: '🐄',
+        zoneType: FarmZoneType.barn,
+        rect: const Rect.fromLTWH(140, 1160, 440, 290),
+        solidBuildingRect: Rect.zero,
+        gateMinX: 310,
+        gateMaxX: 420,
+        toolStandPos: const Offset(255, 1126),
+        requiredTool: FarmToolType.milkBucket,
+        primaryProduct: SimProductType.milk,
+        isUnlocked: true,
+        spots: [
+          FarmHarvestSpot(id: 'cow_0', index: 0, x: 215, y: 1248, productType: SimProductType.milk, regrowDuration: 5.2),
+          FarmHarvestSpot(id: 'cow_1', index: 1, x: 465, y: 1255, productType: SimProductType.milk, regrowDuration: 6.4),
+          FarmHarvestSpot(id: 'cow_2', index: 2, x: 230, y: 1372, productType: SimProductType.milk, regrowDuration: 7.6),
+          FarmHarvestSpot(id: 'cow_3', index: 3, x: 475, y: 1378, productType: SimProductType.milk, regrowDuration: 8.8),
+        ],
+        readyBoxes: 4,
+        maxBoxes: 4,
+        productionDuration: 6.5,
+      ),
+      FarmProducer(
+        id: 'farm_field',
+        name: 'Un Tarlası',
+        emoji: '🌾',
+        zoneType: FarmZoneType.field,
+        rect: const Rect.fromLTWH(780, 1160, 440, 290),
+        solidBuildingRect: const Rect.fromLTWH(805, 1245, 88, 102),
+        gateMinX: 995,
+        gateMaxX: 1105,
+        toolStandPos: const Offset(945, 1126),
+        requiredTool: FarmToolType.scythe,
+        primaryProduct: SimProductType.flour,
+        isUnlocked: true,
+        spots: [
+          FarmHarvestSpot(id: 'crop_0', index: 0, x: 960, y: 1242, productType: SimProductType.flour, regrowDuration: 4.8),
+          FarmHarvestSpot(id: 'crop_1', index: 1, x: 1062, y: 1248, productType: SimProductType.flour, regrowDuration: 5.7),
+          FarmHarvestSpot(id: 'crop_2', index: 2, x: 1162, y: 1242, productType: SimProductType.flour, regrowDuration: 6.6),
+          FarmHarvestSpot(id: 'crop_3', index: 3, x: 960, y: 1362, productType: SimProductType.flour, regrowDuration: 7.5),
+          FarmHarvestSpot(id: 'crop_4', index: 4, x: 1062, y: 1368, productType: SimProductType.flour, regrowDuration: 8.4),
+          FarmHarvestSpot(id: 'crop_5', index: 5, x: 1162, y: 1362, productType: SimProductType.flour, regrowDuration: 9.2),
+        ],
+        readyBoxes: 6,
+        maxBoxes: 6,
+        productionDuration: 6.0,
+      ),
+      FarmProducer(
+        id: 'farm_coop',
+        name: 'Tavuk Çiftliği',
+        emoji: '🐔',
+        zoneType: FarmZoneType.coop,
+        rect: const Rect.fromLTWH(1420, 1160, 440, 290),
+        solidBuildingRect: const Rect.fromLTWH(1700, 1205, 140, 205),
+        gateMinX: 1500,
+        gateMaxX: 1605,
+        toolStandPos: const Offset(1455, 1126),
+        requiredTool: FarmToolType.eggBucket,
+        primaryProduct: SimProductType.egg,
+        isUnlocked: true,
+        spots: [
+          FarmHarvestSpot(id: 'nest_0', index: 0, x: 1475, y: 1242, productType: SimProductType.egg, regrowDuration: 4.5),
+          FarmHarvestSpot(id: 'nest_1', index: 1, x: 1615, y: 1255, productType: SimProductType.egg, regrowDuration: 5.8),
+          FarmHarvestSpot(id: 'nest_2', index: 2, x: 1480, y: 1368, productType: SimProductType.egg, regrowDuration: 7.1),
+          FarmHarvestSpot(id: 'nest_3', index: 3, x: 1620, y: 1380, productType: SimProductType.egg, regrowDuration: 8.4),
+        ],
+        readyBoxes: 4,
+        maxBoxes: 4,
+        productionDuration: 5.5,
+      ),
+      // 2. Sıra: Seviye arttıkça açılan 3 kilitli tarla (Domates, Biber, Elma)
+      FarmProducer(
+        id: 'farm_tomato',
+        name: 'Domates Tarlası',
+        emoji: '🍅',
+        zoneType: FarmZoneType.field,
+        rect: const Rect.fromLTWH(140, 1555, 440, 265),
+        solidBuildingRect: Rect.zero,
+        gateMinX: 310,
+        gateMaxX: 420,
+        toolStandPos: const Offset(255, 1522),
+        requiredTool: FarmToolType.scythe,
+        primaryProduct: SimProductType.tomato,
+        isUnlocked: false,
+        spots: [
+          FarmHarvestSpot(id: 'tom_0', index: 0, x: 245, y: 1640, productType: SimProductType.tomato, regrowDuration: 5.5),
+          FarmHarvestSpot(id: 'tom_1', index: 1, x: 455, y: 1640, productType: SimProductType.tomato, regrowDuration: 5.5),
+          FarmHarvestSpot(id: 'tom_2', index: 2, x: 245, y: 1745, productType: SimProductType.tomato, regrowDuration: 5.5),
+          FarmHarvestSpot(id: 'tom_3', index: 3, x: 455, y: 1745, productType: SimProductType.tomato, regrowDuration: 5.5),
+        ],
+        readyBoxes: 4,
+        maxBoxes: 4,
+        productionDuration: 5.5,
+      ),
+      FarmProducer(
+        id: 'farm_pepper',
+        name: 'Biber Tarlası',
+        emoji: '🌶️',
+        zoneType: FarmZoneType.field,
+        rect: const Rect.fromLTWH(780, 1555, 440, 265),
+        solidBuildingRect: Rect.zero,
+        gateMinX: 995,
+        gateMaxX: 1105,
+        toolStandPos: const Offset(945, 1522),
+        requiredTool: FarmToolType.scythe,
+        primaryProduct: SimProductType.pepper,
+        isUnlocked: false,
+        spots: [
+          FarmHarvestSpot(id: 'pep_0', index: 0, x: 885, y: 1640, productType: SimProductType.pepper, regrowDuration: 5.5),
+          FarmHarvestSpot(id: 'pep_1', index: 1, x: 1095, y: 1640, productType: SimProductType.pepper, regrowDuration: 5.5),
+          FarmHarvestSpot(id: 'pep_2', index: 2, x: 885, y: 1745, productType: SimProductType.pepper, regrowDuration: 5.5),
+          FarmHarvestSpot(id: 'pep_3', index: 3, x: 1095, y: 1745, productType: SimProductType.pepper, regrowDuration: 5.5),
+        ],
+        readyBoxes: 4,
+        maxBoxes: 4,
+        productionDuration: 5.5,
+      ),
+      FarmProducer(
+        id: 'farm_apple',
+        name: 'Elma Tarlası',
+        emoji: '🍎',
+        zoneType: FarmZoneType.field,
+        rect: const Rect.fromLTWH(1420, 1555, 440, 265),
+        solidBuildingRect: Rect.zero,
+        gateMinX: 1500,
+        gateMaxX: 1605,
+        toolStandPos: const Offset(1455, 1522),
+        requiredTool: FarmToolType.scythe,
+        primaryProduct: SimProductType.apple,
+        isUnlocked: false,
+        spots: [
+          FarmHarvestSpot(id: 'app_0', index: 0, x: 1525, y: 1640, productType: SimProductType.apple, regrowDuration: 5.5),
+          FarmHarvestSpot(id: 'app_1', index: 1, x: 1735, y: 1640, productType: SimProductType.apple, regrowDuration: 5.5),
+          FarmHarvestSpot(id: 'app_2', index: 2, x: 1525, y: 1745, productType: SimProductType.apple, regrowDuration: 5.5),
+          FarmHarvestSpot(id: 'app_3', index: 3, x: 1735, y: 1745, productType: SimProductType.apple, regrowDuration: 5.5),
+        ],
+        readyBoxes: 4,
+        maxBoxes: 4,
+        productionDuration: 5.5,
+      ),
+    ];
+  }
+
+  StoreShelf? shelfForProduct(SimProductType t) {
+    for (final s in shelves) {
+      if (s.assignedProduct == t) return s;
+    }
+    return null;
+  }
+
+  FarmProducer? farmForProduct(SimProductType t) {
+    for (final f in farmProducers) {
+      if (f.primaryProduct == t) return f;
+    }
+    return null;
   }
 
   List<SimProductType> get unlockedProducts {
     return shelves.where((s) => s.isUnlocked).map((s) => s.assignedProduct).toList();
   }
 
-  /// Opens every shelf whose day has come and whose area of the store is open.
-  /// Returns the names of the products that were opened.
+  /// Opens every free shelf whose day/level has come; paid shelves wait for the player to unlock them.
   List<String> refreshShelfUnlocks() {
     final opened = <String>[];
     for (final s in shelves) {
       if (s.isUnlocked) continue;
-      if (day >= s.unlockDay && storeLevel >= s.zoneLevel) {
+      if (s.unlockCost <= 0 && day >= s.unlockDay && storeLevel >= s.zoneLevel) {
         if (unlockShelf(s)) {
           final def = productCatalog[s.assignedProduct]!;
           opened.add('${def.emoji} ${def.name}');
@@ -326,11 +468,41 @@ class SimulationEngine with ChangeNotifier {
     return opened;
   }
 
-  /// Short text explaining why a shelf is still closed.
+  /// Short text explaining why a shelf / field is still closed or how to unlock it.
   String shelfLockReason(StoreShelf s) {
-    if (day < s.unlockDay) return 'Opens on Day ${s.unlockDay}';
-    if (storeLevel < s.zoneLevel) return 'Needs Store Level ${s.zoneLevel}';
-    return 'Opening soon';
+    if (storeLevel < s.zoneLevel) return 'Seviye ${s.zoneLevel} Gerekli';
+    if (day < s.unlockDay) return 'Gün ${s.unlockDay} Gerekli';
+    if (s.unlockCost > 0) return 'Açmak İçin Tıkla (\$${s.unlockCost.toInt()})';
+    return 'Açmak İçin Tıkla';
+  }
+
+  bool tryUnlockShelfOrFarm(StoreShelf shelf, {Offset? feedbackPos}) {
+    final pos = feedbackPos ?? shelf.rect.center;
+    if (shelf.isUnlocked) return true;
+    if (storeLevel < shelf.zoneLevel) {
+      _sfx('error');
+      spawnParticle(
+        pos.dx,
+        pos.dy - 14,
+        '🔒 Seviye ${shelf.zoneLevel} Gerekli! (Yöneticiden Marketi Yükselt)',
+        Colors.orangeAccent,
+        size: 15,
+      );
+      return false;
+    }
+    if (cash < shelf.unlockCost) {
+      _sfx('error');
+      spawnParticle(
+        pos.dx,
+        pos.dy - 14,
+        '⚠️ Açmak için \$${shelf.unlockCost.toInt()} gerekli!',
+        Colors.redAccent,
+        size: 15,
+      );
+      return false;
+    }
+    _sfx('cash');
+    return unlockShelf(shelf);
   }
 
   bool unlockShelf(StoreShelf shelf) {
@@ -426,12 +598,11 @@ class SimulationEngine with ChangeNotifier {
       shelf.isHovered = shelf.rect.inflate(10).contains(mousePos);
     }
     for (var farm in farmProducers) {
+      farm.isHovered = farm.rect.inflate(12).contains(mousePos);
       if (!farm.isUnlocked) {
-        farm.isHovered = false;
         farm.isToolStandHovered = false;
         continue;
       }
-      farm.isHovered = farm.rect.inflate(12).contains(mousePos);
       farm.isToolStandHovered = (farm.toolStandPos - mousePos).distance < 42;
     }
     for (var box in deliveryBoxes) {
@@ -686,6 +857,10 @@ class SimulationEngine with ChangeNotifier {
           s.currentStock = ((d['stock'] as num?)?.toInt() ?? 0).clamp(0, s.maxCapacity);
         }
       }
+    }
+    for (final f in farmProducers) {
+      final s = shelfForProduct(f.primaryProduct);
+      if (s != null) f.isUnlocked = s.isUnlocked;
     }
     phase = DayPhase.day;
     phaseTimer = 0.0;
@@ -1238,33 +1413,29 @@ class SimulationEngine with ChangeNotifier {
   // Çiftlikten çıkınca Tırpan ve Kova otomatik bırakılır!
   // ===============================================================
 
-  /// Oyuncu alet standından Kova veya Tırpan alır
+  /// Oyuncu alet standından Kova veya Çapa alır
   void equipToolFromStand(FarmProducer farm) {
     playerTool = farm.requiredTool;
+    _sfx('pickup');
     spawnParticle(
       playerX,
       playerY - 38,
-      '${farm.requiredTool.emoji} ${farm.requiredTool.name} Picked Up!',
+      '${farm.requiredTool.emoji} ${farm.requiredTool.name} Alındı!',
       Colors.amberAccent,
       size: 16,
     );
     notifyListeners();
   }
 
-  /// Tıklanan veya [E] basılan çiftlik alanında önce Kova/Tırpan alıp sonra içeri girerek toplama başlatır
+  /// Tıklanan veya [E] basılan çiftlik alanında: kilitliyse seviye yetiyorsa açar, açıksa ekipmanı alıp toplama başlatır
   void handleFarmZoneOrToolClick(FarmProducer farm, Offset clickWorldPos) {
-    if (!farm.isUnlocked) return;
-    if ((clickWorldPos - farm.toolStandPos).distance < 48) {
-      if ((Offset(playerX, playerY) - farm.toolStandPos).distance < 75) {
-        equipToolFromStand(farm);
-      } else {
-        pendingAutoFarmId = farm.id;
-        _pendingToolOnly = true;
-        setTargetMove(farm.toolStandPos.dx, farm.toolStandPos.dy + 12, clearPendingFarm: false);
+    if (!farm.isUnlocked) {
+      final shelf = shelfForProduct(farm.primaryProduct);
+      if (shelf != null) {
+        tryUnlockShelfOrFarm(shelf, feedbackPos: farm.rect.center);
       }
       return;
     }
-
     startAutoFarmHarvest(farm, preferredPos: clickWorldPos);
   }
 
@@ -1396,29 +1567,44 @@ class SimulationEngine with ChangeNotifier {
       }
     }
 
-    // 2. SÜT KOVASI / YUMURTA KOVASI / TIRPAN ARKA BAHÇEDE YÜRÜRKEN ELİMİZDE KALSIN!
-    // Sadece market binasının içine geri girildiğinde (playerY < 960) otomatik bırakılır.
-    if (playerTool != null && playerY < 960) {
-      final droppedTool = playerTool!;
-      playerTool = null;
-      spawnParticle(
-        playerX,
-        playerY - 24,
-        '${droppedTool.emoji} ${droppedTool.name} Left at the Farm Entrance',
-        Colors.white70,
-        size: 13,
+    // 2. TARLADAN / ÇİFTLİKTEN ÇIKTIĞINDA ÇAPAYI VE KOVAYI OTOMATİK BIRAK!
+    if (playerTool != null) {
+      final insideMatchingFarm = farmProducers.any(
+        (f) => f.isUnlocked && f.requiredTool == playerTool && f.rect.inflate(10).contains(playerPos),
       );
+      final walkingIntoMatchingFarm = pendingAutoFarmId != null &&
+          farmProducers.any((f) => f.id == pendingAutoFarmId && f.requiredTool == playerTool);
+
+      if (!insideMatchingFarm && !walkingIntoMatchingFarm) {
+        final droppedTool = playerTool!;
+        playerTool = null;
+        spawnParticle(
+          playerX,
+          playerY - 24,
+          '${droppedTool.emoji} ${droppedTool.name} Tarlada Bırakıldı',
+          Colors.white70,
+          size: 14,
+        );
+      }
     }
 
-    // 3. Oyuncu bir çiftlik alanının İÇİNDEYSE ve doğru ekipmanı (Süt Kovası / Tırpan / Yumurta Kovası) tutuyorsa:
+    // 3. Oyuncu bir çiftlik alanının İÇİNDEYSE ve doğru ekipmanı (Süt Kovası / Çapa / Tavuk Kovası) tutuyorsa:
     for (final farm in farmProducers) {
       if (!farm.isUnlocked) continue;
-      if (!farm.rect.inflate(15).contains(playerPos)) continue;
-      if (playerTool != farm.requiredTool) continue;
+      if (!farm.rect.inflate(10).contains(playerPos)) continue;
+
+      if (pendingAutoFarmId == farm.id) {
+        pendingAutoFarmId = null;
+      }
 
       if (carriedBox != null) {
         if (!_isProductFromFarm(carriedBox!.productType, farm)) continue;
         if (carriedBox!.currentCount >= carriedBox!.maxCount) continue;
+      }
+
+      // WASD / D-pad ile doğrudan çiftliğin içine yürüdüyse ekipmanı otomatik eline alsın
+      if (playerTool != farm.requiredTool) {
+        equipToolFromStand(farm);
       }
 
       FarmHarvestSpot? nearbySpot;
@@ -1446,10 +1632,11 @@ class SimulationEngine with ChangeNotifier {
           nearbySpot.harvestProgress = 0.0;
           nearbySpot.isReady = false;
           nearbySpot.regrowTimer = 0.0;
+          _sfx('pickup');
 
           final SimProductType harvestedProd = farm.primaryProduct;
           final def = productCatalog[harvestedProd]!;
-          final int gain = (def.boxSize / 2).ceil(); // 2 nokta = 1 tam dolu kova / sepet!
+          final int gain = (def.boxSize / 2).ceil(); // 2 nokta = 1 tam dolu kova / çuval!
 
           if (carriedBox == null) {
             carriedBox = CarriedBox(
@@ -1467,13 +1654,13 @@ class SimulationEngine with ChangeNotifier {
             pendingAutoFarmId = null;
             playerTool = null;
 
-            String msg = '${def.emoji} ${def.name} Collected! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+            String msg = '${def.emoji} ${def.name} Toplandı! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             if (farm.zoneType == FarmZoneType.barn) {
-              msg = '🥛 Cow Milked, Bucket Dropped! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+              msg = '🥛 Süt Kovası Doldu! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             } else if (farm.primaryProduct == SimProductType.flour) {
-              msg = '🌾 Scythe Dropped, Wheat in Hand! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+              msg = '🌾 Çapa ile Un Hasat Edildi! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             } else if (farm.zoneType == FarmZoneType.coop) {
-              msg = '🥚 Eggs Collected, Bucket Dropped! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+              msg = '🥚 Tavuk Kovası Doldu! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             }
             spawnParticle(playerX, playerY - 40, msg, Colors.greenAccent, size: 15);
 
@@ -1896,8 +2083,12 @@ class SimulationEngine with ChangeNotifier {
     return true;
   }
 
-  /// Raf/dolap tıklaması: elinde çiftlik/kamyon kolisi varsa dizer; yoksa her basışta 1 adet alır
+  /// Raf/dolap tıklaması: kilitliyse açmayı dener; açıksa elinde koli varsa dizer, yoksa her basışta 1 adet alır
   void handleShelfClick(StoreShelf shelf) {
+    if (!shelf.isUnlocked) {
+      tryUnlockShelfOrFarm(shelf, feedbackPos: shelf.rect.center);
+      return;
+    }
     final playerPos = Offset(playerX, playerY);
     if (!shelf.rect.inflate(55).contains(playerPos)) {
       if (carriedBox == null ||
@@ -2666,10 +2857,10 @@ class SimulationEngine with ChangeNotifier {
   }
 
   bool _canMoveTo(double nx, double ny) {
-    final bool insideStore = ny >= 225;
+    final bool insideStore = ny >= 225 && ny <= 985;
     final double minX = insideStore ? storeMinX : 90.0;
     final double maxX = insideStore ? storeMaxX : (worldWidth - 90);
-    if (nx < minX || nx > maxX || ny < 60 || ny > 975) {
+    if (nx < minX || nx > maxX || ny < 60 || ny > (worldHeight - 40)) {
       return false;
     }
 
@@ -2683,10 +2874,13 @@ class SimulationEngine with ChangeNotifier {
     }
 
     // Alt duvar (Arka Bahçe Çiftlik Kapısı: x: 860 - 1140 arası geniş kapı)
+    if (ny > 975 && ny < 1005) {
+      if (nx < doorCenter - 138 || nx > doorCenter + 138) return false;
+    }
     if (playerY <= 990 && ny > 990) {
-      if (nx < doorCenter - 140 || nx > doorCenter + 140) return false;
+      if (nx < doorCenter - 138 || nx > doorCenter + 138) return false;
     } else if (playerY > 990 && ny <= 990) {
-      if (nx < doorCenter - 140 || nx > doorCenter + 140) return false;
+      if (nx < doorCenter - 138 || nx > doorCenter + 138) return false;
     }
 
     final playerRect = Rect.fromCircle(center: Offset(nx, ny), radius: 14);
@@ -2752,10 +2946,10 @@ class SimulationEngine with ChangeNotifier {
       if (playerY < 955) {
         return _getStoreSmartWaypoint(playerX, playerY, doorCenter, 965);
       }
-      return Offset(doorCenter, 1015);
+      return Offset(doorCenter, 1020);
     }
     if (playerY > 995 && destY < 985 && (playerX - doorCenter).abs() > 115) {
-      return Offset(doorCenter, 965);
+      return Offset(doorCenter, 1020);
     }
 
     if (playerY >= 235 && destY < 225 && (playerX - doorCenter).abs() > 115) {
@@ -3201,7 +3395,7 @@ class SimulationEngine with ChangeNotifier {
     if (truckX < truckTargetX) {
       truckX += 380 * dt;
       if (Random().nextDouble() < 0.3) {
-        spawnParticle(truckX - 10, 1030, '💨', Colors.white54, size: 12);
+        spawnParticle(truckX - 10, 92, '💨', Colors.white54, size: 12);
       }
     } else {
       for (int i = 0; i < incomingShipment.length; i++) {
@@ -3724,15 +3918,12 @@ class SimulationEngine with ChangeNotifier {
       return;
     }
 
-    // 🧺🌾 Çiftlik Alet Standları (Yaklaşınca Süt Kovası, Tırpan veya Yumurta Kovasını Otomatik Alır!)
+    // 🧺🌾 Çiftlik Alet Standları (Tıklayınca veya [E] basınca ekipmanı alıp içeri girer)
     for (var farm in farmProducers) {
       if (!farm.isUnlocked) continue;
       if ((playerPos - farm.toolStandPos).distance < 58) {
-        if (playerTool != farm.requiredTool && carriedBox == null) {
-          equipToolFromStand(farm);
-        }
         activeInteractionText =
-            '✅ ${farm.requiredTool.emoji} ${farm.requiredTool.name} in Hand! Go Inside & Collect';
+            '${farm.requiredTool.emoji} ${farm.requiredTool.name} Al & İçeri Gir [E / Tıkla]';
         activeInteractionAction = () {
           startAutoFarmHarvest(farm);
         };
@@ -3742,8 +3933,17 @@ class SimulationEngine with ChangeNotifier {
 
     // 🐄🌾🐔🍎🍅🌶️🥖 Çiftlik Alanları Etkileşimi
     for (var farm in farmProducers) {
-      if (!farm.isUnlocked) continue;
       if (farm.rect.inflate(45).contains(playerPos)) {
+        if (!farm.isUnlocked) {
+          final shelf = shelfForProduct(farm.primaryProduct);
+          if (shelf != null) {
+            activeInteractionText = '🔒 ${farm.name}: ${shelfLockReason(shelf)} [E / Tıkla]';
+            activeInteractionAction = () {
+              tryUnlockShelfOrFarm(shelf, feedbackPos: farm.rect.center);
+            };
+          }
+          return;
+        }
         if (carriedBox != null &&
             (!_isProductFromFarm(carriedBox!.productType, farm) ||
                 carriedBox!.currentCount >= carriedBox!.maxCount ||
@@ -3793,7 +3993,10 @@ class SimulationEngine with ChangeNotifier {
         final def = productCatalog[shelf.assignedProduct]!;
 
         if (!shelf.isUnlocked) {
-          activeInteractionText = '🔒 ${def.emoji} ${shelf.name}: ${shelfLockReason(shelf)}';
+          activeInteractionText = '🔒 ${def.emoji} ${shelf.name}: ${shelfLockReason(shelf)} [E / Tıkla]';
+          activeInteractionAction = () {
+            tryUnlockShelfOrFarm(shelf, feedbackPos: shelf.rect.center);
+          };
           return;
         }
 

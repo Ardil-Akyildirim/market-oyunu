@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:material_ui/material_ui.dart' hide Text;
 import '../../widgets/pixel_ui.dart';
 import '../simulation_engine.dart';
+import '../simulation_models.dart';
 
 class ManageStoreDialog extends StatefulWidget {
   final SimulationEngine engine;
@@ -346,6 +347,86 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                 ],
               ),
             ),
+
+            const SizedBox(height: 14),
+            const Text(
+              'Yeni Tarlalar & Reyonlar (Seviye Artınca Açılır)',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+            ),
+            const SizedBox(height: 8),
+            ...engine.shelves.where((s) => s.unlockCost > 0).map((shelf) {
+              final def = productCatalog[shelf.assignedProduct]!;
+              final farm = engine.farmForProduct(shelf.assignedProduct);
+              final levelMet = engine.storeLevel >= shelf.zoneLevel;
+              final canBuy = !shelf.isUnlocked && levelMet && engine.cash >= shelf.unlockCost;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: shelf.isUnlocked
+                      ? Colors.green.shade50
+                      : (levelMet ? Colors.amber.shade50 : Colors.grey.shade100),
+                  border: Border.all(
+                    color: shelf.isUnlocked
+                        ? Colors.green.shade300
+                        : (levelMet ? Colors.amber.shade400 : Colors.grey.shade300),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Text(def.ico, style: const TextStyle(fontSize: 26)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${farm?.name ?? def.name} & ${shelf.name}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          Text(
+                            shelf.isUnlocked
+                                ? 'Tarla ve Reyon Açık! Çapa ile hasat edebilirsin.'
+                                : 'Gerekli: Seviye ${shelf.zoneLevel} • Satış: \$${def.retailPrice.toStringAsFixed(0)}',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (shelf.isUnlocked)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        color: Colors.green.shade100,
+                        child: Text('Açık {check}',
+                            style: TextStyle(color: Colors.green.shade900, fontSize: 11, fontWeight: FontWeight.bold)),
+                      )
+                    else if (!levelMet)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        color: Colors.grey.shade300,
+                        child: Text('{lock} Seviye ${shelf.zoneLevel}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      )
+                    else
+                      ElevatedButton(
+                        onPressed: canBuy
+                            ? () {
+                                setState(() {
+                                  engine.tryUnlockShelfOrFarm(shelf);
+                                });
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade600,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text('Aç (\$${shelf.unlockCost.toInt()})',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       )),

@@ -100,7 +100,10 @@ class PixelSprites {
     'clock': ['KKKKKKKK', '.KWWWWK.', '..KWWK..', '...KK...', '...KK...', '..KYYK..', '.KYYYYK.', 'KKKKKKKK'],
     'dot': ['........', '..KKKK..', '.KRRRRK.', '.KRRRRK.', '.KRRRRK.', '.KRRRRK.', '..KKKK..', '........'],
     'menu': ['........', 'WWWWWWWW', 'WWWWWWWW', '........', 'WWWWWWWW', 'WWWWWWWW', '........', '........'],
-    'heart': ['........', '.KK..KK.', 'KRRKKRRK', 'KRWRRRRK', 'KRRRRRRK', '.KRRRRK.', '..KRRK..', '...KK...']
+    'heart': ['........', '.KK..KK.', 'KRRKKRRK', 'KRWRRRRK', 'KRRRRRRK', '.KRRRRK.', '..KRRK..', '...KK...'],
+    'milk_bucket': ['..KKKK..', '.K....K.', 'KKKKKKKK', 'KWWWWWWK', 'KbbbbbbK', 'KbBBBBbK', '.KBBBBK.', '..KKKK..'],
+    'hoe': ['..KKKKK.', '.KGGGGGK', '.KGGKK..', '....KnK.', '...KnK..', '..KnK...', '.KnK....', '.KK.....'],
+    'egg_bucket': ['..KKKK..', '.K....K.', 'KKKKKKKK', 'KCCWWCCK', 'KYYYYYYK', 'KROYYYYK', '.KyyyyK.', '..KKKK..']
   };
 
   static bool has(String name) => _art.containsKey(name);
