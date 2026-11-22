@@ -178,7 +178,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                                         }
                                       : null,
                                 ),
-                                Text('${qty} Box', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                Text('$qty Box', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                 IconButton(
                                   icon: const Icon(Icons.add_circle_outline, size: 20, color: Colors.blue),
                                   onPressed: () {

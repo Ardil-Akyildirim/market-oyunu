@@ -470,7 +470,7 @@ class PixelPainter extends CustomPainter {
       _p.color = const Color(0xAAFFFFFF);
       _p.style = PaintingStyle.stroke;
       _p.strokeWidth = kPx;
-      canvas_strokeRect(c, Rect.fromLTWH(x - kPx, y - kPx, (gw + 2) * kPx, (gh + 2) * kPx));
+      c.drawRect(Rect.fromLTWH(x - kPx, y - kPx, (gw + 2) * kPx, (gh + 2) * kPx), _p);
       _p.style = PaintingStyle.fill;
     }
     // price/stock plate
@@ -478,8 +478,6 @@ class PixelPainter extends CustomPainter {
     _text(c, '${def.name}  ${s.currentStock}/${s.maxCapacity}', r.center.dx, r.top - 9,
         size: 9, color: s.currentStock == 0 ? const Color(0xFFFF8A80) : Colors.white, plate: true);
   }
-
-  void canvas_strokeRect(Canvas c, Rect r) => c.drawRect(r, _p);
 
   void _drawCheckout(Canvas c, Rect r, int index) {
     final x = _snap(r.left);
@@ -648,7 +646,6 @@ class PixelPainter extends CustomPainter {
     bool backpack = false,
     bool glasses = false,
     bool flash = false,
-    double lean = 0,
   }) {
     final x = _snap(wx);
     final y = _snap(wy);

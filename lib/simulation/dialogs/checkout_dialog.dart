@@ -229,7 +229,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                               ? '⏳ Customers will appear here when they finish shopping and reach the register...'
                               : (isAllPacked
                                   ? '✅ All items scanned! Hand the bag to the customer and take payment.'
-                                  : '🖱️ CLICK an item on the belt or DRAG it to the LASER SCANNER (${packedCount}/${cust.basket.length})'),
+                                  : '🖱️ CLICK an item on the belt or DRAG it to the LASER SCANNER ($packedCount/${cust.basket.length})'),
                           style: TextStyle(
                             color: cust == null
                                 ? Colors.amberAccent

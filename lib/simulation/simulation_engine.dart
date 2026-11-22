@@ -974,7 +974,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           cheeseMachineRect.center.dx,
           cheeseMachineRect.top - 16,
-          '🧀 Tulum Cheese Ready! (${cheeseMachineReadyBoxes}/${cheeseMachineMaxBoxes})',
+          '🧀 Tulum Cheese Ready! ($cheeseMachineReadyBoxes/$cheeseMachineMaxBoxes)',
           Colors.greenAccent,
           size: 16,
         );
@@ -1506,7 +1506,7 @@ class SimulationEngine with ChangeNotifier {
             spawnParticle(
               courierPackingDesk.center.dx,
               courierPackingDesk.top - 22,
-              '⚠️ Too many! The courier wants ${needed} ${def.emoji} (${excess} extra)!',
+              '⚠️ Too many! The courier wants $needed ${def.emoji} ($excess extra)!',
               Colors.orangeAccent,
               size: 16,
             );
@@ -1569,7 +1569,7 @@ class SimulationEngine with ChangeNotifier {
           spawnParticle(
             courierPackingDesk.center.dx,
             courierPackingDesk.top - 22,
-            '📦 ${def.emoji} Courier Package Ready! Take It to the Bike! (${packedQty}/${order.requiredQty})',
+            '📦 ${def.emoji} Courier Package Ready! Take It to the Bike! ($packedQty/${order.requiredQty})',
             Colors.greenAccent,
             size: 16,
           );
@@ -1701,7 +1701,7 @@ class SimulationEngine with ChangeNotifier {
       if (total > needed) {
         msg = '+1 ${def.emoji} (In Hand: ${carriedBox!.currentCount} • ⚠️ ${total - needed} extra for the courier!)';
       } else {
-        msg = '+1 ${def.emoji} Picked (${total}/${needed} for the courier)';
+        msg = '+1 ${def.emoji} Picked ($total/$needed for the courier)';
       }
     }
 
@@ -1798,8 +1798,8 @@ class SimulationEngine with ChangeNotifier {
       courierPackingDesk.center.dx,
       courierPackingDesk.top - 14,
       remAfter > 0
-          ? '📦 +${take} ${def.emoji} Placed on the Table (${courierStagedCount}/${order.requiredQty}) — bring ${remAfter} more!'
-          : '📦 +${take} ${def.emoji} Complete! Taping the Package...',
+          ? '📦 +$take ${def.emoji} Placed on the Table ($courierStagedCount/${order.requiredQty}) — bring $remAfter more!'
+          : '📦 +$take ${def.emoji} Complete! Taping the Package...',
       Colors.amberAccent,
       size: 15,
     );
@@ -1819,7 +1819,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         courierPackingDesk.left - 18,
         courierPackingDesk.top - 12,
-        '↩️ ${excessReturned} extra ${def.emoji} returned to the shelf',
+        '↩️ $excessReturned extra ${def.emoji} returned to the shelf',
         Colors.lightBlueAccent,
         size: 14,
       );
@@ -1842,7 +1842,7 @@ class SimulationEngine with ChangeNotifier {
     spawnParticle(
       courierPackingDesk.center.dx,
       courierPackingDesk.top - 22,
-      '📦 ${def.emoji} Courier Package Ready! (${packCount}/${order.requiredQty}) Take It to the Bike!',
+      '📦 ${def.emoji} Courier Package Ready! ($packCount/${order.requiredQty}) Take It to the Bike!',
       Colors.greenAccent,
       size: 16,
     );
@@ -1866,7 +1866,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         courierPackingDesk.center.dx,
         courierPackingDesk.top - 16,
-        '📦 ${stageCount}/${order.remainingQty} ${def.emoji} waiting on the table!',
+        '📦 $stageCount/${order.remainingQty} ${def.emoji} waiting on the table!',
         Colors.amberAccent,
         size: 14,
       );
@@ -1924,7 +1924,7 @@ class SimulationEngine with ChangeNotifier {
           spawnParticle(
             courierPackingDesk.center.dx,
             courierPackingDesk.top - 18,
-            '⚠️ Too many! The courier wants ${order.remainingQty} ${def.emoji} (${excess} extra)!',
+            '⚠️ Too many! The courier wants ${order.remainingQty} ${def.emoji} ($excess extra)!',
             Colors.orangeAccent,
             size: 16,
           );
@@ -2063,7 +2063,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           courierStation.center.dx,
           courierStation.top - 15,
-          '📦 +${take} ${def.emoji} Package Loaded to the Courier (${order.deliveredQty}/${order.requiredQty})',
+          '📦 +$take ${def.emoji} Package Loaded to the Courier (${order.deliveredQty}/${order.requiredQty})',
           Colors.lightBlueAccent,
           size: 15,
         );
@@ -3429,10 +3429,10 @@ class SimulationEngine with ChangeNotifier {
           if (total > order.remainingQty) {
             final excess = total - order.remainingQty;
             activeInteractionText =
-                '⚠️ Too many! The courier wants ${order.remainingQty} ${def.emoji} (${excess} extra!) — Open Packing [E / Click]';
+                '⚠️ Too many! The courier wants ${order.remainingQty} ${def.emoji} ($excess extra!) — Open Packing [E / Click]';
           } else {
             activeInteractionText =
-                '📦 ${def.emoji} ${def.name} Packing (${total}/${order.remainingQty}) [E / Click]';
+                '📦 ${def.emoji} ${def.name} Packing ($total/${order.remainingQty}) [E / Click]';
           }
           activeInteractionAction = () {
             handleCourierPackingDeskClick();
@@ -3441,11 +3441,11 @@ class SimulationEngine with ChangeNotifier {
           if (courierStagedCount >= order.remainingQty) {
             final pct = (courierPackingProgress * 100).toInt().clamp(0, 100);
             activeInteractionText =
-                '📦 ${def.emoji} ${def.name} Courier Package Being Taped... ${pct}% (${courierStagedCount}/${order.requiredQty})';
+                '📦 ${def.emoji} ${def.name} Courier Package Being Taped... $pct% ($courierStagedCount/${order.requiredQty})';
           } else {
             final rem = order.remainingQty - courierStagedCount;
             activeInteractionText =
-                '📦 On the Table ${courierStagedCount}/${order.remainingQty} ${def.emoji} Ready (bring ${rem} more!) [E / Click]';
+                '📦 On the Table $courierStagedCount/${order.remainingQty} ${def.emoji} Ready (bring $rem more!) [E / Click]';
             activeInteractionAction = () {
               handleCourierPackingDeskClick();
             };
@@ -3507,7 +3507,7 @@ class SimulationEngine with ChangeNotifier {
           activeInteractionAction = null;
         } else {
           activeInteractionText = hasAutoCashier
-              ? '🛎️ Register ${i + 1} Counter (Cashier on Duty - ${unlockedCheckoutCount}/3 Registers Open)'
+              ? '🛎️ Register ${i + 1} Counter (Cashier on Duty - $unlockedCheckoutCount/3 Registers Open)'
               : '🛎️ Register ${i + 1} Counter (Scan Items at the Barcode When a Customer Arrives)';
           activeInteractionAction = null;
         }
@@ -3535,7 +3535,7 @@ class SimulationEngine with ChangeNotifier {
         return;
       } else if (cheeseMachineMilkInput > 0) {
         final pct = ((cheeseMachineTimer / cheeseMachineDuration) * 100).toInt().clamp(0, 100);
-        activeInteractionText = '⏳ Cheese Machine Running... ${pct}%';
+        activeInteractionText = '⏳ Cheese Machine Running... $pct%';
       } else {
         activeInteractionText = '🧀 Cheese Machine: Bring Milk from the Barn!';
         activeInteractionAction = () {
@@ -3598,7 +3598,7 @@ class SimulationEngine with ChangeNotifier {
             actionDesc = 'Enter the Coop & Collect Eggs in the Bucket';
           }
           activeInteractionText =
-              '${farm.requiredTool.emoji} ${actionDesc} (${farm.readySpotCount} Ready Spots)';
+              '${farm.requiredTool.emoji} $actionDesc (${farm.readySpotCount} Ready Spots)';
           activeInteractionAction = () {
             startAutoFarmHarvest(farm);
           };

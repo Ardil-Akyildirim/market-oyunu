@@ -153,7 +153,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                'Courier Wants: ${needed} pcs',
+                                'Courier Wants: $needed pcs',
                                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -219,12 +219,12 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                   Expanded(
                     child: Text(
                       hasExcess
-                          ? 'Too many! The courier wants ${needed} x ${def.emoji}, you brought ${_trayCount} (${excess} extra!). Remove the extras and pack accordingly!'
+                          ? 'Too many! The courier wants $needed x ${def.emoji}, you brought $_trayCount ($excess extra!). Remove the extras and pack accordingly!'
                           : (isExact
-                              ? 'Exactly the courier order (${needed}/${needed})! Now tape the package and take it to the bike.'
+                              ? 'Exactly the courier order ($needed/$needed)! Now tape the package and take it to the bike.'
                               : (_trayCount == 0
-                                  ? 'Each press takes 1 ${def.emoji} ${def.name} from the cabinet; bring it to this table (${needed} needed).'
-                                  : 'There are ${_trayCount} here now. Grab ${missing} more ${def.emoji} from the cabinet!')),
+                                  ? 'Each press takes 1 ${def.emoji} ${def.name} from the cabinet; bring it to this table ($needed needed).'
+                                  : 'There are $_trayCount here now. Grab $missing more ${def.emoji} from the cabinet!')),
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
@@ -255,7 +255,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
               child: _trayCount == 0
                   ? Center(
                       child: Text(
-                        '📦 Courier Box Empty (0/${needed} ${def.emoji})',
+                        '📦 Courier Box Empty (0/$needed ${def.emoji})',
                         style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 12.5),
                       ),
                     )
@@ -322,7 +322,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                     child: ElevatedButton.icon(
                       onPressed: () => _trimAllExcess(needed),
                       icon: const Icon(Icons.content_cut_rounded),
-                      label: Text('Set to ${needed} (${excess} Returned)',
+                      label: Text('Set to $needed ($excess Returned)',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange.shade600,
@@ -347,7 +347,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                 },
                 icon: const Icon(Icons.inventory_2_rounded),
                 label: Text(
-                  '📦 Prepare & Tape the Courier Package (${needed}/${needed})',
+                  '📦 Prepare & Tape the Courier Package ($needed/$needed)',
                   style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -368,7 +368,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                 },
                 icon: const Icon(Icons.save_alt_rounded),
                 label: Text(
-                  'Leave on Table (${_trayCount}/${needed}) & Take from Cabinet',
+                  'Leave on Table ($_trayCount/$needed) & Take from Cabinet',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(

@@ -1934,11 +1934,11 @@ class SimulationPainter extends CustomPainter {
     final def = productCatalog[farm.primaryProduct]!;
     if (readyCount > 0) {
       if (farm.zoneType == FarmZoneType.barn) {
-        statusText = '🧺 TAKE A MILK BUCKET AT THE ENTRANCE & GO INSIDE TO MILK THE COWS (${readyCount}/${totalCount} Ready)';
+        statusText = '🧺 TAKE A MILK BUCKET AT THE ENTRANCE & GO INSIDE TO MILK THE COWS ($readyCount/$totalCount Ready)';
       } else if (farm.zoneType == FarmZoneType.field) {
-        statusText = '🌾 TAKE A SCYTHE & GO INSIDE TO HARVEST ${def.emoji} ${def.name.toUpperCase()} (${readyCount}/${totalCount} Ready)';
+        statusText = '🌾 TAKE A SCYTHE & GO INSIDE TO HARVEST ${def.emoji} ${def.name.toUpperCase()} ($readyCount/$totalCount Ready)';
       } else {
-        statusText = '🧺 TAKE AN EGG BUCKET AT THE ENTRANCE & COLLECT EGGS IN THE COOP (${readyCount}/${totalCount} Ready)';
+        statusText = '🧺 TAKE AN EGG BUCKET AT THE ENTRANCE & COLLECT EGGS IN THE COOP ($readyCount/$totalCount Ready)';
       }
     } else {
       statusText = '⏳ NEW ${def.emoji} ${def.name.toUpperCase()} GROWING...';
@@ -2320,7 +2320,7 @@ class SimulationPainter extends CustomPainter {
 
     _drawText(
       canvas,
-      '🔒 🛎️ Register ${index} Area',
+      '🔒 🛎️ Register $index Area',
       center.dx,
       center.dy - 7,
       fontSize: 10.2,
@@ -2329,7 +2329,7 @@ class SimulationPainter extends CustomPainter {
     );
     _drawText(
       canvas,
-      '⭐ Unlocks at Store Level ${index}',
+      '⭐ Unlocks at Store Level $index',
       center.dx,
       center.dy + 8,
       fontSize: 9.0,
@@ -4103,7 +4103,7 @@ class SimulationPainter extends CustomPainter {
     _drawNaturalWorldButton(
       canvas,
       center: Offset(topFace.center.dx, topFace.bottom - 15),
-      label: '🛎️ Register ${index}',
+      label: '🛎️ Register $index',
       width: 86,
       height: 20,
     );
@@ -4282,7 +4282,7 @@ class SimulationPainter extends CustomPainter {
       _drawText(
         canvas,
         isExcess
-            ? '⚠️ TOO MANY! (${totalWithHeld}/${ord.remainingQty} ${def.emoji}) [Click]'
+            ? '⚠️ TOO MANY! ($totalWithHeld/${ord.remainingQty} ${def.emoji}) [Click]'
             : '📦 ${ord.requiredQty}x ${def.emoji} Courier Packing [Click]',
         badgeRect.center.dx,
         badgeRect.center.dy,
@@ -4459,7 +4459,7 @@ class SimulationPainter extends CustomPainter {
 
     _drawText(
       canvas,
-      'STOCK: ${current} / ${maxCap}',
+      'STOCK: $current / $maxCap',
       bgRect.center.dx,
       bgRect.center.dy,
       fontSize: 8.2,
