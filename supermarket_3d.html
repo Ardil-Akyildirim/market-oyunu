@@ -1,0 +1,4915 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>🏪 Süpermarket Simülatörü 3D (Supermarket Simulator 3D)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0b0f19;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #fff;
+    }
+    #game-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* HUD Overlay */
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: auto;
+    }
+    .hud-card {
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 10px 18px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .money-badge {
+      font-size: 24px;
+      font-weight: 800;
+      color: #10b981;
+      text-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+    }
+    .store-badge {
+      font-size: 14px;
+      color: #94a3b8;
+    }
+    .store-badge span {
+      color: #38bdf8;
+      font-weight: 700;
+    }
+
+    /* Floating feedback */
+    .floating-text {
+      position: absolute;
+      color: #10b981;
+      font-weight: 900;
+      font-size: 24px;
+      animation: floatUp 1.2s forwards ease-out;
+      pointer-events: none;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.9);
+      z-index: 60;
+    }
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -60px) scale(1.25); }
+    }
+
+    /* Crosshair & Interaction */
+    #crosshair-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      transition: all 0.15s ease;
+    }
+    #crosshair {
+      width: 10px;
+      height: 10px;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.25);
+      transition: transform 0.1s, border-color 0.1s, background-color 0.1s;
+    }
+    #crosshair.active {
+      transform: scale(2.0);
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.6);
+      box-shadow: 0 0 12px #38bdf8;
+    }
+    #interaction-prompt {
+      margin-top: 16px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid #38bdf8;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 8px 18px;
+      border-radius: 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+      display: none;
+      white-space: nowrap;
+    }
+    #interaction-prompt kbd {
+      background: #38bdf8;
+      color: #0f172a;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 900;
+      margin-right: 6px;
+    }
+
+    /* Hand / Carried Item Indicator */
+    #hand-indicator {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(30, 41, 59, 0.95);
+      border: 2px solid #f59e0b;
+      padding: 10px 24px;
+      border-radius: 30px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #f59e0b;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      gap: 12px;
+      pointer-events: auto;
+    }
+    #hand-indicator button {
+      background: #ef4444;
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 12px;
+      transition: background 0.15s;
+    }
+    #hand-indicator button:hover {
+      background: #dc2626;
+    }
+
+    /* Controls Guide Box (bottom-left) */
+    .controls-box {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 14px 18px;
+      border-radius: 14px;
+      font-size: 13px;
+      color: #cbd5e1;
+      line-height: 1.6;
+      pointer-events: auto;
+    }
+    .controls-box kbd {
+      background: #334155;
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: #38bdf8;
+      font-weight: 700;
+    }
+
+    /* Farm Tool & Harvest Progress HUD */
+    #tool-indicator {
+      position: absolute;
+      bottom: 86px;
+      right: 20px;
+      background: rgba(15, 118, 110, 0.94);
+      border: 2px solid #5eead4;
+      color: #f0fdfa;
+      padding: 10px 18px;
+      border-radius: 14px;
+      font-weight: 800;
+      font-size: 14px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.35);
+      pointer-events: auto;
+    }
+    #tool-indicator button {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #harvest-progress-wrap {
+      position: absolute;
+      bottom: 130px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 300px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 2px solid #facc15;
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+    #harvest-progress-label {
+      font-size: 13px;
+      font-weight: 800;
+      color: #fef08a;
+      text-align: center;
+    }
+    #harvest-progress-track {
+      width: 100%;
+      height: 10px;
+      background: #1e293b;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    #harvest-progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #22c55e, #facc15);
+      transition: width 0.05s linear;
+    }
+
+    /* Start / Pause / Lock Screen Overlay */
+    #start-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.85) 0%, rgba(2, 6, 23, 0.98) 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      cursor: pointer;
+      text-align: center;
+      padding: 20px;
+    }
+    #start-overlay h1 {
+      font-size: 52px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #f59e0b, #ef4444, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
+      letter-spacing: -1px;
+    }
+    #start-overlay p {
+      font-size: 18px;
+      color: #94a3b8;
+      max-width: 640px;
+      margin-bottom: 30px;
+      line-height: 1.6;
+    }
+    .btn-play {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      padding: 18px 56px;
+      font-size: 22px;
+      font-weight: 800;
+      border-radius: 50px;
+      box-shadow: 0 10px 30px rgba(16, 185, 129, 0.5);
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-play:hover {
+      transform: scale(1.05);
+      box-shadow: 0 14px 45px rgba(16, 185, 129, 0.75);
+    }
+
+    /* Modals (Computer, Checkout, etc.) */
+    .modal-backdrop {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(8px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 200;
+      pointer-events: auto;
+    }
+    .modal-content {
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 18px;
+      width: 90%;
+      max-width: 860px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 65px rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+    }
+    .modal-header {
+      padding: 18px 24px;
+      background: #0f172a;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal-close {
+      background: #334155;
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .modal-close:hover {
+      background: #ef4444;
+    }
+    .modal-body {
+      padding: 24px;
+      flex: 1;
+    }
+
+    /* Products Grid in Order Dialog */
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 18px;
+    }
+    .product-card {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .product-card:hover {
+      border-color: #38bdf8;
+      transform: translateY(-4px);
+    }
+    .product-icon {
+      font-size: 44px;
+      margin-bottom: 10px;
+    }
+    .product-name {
+      font-weight: 700;
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+    .product-detail {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+    .product-cost {
+      font-size: 19px;
+      font-weight: 800;
+      color: #10b981;
+      margin-bottom: 14px;
+    }
+    .btn-buy {
+      width: 100%;
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: 800;
+      border: none;
+      padding: 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-buy:hover {
+      background: #0284c7;
+      color: white;
+    }
+
+    /* Checkout Screen UI */
+    .checkout-layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 20px;
+    }
+    .scanner-feed {
+      background: #0f172a;
+      border-radius: 14px;
+      border: 2px dashed #38bdf8;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 250px;
+      position: relative;
+      overflow: hidden;
+    }
+    .laser-line {
+      position: absolute;
+      width: 100%;
+      height: 2px;
+      background: #ef4444;
+      box-shadow: 0 0 14px #ef4444;
+      animation: scanLaser 1.4s infinite alternate ease-in-out;
+    }
+    @keyframes scanLaser {
+      0% { top: 20%; opacity: 0.3; }
+      100% { top: 80%; opacity: 1; }
+    }
+    .conveyor-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 15px;
+      justify-content: center;
+      z-index: 2;
+    }
+    .conveyor-item-btn {
+      background: #334155;
+      border: 2px solid #64748b;
+      color: white;
+      padding: 14px 20px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .conveyor-item-btn.scanned {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.25);
+      opacity: 0.6;
+      cursor: default;
+    }
+    .conveyor-item-btn:not(.scanned):hover {
+      border-color: #f59e0b;
+      transform: scale(1.06);
+    }
+    .receipt-panel {
+      background: #0f172a;
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .receipt-list {
+      max-height: 190px;
+      overflow-y: auto;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 10px;
+    }
+    .receipt-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      margin-bottom: 6px;
+      color: #cbd5e1;
+    }
+    .receipt-total {
+      font-size: 26px;
+      font-weight: 900;
+      color: #10b981;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .btn-complete-payment {
+      width: 100%;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      padding: 15px;
+      font-size: 18px;
+      font-weight: 800;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-complete-payment:disabled {
+      background: #475569;
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    /* Upgrade tab styles */
+    .upgrade-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* 3D Cashier View HUD */
+    #cashier-hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+      z-index: 25;
+    }
+    .cashier-side-panel {
+      position: fixed;
+      top: 88px;
+      left: 20px;
+      width: 275px;
+      background: rgba(15, 23, 42, 0.86);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 16px;
+      padding: 16px;
+      color: #f8fafc;
+      pointer-events: auto;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+    }
+    .cashier-side-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .cashier-side-header h3 {
+      margin: 0;
+      font-size: 16px;
+      color: #38bdf8;
+    }
+    .btn-exit-cashier {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-exit-cashier:hover {
+      background: rgba(239, 68, 68, 0.4);
+      color: #fff;
+    }
+    .cashier-status-pill {
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+      color: #bae6fd;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .cashier-bottom-hint {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 999px;
+      padding: 10px 22px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #f8fafc;
+      pointer-events: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    #cashier-hover-tooltip {
+      position: fixed;
+      display: none;
+      pointer-events: none;
+      z-index: 30;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid #10b981;
+      color: #f8fafc;
+      padding: 6px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      transform: translate(14px, -50%);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+      white-space: nowrap;
+    }
+    .upgrade-item {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .upgrade-info h4 {
+      font-size: 16px;
+      color: #f8fafc;
+      margin-bottom: 4px;
+    }
+    .upgrade-info p {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    /* Notification Pill */
+    #notification-pill {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(16, 185, 129, 0.95);
+      color: white;
+      padding: 10px 24px;
+      border-radius: 25px;
+      font-size: 14px;
+      font-weight: 700;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      display: none;
+      z-index: 50;
+      animation: bounceDown 0.3s ease-out;
+    }
+    @keyframes bounceDown {
+      0% { transform: translate(-50%, -20px); opacity: 0; }
+      100% { transform: translate(-50%, 0); opacity: 1; }
+    }
+  </style>
+  <script src="three.min.js"></script>
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Game 3D Viewport -->
+  <div id="game-container"></div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <!-- Top Stats -->
+    <div class="top-bar">
+      <div class="hud-card">
+        <span style="font-size: 26px;">🏪</span>
+        <div>
+          <div class="store-badge">MARKET SEVİYESİ: <span id="store-level">1</span></div>
+          <div style="font-size: 12px; color: #64748b;" id="day-clock">GÜN 1 • SAAT: 10:00</div>
+        </div>
+      </div>
+
+      <div class="hud-card">
+        <span style="font-size: 22px;">💵</span>
+        <div class="money-badge" id="hud-money">₺1,250.00</div>
+      </div>
+
+      <div class="hud-card" id="courier-hud-card" style="background: linear-gradient(135deg, rgba(109,40,217,0.92), rgba(76,29,149,0.95)); border-color: #facc15; cursor: pointer;" onclick="deliverToCourier3D()">
+        <span style="font-size: 24px;">🛵</span>
+        <div>
+          <div style="font-size: 11px; color: #fde047; font-weight: 800;">ACİL KURYE SİPARİŞİ (2.2x ÖDÜL)</div>
+          <div id="courier-hud-text" style="font-size: 13px; font-weight: 900; color: #fff;">Hazırlanıyor...</div>
+        </div>
+        <button style="background:#facc15; color:#0f172a; border:none; padding:6px 10px; border-radius:8px; font-weight:900; font-size:11px; cursor:pointer;">⚡ GÖNDER</button>
+      </div>
+
+      <div class="hud-card" style="gap: 10px;">
+        <button id="btn-toggle-camera" style="background:#10b981; border:none; color:white; padding:9px 16px; border-radius:10px; font-weight:700; cursor:pointer; font-size:13px; pointer-events:auto; box-shadow: 0 4px 12px rgba(16,185,129,0.4);" onclick="toggleCameraMode()">
+          🎥 Kamera: Üstten 3D (V)
+        </button>
+        <button id="btn-open-computer" style="background:#0284c7; border:none; color:white; padding:9px 16px; border-radius:10px; font-weight:700; cursor:pointer; font-size:13px; pointer-events:auto;" onclick="openComputerModal()">
+          💻 Toptancı Siparişi
+        </button>
+        <button id="btn-open-upgrades" style="background:#7c3aed; border:none; color:white; padding:9px 16px; border-radius:10px; font-weight:700; cursor:pointer; font-size:13px; pointer-events:auto;" onclick="openUpgradesModal()">
+          ⭐ Geliştirmeler
+        </button>
+      </div>
+    </div>
+
+    <!-- Notification Pill -->
+    <div id="notification-pill"></div>
+
+    <!-- Crosshair and Interaction Prompt -->
+    <div id="crosshair-container">
+      <div id="crosshair"></div>
+      <div id="interaction-prompt">
+        <span id="prompt-key"><kbd>E</kbd></span>
+        <span id="prompt-text">Etkileşim</span>
+      </div>
+    </div>
+
+    <!-- Hand Indicator (Holding a Box / Farm Goods) -->
+    <div id="hand-indicator">
+      <span id="hand-emoji" style="font-size: 22px;">📦</span>
+      <span id="hand-text">Elinizde: 🥛 Süt Kolisi (8/8)</span>
+      <button onclick="discardCarriedBox()">Bırak [Q]</button>
+    </div>
+
+    <!-- Equipped Farm Tool Indicator -->
+    <div id="tool-indicator">
+      <span id="tool-emoji" style="font-size: 20px;">🪣</span>
+      <span id="tool-text">Ekipman: Süt Kovası</span>
+      <button onclick="dropEquippedTool()">Bırak</button>
+    </div>
+
+    <!-- Active Farm Harvest / Milking Progress -->
+    <div id="harvest-progress-wrap">
+      <div id="harvest-progress-label">🥛 İnekten Süt Sağılıyor... %0</div>
+      <div id="harvest-progress-track"><div id="harvest-progress-fill"></div></div>
+    </div>
+
+    <!-- Controls Reminder (bottom left) -->
+    <div class="controls-box">
+      <div><kbd>V</kbd> : <strong>Kamera Modu</strong> (Üstten 3D Simülasyon ⮂ 1. Şahıs)</div>
+      <div><kbd>Fare Tekerleği</kbd> : Üstten Görünümde Zoom (Yakınlaş / Uzaklaş)</div>
+      <div><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> veya <kbd>Sol Tık</kbd> : 3D Markette Yürüme</div>
+      <div><kbd>E</kbd> veya <kbd>Tıkla</kbd> : Etkileşim (Koli Al / Rafa Diz / Kasa)</div>
+      <div><kbd>Shift</kbd> : Hızlı Koşma | <kbd>Q</kbd> : Kutuyu Bırak</div>
+    </div>
+  </div>
+
+  <!-- Start Screen & Pointer Lock Trigger -->
+  <div id="start-overlay" onclick="requestGameStart()">
+    <h1>🏪 SÜPERMARKET SİMÜLATÖRÜ 3D</h1>
+    <p>
+      Gerçek 3 Boyutlu Süpermarket Simülasyonu!<br>
+      İster <strong>Üstten 3D Simülasyon</strong> açısıyla tüm marketi yönetin, ister <strong>1. Şahıs (FPS)</strong> göz hizasından yürüyün!<br>
+      Gerçekçi 3D gondol raflar, fiyat etiket rayları, reyon tabelaları, lojistik sevkiyatı ve kasa sistemi!
+    </p>
+    <button class="btn-play">OYUNA BAŞLA (TIKLA)</button>
+    <div style="margin-top: 18px; font-size: 14px; color: #94a3b8;">
+      💡 İpucu: <kbd>V</kbd> tuşu ile kamera modunu (Üstten 3D ⮂ 1. Şahıs) anında değiştirebilirsiniz!
+    </div>
+  </div>
+
+  <!-- Computer Modal (Wholesale Orders) -->
+  <div id="modal-computer" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>💻 Toptancı & Lojistik Portalı (Mal Siparişi)</h2>
+        <button class="modal-close" onclick="closeModals()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: #94a3b8; font-size: 14px; margin-bottom: 20px;">
+          Sipariş ettiğiniz koliler hemen lojistik kamyonuyla kapınızın önüne indirilir.
+        </p>
+        <div class="products-grid" id="wholesale-products-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upgrades Modal -->
+  <div id="modal-upgrades" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>⭐ Mağaza Geliştirmeleri & Personel</h2>
+        <button class="modal-close" onclick="closeModals()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="upgrade-list" id="upgrades-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Checkout Mini-game Modal -->
+  <div id="modal-checkout" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 760px;">
+      <div class="modal-header">
+        <h2>🛎️ Kasa & Barkod Okutma Tezgahı</h2>
+        <button class="modal-close" onclick="closeModals()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="checkout-layout">
+          <!-- Conveyor Belt with items -->
+          <div>
+            <div style="font-weight: 700; margin-bottom: 8px; color: #f8fafc;">
+              Banttaki Ürünler (Okutmak için tıkla):
+            </div>
+            <div class="scanner-feed">
+              <div class="laser-line"></div>
+              <div class="conveyor-items" id="conveyor-items-container">
+                <!-- Items to scan -->
+              </div>
+            </div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 8px; text-align: center;">
+              🔴 Kırmızı barkod okuyucu aktif! Ürünlere tıklayarak BİİP sesini duyun.
+            </div>
+          </div>
+
+          <!-- Receipt & Pay button -->
+          <div class="receipt-panel">
+            <div>
+              <div style="font-weight: 700; border-bottom: 1px dashed #475569; padding-bottom: 6px; margin-bottom: 12px;">
+                🧾 Müşteri Fişi
+              </div>
+              <div class="receipt-list" id="receipt-items-container">
+                <!-- Scanned lines -->
+              </div>
+            </div>
+
+            <div>
+              <div class="receipt-total">
+                <span>TOPLAM:</span>
+                <span id="checkout-total-price">₺0.00</span>
+              </div>
+              <button id="btn-pay" class="btn-complete-payment" disabled onclick="completeCheckoutPayment()">
+                ÖDEMEYİ AL & FİŞ KES 💳
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D Cashier View HUD -->
+  <div id="cashier-hud">
+    <div class="cashier-side-panel">
+      <div class="cashier-side-header">
+        <h3>👁️ Market Sahibi (Kasa)</h3>
+        <button class="btn-exit-cashier" onclick="exitCashierMode()">Ayrıl [ESC / Tab]</button>
+      </div>
+      <div id="cashier-status-pill" class="cashier-status-pill">
+        Banttaki 3D ürünlere tıklayarak okutun
+      </div>
+      <div class="receipt-list" id="cashier-receipt-list" style="max-height: 220px;">
+        <!-- Scanned items -->
+      </div>
+      <div class="receipt-total" style="font-size: 22px; margin-bottom: 12px;">
+        <span>TOPLAM:</span>
+        <span id="cashier-total-price">₺0.00</span>
+      </div>
+      <button id="btn-cashier-pay" class="btn-complete-payment" disabled onclick="completeCheckoutPayment()">
+        ÖDEMEYİ AL & FİŞ KES 💳
+      </button>
+    </div>
+    <div class="cashier-bottom-hint">
+      🖱️ <strong>Sol Tık:</strong> Ürünü okut • <strong>Sağ Tık Sürükle:</strong> Etrafa bak • <kbd>Space</kbd> Ödemeyi Al • <kbd>ESC</kbd> / <kbd>Tab</kbd> Çık
+    </div>
+  </div>
+  <div id="cashier-hover-tooltip"></div>
+
+  <script>
+    /* =========================================================================
+       AUDIO SYNTHESIZER (Pure Web Audio API - Zero external MP3s needed)
+       ========================================================================= */
+    const AudioEngine = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      },
+      beep() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1750, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.12);
+      },
+      cash() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        [987, 1318].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+          gain.gain.setValueAtTime(0.35, now + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.35);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.08);
+          osc.stop(now + idx * 0.08 + 0.35);
+        });
+      },
+      pop() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(420, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.08);
+      },
+      thud() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.15);
+      },
+      horn() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        [280, 350].forEach(f => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(f, now);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.4);
+        });
+      },
+      chime() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        [587, 880].forEach((f, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(f, now + idx * 0.1);
+          gain.gain.setValueAtTime(0.2, now + idx * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.4);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.1);
+          osc.stop(now + idx * 0.1 + 0.4);
+        });
+      }
+    };
+
+    /* =========================================================================
+       GAME STATE & CATALOG
+       ========================================================================= */
+    const PRODUCTS = {
+      milk: {
+        id: 'milk',
+        name: 'Taze Köy Sütü',
+        emoji: '🥛',
+        color: 0x38bdf8,
+        costPerBox: 120,
+        unitsPerBox: 8,
+        sellPrice: 28,
+        shelfId: 'shelf_dairy',
+        unlocked: true
+      },
+      flour: {
+        id: 'flour',
+        name: 'Doğal Buğday Unu',
+        emoji: '🌾',
+        color: 0xfef3c7,
+        costPerBox: 75,
+        unitsPerBox: 8,
+        sellPrice: 20,
+        shelfId: 'shelf_flour',
+        unlocked: true
+      },
+      egg: {
+        id: 'egg',
+        name: 'Taze Köy Yumurtası',
+        emoji: '🥚',
+        color: 0xfef9c3,
+        costPerBox: 90,
+        unitsPerBox: 10,
+        sellPrice: 22,
+        shelfId: 'shelf_eggs',
+        unlocked: true
+      },
+      bread: {
+        id: 'bread',
+        name: 'Taş Fırın Ekmeği',
+        emoji: '🍞',
+        color: 0xd97706,
+        costPerBox: 80,
+        unitsPerBox: 8,
+        sellPrice: 18,
+        shelfId: 'shelf_bakery',
+        unlocked: false,
+        unlockCost: 250
+      },
+      cheese: {
+        id: 'cheese',
+        name: 'Tulum Peyniri',
+        emoji: '🧀',
+        color: 0xfacc15,
+        costPerBox: 210,
+        unitsPerBox: 6,
+        sellPrice: 52,
+        shelfId: 'shelf_cheese',
+        unlocked: false,
+        unlockCost: 350
+      },
+      apple: {
+        id: 'apple',
+        name: 'Amasya Elması',
+        emoji: '🍎',
+        color: 0xdc2626,
+        costPerBox: 100,
+        unitsPerBox: 10,
+        sellPrice: 20,
+        shelfId: 'shelf_fruits',
+        unlocked: false,
+        unlockCost: 400
+      },
+      cereal: {
+        id: 'cereal',
+        name: 'Mısır Gevreği',
+        emoji: '🥣',
+        color: 0xf59e0b,
+        costPerBox: 180,
+        unitsPerBox: 6,
+        sellPrice: 48,
+        shelfId: 'shelf_cereal',
+        unlocked: false,
+        unlockCost: 500
+      },
+      soda: {
+        id: 'soda',
+        name: 'Kutu Kola',
+        emoji: '🥤',
+        color: 0xef4444,
+        costPerBox: 150,
+        unitsPerBox: 10,
+        sellPrice: 25,
+        shelfId: 'shelf_drinks',
+        unlocked: false,
+        unlockCost: 600
+      },
+      chocolate: {
+        id: 'chocolate',
+        name: 'Fındıklı Çikolata',
+        emoji: '🍫',
+        color: 0x78350f,
+        costPerBox: 140,
+        unitsPerBox: 10,
+        sellPrice: 24,
+        shelfId: 'shelf_snacks',
+        unlocked: false,
+        unlockCost: 750
+      }
+    };
+
+    const FARM_TOOLS = {
+      milkBucket: { id: 'milkBucket', name: 'Süt Kovası', emoji: '🪣', actionVerb: 'İnekten Süt Sağılıyor' },
+      scythe: { id: 'scythe', name: 'Hasat Tırpanı', emoji: '🌾', actionVerb: 'Tırpanla Biçiliyor' },
+      eggBucket: { id: 'eggBucket', name: 'Yumurta Sepeti', emoji: '🧺', actionVerb: 'Folluktan Yumurta Toplanıyor' },
+      basket: { id: 'basket', name: 'Hasat Sepeti', emoji: '🧺', actionVerb: 'Sepete Toplanıyor' }
+    };
+
+    const Game = {
+      money: 1250,
+      level: 1,
+      day: 1,
+      clockHours: 10,
+      clockMinutes: 0,
+      carriedBox: null, // { productId, remaining, maxCount, isFromFarm }
+      equippedTool: null, // 'milkBucket' | 'scythe' | 'basket' | null
+      activeHarvest: null, // { spot, progress, duration }
+      autoCashier: false,
+      speedUpgrade: false,
+      customers: [],
+      deliveryBoxes: [],
+      shelves: {},
+      isPointerLocked: false,
+      activeModal: false
+    };
+
+    /* =========================================================================
+       THREE.JS 3D SCENE SETUP (PBR LIGHTING, ACES TONE MAPPING & SOFT SHADOWS)
+       ========================================================================= */
+    const container = document.getElementById('game-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x7dd3fc);
+    scene.fog = new THREE.FogExp2(0xbae6fd, 0.0075);
+
+    const camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.1, 160);
+    camera.rotation.order = 'YXZ';
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    if (THREE.ACESFilmicToneMapping !== undefined) {
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.22;
+    }
+    if (THREE.sRGBEncoding !== undefined) {
+      renderer.outputEncoding = THREE.sRGBEncoding;
+    }
+    container.appendChild(renderer.domElement);
+
+    function enableShadowsRecursive(obj) {
+      obj.traverse(child => {
+        if (child.isMesh && child.material && child.material.visible !== false) {
+          if (!child.material.transparent) {
+            child.castShadow = true;
+          }
+          child.receiveShadow = true;
+        }
+      });
+    }
+
+    // Player position & physics
+    const player = {
+      pos: new THREE.Vector3(0, 1.7, 5),
+      yaw: 0,
+      pitch: 0,
+      speed: 6.8,
+      walkTimer: 0
+    };
+    camera.position.copy(player.pos);
+
+    // Helper to build carried item 3D visuals (Cardboard box OR Farm goods: milk churn, wheat sheaf, fruit crate)
+    function populateCarriedGroup(group) {
+      const boxMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.55, 0.4, 0.4),
+        new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.8 })
+      );
+      boxMesh.name = 'variant_box';
+      group.add(boxMesh);
+
+      // Milk Churn / Bucket (Sağılmış Süt Güğümü)
+      const milkGroup = new THREE.Group();
+      milkGroup.name = 'variant_milk';
+      const churnBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.21, 0.42, 12),
+        new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.55, roughness: 0.25 })
+      );
+      const churnBand = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.19, 0.19, 0.12, 12),
+        new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.35 })
+      );
+      const milkTop = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.16, 0.16, 0.03, 12),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15 })
+      );
+      milkTop.position.y = 0.21;
+      milkGroup.add(churnBody, churnBand, milkTop);
+      milkGroup.visible = false;
+      group.add(milkGroup);
+
+      // Golden Wheat Sheaf (Biçilmiş Buğday Demeti)
+      const wheatGroup = new THREE.Group();
+      wheatGroup.name = 'variant_flour';
+      const wheatMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.65 });
+      for (let i = -2; i <= 2; i++) {
+        const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.055, 0.58, 6), wheatMat);
+        stalk.position.set(i * 0.06, 0, (i % 2) * 0.05);
+        stalk.rotation.z = i * 0.08;
+        wheatGroup.add(stalk);
+      }
+      const tieBand = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.17, 0.17, 0.08, 10),
+        new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 })
+      );
+      wheatGroup.add(tieBand);
+      wheatGroup.rotation.z = Math.PI / 2.4;
+      wheatGroup.visible = false;
+      group.add(wheatGroup);
+
+      // Harvest Crate with Apples / Corn
+      const crateGroup = new THREE.Group();
+      crateGroup.name = 'variant_crate';
+      const crateWood = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.24, 0.36),
+        new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.85 })
+      );
+      crateGroup.add(crateWood);
+      const fruitMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
+      for (let fx = -0.14; fx <= 0.14; fx += 0.14) {
+        for (let fz = -0.08; fz <= 0.08; fz += 0.16) {
+          const f = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), fruitMat);
+          f.position.set(fx, 0.14, fz);
+          f.name = 'crate_fruit';
+          crateGroup.add(f);
+        }
+      }
+      crateGroup.visible = false;
+      group.add(crateGroup);
+    }
+
+    function populateToolGroup(group) {
+      // Milk Bucket
+      const bucket = new THREE.Group();
+      bucket.name = 'tool_milkBucket';
+      const bBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.15, 0.11, 0.28, 10),
+        new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.3, roughness: 0.35 })
+      );
+      bucket.add(bBody);
+      bucket.visible = false;
+      group.add(bucket);
+
+      // Harvest Scythe
+      const scythe = new THREE.Group();
+      scythe.name = 'tool_scythe';
+      const handle = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.025, 0.025, 0.95, 6),
+        new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 })
+      );
+      handle.rotation.x = Math.PI / 4;
+      const blade = new THREE.Mesh(
+        new THREE.BoxGeometry(0.42, 0.03, 0.09),
+        new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.8, roughness: 0.25 })
+      );
+      blade.position.set(0.18, 0.34, 0.34);
+      scythe.add(handle, blade);
+      scythe.visible = false;
+      group.add(scythe);
+
+      // Harvest Basket
+      const basket = new THREE.Group();
+      basket.name = 'tool_basket';
+      const baskMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.13, 0.24, 10),
+        new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.85 })
+      );
+      basket.add(baskMesh);
+      basket.visible = false;
+      group.add(basket);
+
+      // Egg Basket
+      const eggBasket = new THREE.Group();
+      eggBasket.name = 'tool_eggBucket';
+      const ebMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.13, 0.24, 10),
+        new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.8 })
+      );
+      eggBasket.add(ebMesh);
+      eggBasket.visible = false;
+      group.add(eggBasket);
+    }
+
+    // First person held item & tool (in front of camera)
+    const heldBoxMesh = new THREE.Group();
+    populateCarriedGroup(heldBoxMesh);
+    heldBoxMesh.position.set(0.28, -0.32, -0.65);
+    heldBoxMesh.visible = false;
+    camera.add(heldBoxMesh);
+
+    const fpsToolMesh = new THREE.Group();
+    populateToolGroup(fpsToolMesh);
+    fpsToolMesh.position.set(0.36, -0.28, -0.58);
+    fpsToolMesh.visible = false;
+    camera.add(fpsToolMesh);
+    scene.add(camera);
+
+    // Camera Mode: 'TOPDOWN' (Üstten 3D Simülasyon) or 'FPS' (1. Şahıs)
+    let cameraMode = 'TOPDOWN';
+    let cameraZoom = 0;
+    const mouseNormalized = new THREE.Vector2(-999, -999);
+    let eventClientX = window.innerWidth / 2;
+    let eventClientY = window.innerHeight / 2;
+
+    // 3D Player Character Mesh (for Top-Down view)
+    const playerMesh = new THREE.Group();
+    playerMesh.position.set(player.pos.x, 0, player.pos.z);
+
+    // Legs
+    const legGeo = new THREE.BoxGeometry(0.24, 0.72, 0.24);
+    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+    const pLeftLeg = new THREE.Mesh(legGeo, pantsMat);
+    pLeftLeg.position.set(-0.2, 0.36, 0);
+    const pRightLeg = new THREE.Mesh(legGeo, pantsMat);
+    pRightLeg.position.set(0.2, 0.36, 0);
+    playerMesh.add(pLeftLeg, pRightLeg);
+
+    // Torso (Manager Apron & Shirt)
+    const torsoGeo = new THREE.BoxGeometry(0.66, 0.8, 0.4);
+    const shirtMat = new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.5 });
+    const pTorso = new THREE.Mesh(torsoGeo, shirtMat);
+    pTorso.position.set(0, 1.12, 0);
+    playerMesh.add(pTorso);
+
+    const apronStripe = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.5, 0.42),
+      new THREE.MeshStandardMaterial({ color: 0x0284c7 })
+    );
+    apronStripe.position.set(0, 1.15, 0);
+    playerMesh.add(apronStripe);
+
+    // Arms
+    const armGeo = new THREE.BoxGeometry(0.18, 0.68, 0.18);
+    const armMat = new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.6 });
+    const pLeftArm = new THREE.Mesh(armGeo, armMat);
+    pLeftArm.position.set(-0.44, 1.08, 0);
+    const pRightArm = new THREE.Mesh(armGeo, armMat);
+    pRightArm.position.set(0.44, 1.08, 0);
+    playerMesh.add(pLeftArm, pRightArm);
+
+    // Head & Hair
+    const headGeo = new THREE.BoxGeometry(0.38, 0.38, 0.38);
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xfbcfe8, roughness: 0.4 });
+    const pHead = new THREE.Mesh(headGeo, skinMat);
+    pHead.position.set(0, 1.72, 0);
+    const hairGeo = new THREE.BoxGeometry(0.42, 0.2, 0.42);
+    const hairMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+    const pHair = new THREE.Mesh(hairGeo, hairMat);
+    pHair.position.set(0, 1.86, 0);
+    playerMesh.add(pHead, pHair);
+
+    // 3D Carried Item in Manager's Hands (Box / Milk Churn / Wheat Sheaf / Crate)
+    const pCarriedBox = new THREE.Group();
+    populateCarriedGroup(pCarriedBox);
+    pCarriedBox.position.set(0, 1.05, 0.45);
+    pCarriedBox.visible = false;
+    playerMesh.add(pCarriedBox);
+
+    // 3D Equipped Farm Tool in Manager's Right Hand
+    const pToolMesh = new THREE.Group();
+    populateToolGroup(pToolMesh);
+    pToolMesh.position.set(0.48, 0.95, 0.35);
+    pToolMesh.visible = false;
+    playerMesh.add(pToolMesh);
+
+    // Target / Selection Ring at Manager's feet
+    const ringGeo = new THREE.RingGeometry(0.5, 0.75, 32);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xf97316, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
+    const pRing = new THREE.Mesh(ringGeo, ringMat);
+    pRing.position.y = 0.05;
+    playerMesh.add(pRing);
+
+    enableShadowsRecursive(playerMesh);
+    scene.add(playerMesh);
+
+    /* =========================================================================
+       PROCEDURAL TEXTURES GENERATOR
+       ========================================================================= */
+    function createTileTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, 0, 512, 512);
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(0, 0, 256, 256);
+      ctx.fillRect(256, 256, 256, 256);
+
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(0, 0, 512, 512);
+      ctx.strokeRect(0, 0, 256, 256);
+      ctx.strokeRect(256, 256, 256, 256);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(12, 14);
+      return tex;
+    }
+
+    function createRoadTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, 0, 512, 256);
+
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(50, 120, 110, 16);
+      ctx.fillRect(250, 120, 110, 16);
+      ctx.fillRect(450, 120, 110, 16);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(6, 1);
+      return tex;
+    }
+
+    function createSignTexture(text, bgColor = '#0284c7', textColor = '#ffffff') {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, 512, 128);
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(6, 6, 500, 116);
+
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 42px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 256, 64);
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createBoxLabelTexture(title, count) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#d97706';
+      ctx.fillRect(0, 0, 256, 256);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(20, 20, 216, 216);
+
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 24px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(title, 128, 70);
+
+      ctx.font = 'bold 48px Segoe UI, sans-serif';
+      ctx.fillStyle = '#0284c7';
+      ctx.fillText(count + ' ADET', 128, 140);
+
+      ctx.fillStyle = '#000000';
+      for (let x = 35; x < 220; x += 6) {
+        if (Math.random() > 0.3) ctx.fillRect(x, 175, 4, 40);
+      }
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createPriceRailTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#dc2626';
+      ctx.fillRect(0, 0, 512, 64);
+
+      for (let x = 12; x < 500; x += 85) {
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(x, 8, 65, 48);
+        ctx.strokeStyle = '#ca8a04';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, 8, 65, 48);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 16px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('₺' + (Math.floor((x * 7) % 35) + 12) + '.90', x + 32, 28);
+
+        ctx.fillStyle = '#000000';
+        for (let bx = x + 6; bx < x + 58; bx += 4) {
+          ctx.fillRect(bx, 36, 2, 14);
+        }
+      }
+      return new THREE.CanvasTexture(canvas);
+    }
+    // Hemisphere Sky & Ground Bounce Lighting + High-Res Directional Sun Shadows
+    const hemiLight = new THREE.HemisphereLight(0xf0f9ff, 0x4ade80, 0.95);
+    hemiLight.position.set(0, 30, 0);
+    scene.add(hemiLight);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+    scene.add(ambientLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfffbeb, 1.5);
+    sunLight.position.set(18, 28, 22);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 1024;
+    sunLight.shadow.mapSize.height = 1024;
+    sunLight.shadow.bias = -0.0005;
+    sunLight.shadow.camera.near = 1;
+    sunLight.shadow.camera.far = 90;
+    sunLight.shadow.camera.left = -26;
+    sunLight.shadow.camera.right = 26;
+    sunLight.shadow.camera.top = 26;
+    sunLight.shadow.camera.bottom = -26;
+    scene.add(sunLight);
+
+    // Ceiling Lights (fixtures without expensive per-frame cube shadow maps)
+    const ceilingFixtureGeo = new THREE.BoxGeometry(0.45, 0.1, 2.6);
+    const ceilingFixtureMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    function createCeilingLight(x, z, addPointLight = false) {
+      const fixture = new THREE.Mesh(ceilingFixtureGeo, ceilingFixtureMat);
+      fixture.position.set(x, 4.45, z);
+      scene.add(fixture);
+
+      if (addPointLight) {
+        const pLight = new THREE.PointLight(0xfffbeb, 0.9, 18, 1.5);
+        pLight.position.set(x, 4.15, z);
+        scene.add(pLight);
+      }
+    }
+
+    createCeilingLight(-4, 0, true);
+    createCeilingLight(-4, -6, false);
+    createCeilingLight(4, 0, true);
+    createCeilingLight(4, -6, false);
+
+    const STORE_W = 18;
+    const STORE_D = 20;
+    const STORE_H = 4.5;
+
+    // Glossy Porcelain Tile Floor
+    const tileTex = createTileTexture();
+    const floorGeo = new THREE.PlaneGeometry(STORE_W, STORE_D);
+    const floorMat = new THREE.MeshStandardMaterial({
+      map: tileTex,
+      bumpMap: tileTex,
+      bumpScale: 0.015,
+      roughness: 0.18,
+      metalness: 0.15
+    });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(0, 0, -4);
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Ceiling
+    const ceilingGeo = new THREE.PlaneGeometry(STORE_W, STORE_D);
+    const ceilingMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.75 });
+    const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
+    ceiling.rotation.x = Math.PI / 2;
+    ceiling.position.set(0, STORE_H, -4);
+    scene.add(ceiling);
+
+    // Walls (Warm bright cream)
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xfffbeb, roughness: 0.5 });
+
+    // Back Wall with Wide Archway to Backyard Farm & Fields
+    const backWallLeft = new THREE.Mesh(new THREE.BoxGeometry(6.7, STORE_H, 0.45), wallMat);
+    backWallLeft.position.set(-5.65, STORE_H / 2, -14);
+    backWallLeft.castShadow = true;
+    backWallLeft.receiveShadow = true;
+    scene.add(backWallLeft);
+
+    const backWallRight = new THREE.Mesh(new THREE.BoxGeometry(6.7, STORE_H, 0.45), wallMat);
+    backWallRight.position.set(5.65, STORE_H / 2, -14);
+    backWallRight.castShadow = true;
+    backWallRight.receiveShadow = true;
+    scene.add(backWallRight);
+
+    const backWallTop = new THREE.Mesh(new THREE.BoxGeometry(4.6, 1.1, 0.45), wallMat);
+    backWallTop.position.set(0, STORE_H - 0.55, -14);
+    scene.add(backWallTop);
+
+    const farmDoorSign = new THREE.Mesh(
+      new THREE.BoxGeometry(4.4, 0.72, 0.16),
+      new THREE.MeshStandardMaterial({ map: createSignTexture('🌾 ÇİFTLİK & TARLALAR 🐄', '#16a34a'), roughness: 0.35 })
+    );
+    farmDoorSign.position.set(0, 3.65, -13.72);
+    scene.add(farmDoorSign);
+
+    // Left Wall
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.45, STORE_H, STORE_D), wallMat);
+    leftWall.position.set(-STORE_W / 2, STORE_H / 2, -4);
+    leftWall.castShadow = true;
+    leftWall.receiveShadow = true;
+    scene.add(leftWall);
+
+    // Right Wall
+    const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.45, STORE_H, STORE_D), wallMat);
+    rightWall.position.set(STORE_W / 2, STORE_H / 2, -4);
+    rightWall.castShadow = true;
+    rightWall.receiveShadow = true;
+    scene.add(rightWall);
+
+    // Front Wall with Entrance
+    const frontWallLeft = new THREE.Mesh(new THREE.BoxGeometry(6, STORE_H, 0.45), wallMat);
+    frontWallLeft.position.set(-6, STORE_H / 2, 6);
+    frontWallLeft.castShadow = true;
+    frontWallLeft.receiveShadow = true;
+    scene.add(frontWallLeft);
+
+    const frontWallRight = new THREE.Mesh(new THREE.BoxGeometry(6, STORE_H, 0.45), wallMat);
+    frontWallRight.position.set(6, STORE_H / 2, 6);
+    frontWallRight.castShadow = true;
+    frontWallRight.receiveShadow = true;
+    scene.add(frontWallRight);
+
+    // Front Glass Automatic Doors (lightweight transparent StandardMaterial without extra transmission pass)
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0x93c5fd,
+      transparent: true,
+      opacity: 0.32,
+      roughness: 0.1,
+      metalness: 0.15
+    });
+    const glassDoor = new THREE.Mesh(new THREE.BoxGeometry(5.8, 3.8, 0.1), glassMat);
+    glassDoor.position.set(0, 1.9, 6);
+    scene.add(glassDoor);
+
+    // Supermarket Signboard
+    const signBoard = new THREE.Mesh(
+      new THREE.BoxGeometry(10, 1.4, 0.35),
+      new THREE.MeshStandardMaterial({ map: createSignTexture('⭐ SÜPERMARKET 3D ⭐', '#0284c7'), roughness: 0.3 })
+    );
+    signBoard.position.set(0, 4.2, 6.2);
+    signBoard.castShadow = true;
+    scene.add(signBoard);
+
+    // Outdoor City & Green Valley Environment
+    const grassField = new THREE.Mesh(
+      new THREE.PlaneGeometry(120, 120),
+      new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.88 })
+    );
+    grassField.rotation.x = -Math.PI / 2;
+    grassField.position.set(0, -0.08, -10);
+    grassField.receiveShadow = true;
+    scene.add(grassField);
+
+    const sidewalkGeo = new THREE.PlaneGeometry(46, 6.5);
+    const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.82 });
+    const sidewalk = new THREE.Mesh(sidewalkGeo, sidewalkMat);
+    sidewalk.rotation.x = -Math.PI / 2;
+    sidewalk.position.set(0, -0.01, 9);
+    sidewalk.receiveShadow = true;
+    scene.add(sidewalk);
+
+    const roadGeo = new THREE.PlaneGeometry(46, 14);
+    const roadMat = new THREE.MeshStandardMaterial({
+      map: createRoadTexture(),
+      roughness: 0.75
+    });
+    const road = new THREE.Mesh(roadGeo, roadMat);
+    road.rotation.x = -Math.PI / 2;
+    road.position.set(0, -0.04, 19);
+    road.receiveShadow = true;
+    scene.add(road);
+
+    // 3D Trees Along the Street & Store Sides
+    function create3DTree(x, z) {
+      const treeGrp = new THREE.Group();
+      treeGrp.position.set(x, 0, z);
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.26, 1.8, 10),
+        new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 })
+      );
+      trunk.position.y = 0.9;
+      treeGrp.add(trunk);
+
+      const leafMat1 = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.7 });
+      const leafMat2 = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.65 });
+      const c1 = new THREE.Mesh(new THREE.SphereGeometry(1.15, 14, 14), leafMat1);
+      c1.position.set(0, 2.3, 0);
+      const c2 = new THREE.Mesh(new THREE.SphereGeometry(0.85, 12, 12), leafMat2);
+      c2.position.set(-0.5, 2.8, 0.3);
+      const c3 = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 12), leafMat2);
+      c3.position.set(0.5, 2.7, -0.2);
+      treeGrp.add(c1, c2, c3);
+      enableShadowsRecursive(treeGrp);
+      scene.add(treeGrp);
+    }
+    [-13, -7, 7, 13].forEach(tx => create3DTree(tx, 11.2));
+    [-12, 12].forEach(tx => create3DTree(tx, -3));
+
+    // Buildings Across the Street (City Backdrop)
+    const buildingMat1 = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6 });
+    const buildingMat2 = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+    [-15, -5, 5, 15].forEach((bx, idx) => {
+      const bHeight = 12 + (idx % 3) * 4;
+      const bMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(8, bHeight, 8),
+        idx % 2 === 0 ? buildingMat1 : buildingMat2
+      );
+      bMesh.position.set(bx, bHeight / 2, 28);
+      bMesh.castShadow = true;
+      bMesh.receiveShadow = true;
+      scene.add(bMesh);
+    });
+
+    // Street Lamps
+    function createStreetLamp(x, z) {
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.12, 4.5, 10),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.25 })
+      );
+      pole.position.set(x, 2.25, z);
+      pole.castShadow = true;
+      scene.add(pole);
+
+      const lampHead = new THREE.Mesh(
+        new THREE.BoxGeometry(0.45, 0.22, 0.65),
+        new THREE.MeshBasicMaterial({ color: 0xfef08a })
+      );
+      lampHead.position.set(x, 4.5, z);
+      scene.add(lampHead);
+
+      const lampLight = new THREE.PointLight(0xfef08a, 0.7, 14);
+      lampLight.position.set(x, 4.35, z);
+      scene.add(lampLight);
+    }
+    createStreetLamp(-9, 11);
+    createStreetLamp(9, 11);
+
+    // Dumpster Outside
+    const dumpsterGeo = new THREE.BoxGeometry(1.6, 1.3, 1.1);
+    const dumpsterMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.6 });
+    const dumpster = new THREE.Mesh(dumpsterGeo, dumpsterMat);
+    dumpster.position.set(6.5, 0.65, 8);
+    dumpster.castShadow = true;
+    scene.add(dumpster);
+
+    /* =========================================================================
+       FURNITURE: SHELVES, CHECKOUT COUNTER & COMPUTER DESK
+       ========================================================================= */
+    const interactiveObjects = [];
+
+    function createGondolaShelf(shelfId, title, x, z, rotationY = 0, prodId = null) {
+      const group = new THREE.Group();
+      group.position.set(x, 0, z);
+      group.rotation.y = rotationY;
+
+      const frameMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.5, roughness: 0.5 });
+      const upright1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.5, 0.8), frameMat);
+      upright1.position.set(-1.4, 1.25, 0);
+      group.add(upright1);
+
+      const upright2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.5, 0.8), frameMat);
+      upright2.position.set(1.4, 1.25, 0);
+      group.add(upright2);
+
+      // Back Board (Arka Delikli Metal Panel)
+      const backBoard = new THREE.Mesh(new THREE.BoxGeometry(2.7, 2.4, 0.05), frameMat);
+      backBoard.position.set(0, 1.25, 0);
+      group.add(backBoard);
+
+      // Bottom Kickplate (Alt Baza Metal Koruması)
+      const kickMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.4 });
+      const kickPlate = new THREE.Mesh(new THREE.BoxGeometry(2.85, 0.18, 0.76), kickMat);
+      kickPlate.position.set(0, 0.09, 0);
+      group.add(kickPlate);
+
+      // Side Endcaps (Gondol Başı Panelleri)
+      const endcapMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 });
+      [-1.41, 1.41].forEach(ex => {
+        const endcap = new THREE.Mesh(new THREE.BoxGeometry(0.02, 2.3, 0.78), endcapMat);
+        endcap.position.set(ex, 1.25, 0);
+        group.add(endcap);
+      });
+
+      // 3 Tiers with Metal Decks, Price Rails & LED Lights
+      const tierMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.3, roughness: 0.3 });
+      if (!window._sharedPriceRailMat) {
+        window._sharedPriceRailMat = new THREE.MeshStandardMaterial({ map: createPriceRailTexture(), roughness: 0.3 });
+      }
+      const priceRailMat = window._sharedPriceRailMat;
+      const bracketMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6 });
+      const ledMat = new THREE.MeshBasicMaterial({ color: 0xffedd5 });
+
+      [0.45, 1.15, 1.85].forEach(y => {
+        // Tier Deck
+        const tier = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.05, 0.75), tierMat);
+        tier.position.set(0, y, 0);
+        tier.castShadow = true;
+        tier.receiveShadow = true;
+        group.add(tier);
+
+        // Front Price Tag Rail (Kırmızı Etiket Bandı)
+        const railFront = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.06, 0.03), priceRailMat);
+        railFront.position.set(0, y - 0.01, 0.38);
+        group.add(railFront);
+
+        // Brackets
+        [-1.3, 1.3].forEach(bx => {
+          const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.7), bracketMat);
+          bracket.position.set(bx, y - 0.06, 0);
+          group.add(bracket);
+        });
+
+        // Under-shelf warm LED strip
+        const ledStrip = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.015, 0.04), ledMat);
+        ledStrip.position.set(0, y - 0.02, 0.3);
+        group.add(ledStrip);
+      });
+
+      // Reyon Canopy Sign (Işıklı Üst Başlık)
+      const catSign = new THREE.Mesh(
+        new THREE.BoxGeometry(2.4, 0.45, 0.12),
+        new THREE.MeshStandardMaterial({ map: createSignTexture(title, '#0284c7'), roughness: 0.3 })
+      );
+      catSign.position.set(0, 2.68, 0);
+      group.add(catSign);
+
+      const signGlow = new THREE.Mesh(
+        new THREE.BoxGeometry(2.45, 0.04, 0.14),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+      );
+      signGlow.position.set(0, 2.92, 0);
+      group.add(signGlow);
+
+      const itemsContainer = new THREE.Group();
+      group.add(itemsContainer);
+
+      enableShadowsRecursive(group);
+      scene.add(group);
+
+      const prod = prodId ? PRODUCTS[prodId] : null;
+      const isUnlocked = prod ? prod.unlocked : true;
+
+      // Locked floor pad (shown when shelf is not unlocked yet)
+      const lockedPad = new THREE.Group();
+      lockedPad.position.set(x, 0.02, z);
+      lockedPad.rotation.y = rotationY;
+      const padPlane = new THREE.Mesh(
+        new THREE.BoxGeometry(2.8, 0.04, 1.0),
+        new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 })
+      );
+      const padSign = new THREE.Mesh(
+        new THREE.BoxGeometry(2.4, 0.05, 0.65),
+        new THREE.MeshBasicMaterial({ map: createSignTexture(`🔒 ${title} (₺${prod ? prod.unlockCost : 0})`, '#475569') })
+      );
+      padSign.position.y = 0.03;
+      padSign.rotation.x = -Math.PI / 2;
+      lockedPad.add(padPlane, padSign);
+      lockedPad.visible = !isUnlocked;
+      scene.add(lockedPad);
+
+      group.visible = isUnlocked;
+
+      const trigger = new THREE.Mesh(
+        new THREE.BoxGeometry(3.2, 2.6, 1.8),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      trigger.position.set(x, 1.3, z);
+      trigger.userData = isUnlocked
+        ? { type: 'shelf', shelfId: shelfId }
+        : { type: 'lockedShelf', shelfId: shelfId };
+      scene.add(trigger);
+      interactiveObjects.push(trigger);
+
+      const shelfData = {
+        id: shelfId,
+        title: title,
+        group: group,
+        lockedPad: lockedPad,
+        trigger: trigger,
+        itemsContainer: itemsContainer,
+        stockedCount: 0,
+        maxCapacity: 12,
+        productId: prodId,
+        unlocked: isUnlocked
+      };
+      Game.shelves[shelfId] = shelfData;
+
+      return shelfData;
+    }
+
+    // Starter 3 Shelves (Un, Süt, Yumurta) + 6 Unlockable Shelves
+    createGondolaShelf('shelf_dairy', '🥛 SÜT & AYRAN', -5.5, -4, Math.PI / 2, 'milk');
+    createGondolaShelf('shelf_flour', '🌾 DOĞAL UN & TAHIL', 5.5, -11, 0, 'flour');
+    createGondolaShelf('shelf_eggs', '🥚 KÖY YUMURTASI', -0.5, -7, 0, 'egg');
+
+    createGondolaShelf('shelf_bakery', '🍞 FIRIN & EKMEK', 5.5, -7, 0, 'bread');
+    createGondolaShelf('shelf_cheese', '🧀 PEYNİR & MANDIRA', -5.5, -9, Math.PI / 2, 'cheese');
+    createGondolaShelf('shelf_fruits', '🍎 MANAV & MEYVE', 5.5, -2, 0, 'apple');
+    createGondolaShelf('shelf_cereal', '🥣 MISIR GEVREĞİ', -0.5, -2, 0, 'cereal');
+    createGondolaShelf('shelf_drinks', '🥤 SOĞUK İÇECEK', -5.5, 1, Math.PI / 2, 'soda');
+    createGondolaShelf('shelf_snacks', '🍫 ATIŞTIRMALIK', 0.0, 0.5, 0, 'chocolate');
+
+    // Initial stock setup (Only Starter 3: Milk, Flour, Eggs)
+    setTimeout(() => {
+      stockProductOnShelf('shelf_dairy', 'milk', 6);
+      stockProductOnShelf('shelf_flour', 'flour', 6);
+      stockProductOnShelf('shelf_eggs', 'egg', 6);
+    }, 400);
+
+    function stockProductOnShelf(shelfId, prodId, count) {
+      const shelf = Game.shelves[shelfId];
+      if (!shelf) return;
+      shelf.productId = prodId;
+      shelf.stockedCount = Math.min(shelf.maxCapacity, shelf.stockedCount + count);
+
+      while (shelf.itemsContainer.children.length > 0) {
+        shelf.itemsContainer.remove(shelf.itemsContainer.children[0]);
+      }
+
+      const positions = [
+        // Tier 1 (y: 0.55)
+        new THREE.Vector3(-0.8, 0.55, 0.2),
+        new THREE.Vector3(-0.3, 0.55, 0.2),
+        new THREE.Vector3(0.3, 0.55, 0.2),
+        new THREE.Vector3(0.8, 0.55, 0.2),
+        // Tier 2 (y: 1.25)
+        new THREE.Vector3(-0.8, 1.25, 0.2),
+        new THREE.Vector3(-0.3, 1.25, 0.2),
+        new THREE.Vector3(0.3, 1.25, 0.2),
+        new THREE.Vector3(0.8, 1.25, 0.2),
+        // Tier 3 (y: 1.95)
+        new THREE.Vector3(-0.8, 1.95, 0.2),
+        new THREE.Vector3(-0.3, 1.95, 0.2),
+        new THREE.Vector3(0.3, 1.95, 0.2),
+        new THREE.Vector3(0.8, 1.95, 0.2),
+      ];
+
+      for (let i = 0; i < shelf.stockedCount; i++) {
+        const itemMesh = createProductMesh(prodId);
+        itemMesh.position.copy(positions[i]);
+        shelf.itemsContainer.add(itemMesh);
+      }
+    }
+
+    const PRODUCT_TEMPLATES = {};
+    function createProductMesh(prodId, castShadows = false) {
+      if (!PRODUCT_TEMPLATES[prodId]) {
+        const group = new THREE.Group();
+
+        if (prodId === 'milk') {
+          const carton = new THREE.Mesh(
+            new THREE.BoxGeometry(0.18, 0.32, 0.18),
+            new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25 })
+          );
+          const blueCap = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.045, 0.045, 0.04, 10),
+            new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3 })
+          );
+          blueCap.position.y = 0.18;
+          const label = new THREE.Mesh(
+            new THREE.BoxGeometry(0.185, 0.14, 0.185),
+            new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.4 })
+          );
+          label.position.y = 0.02;
+          group.add(carton, blueCap, label);
+        } else if (prodId === 'soda') {
+          const can = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.09, 0.09, 0.25, 12),
+            new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.85, roughness: 0.25 })
+          );
+          const canTop = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.088, 0.088, 0.02, 12),
+            new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.95, roughness: 0.15 })
+          );
+          canTop.position.y = 0.13;
+          const tab = new THREE.Mesh(
+            new THREE.BoxGeometry(0.04, 0.005, 0.06),
+            new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9 })
+          );
+          tab.position.set(0, 0.142, 0.02);
+          group.add(can, canTop, tab);
+        } else if (prodId === 'bread') {
+          const loaf = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.07, 0.07, 0.44, 10),
+            new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.85 })
+          );
+          loaf.rotation.z = Math.PI / 4;
+          loaf.scale.set(1.4, 1.0, 0.8);
+          const score = new THREE.Mesh(
+            new THREE.BoxGeometry(0.03, 0.08, 0.14),
+            new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.9 })
+          );
+          score.position.y = 0.05;
+          score.rotation.z = Math.PI / 4;
+          group.add(loaf, score);
+        } else if (prodId === 'cereal') {
+          const box = new THREE.Mesh(
+            new THREE.BoxGeometry(0.25, 0.36, 0.13),
+            new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.35 })
+          );
+          const face = new THREE.Mesh(
+            new THREE.BoxGeometry(0.23, 0.28, 0.135),
+            new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.4 })
+          );
+          group.add(box, face);
+        } else if (prodId === 'apple') {
+          const apple = new THREE.Mesh(
+            new THREE.SphereGeometry(0.12, 10, 10),
+            new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.2, metalness: 0.1 })
+          );
+          const stem = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.01, 0.01, 0.06, 6),
+            new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 })
+          );
+          stem.position.set(0.01, 0.12, 0);
+          stem.rotation.z = 0.2;
+          const leaf = new THREE.Mesh(
+            new THREE.BoxGeometry(0.04, 0.01, 0.06),
+            new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.4 })
+          );
+          leaf.position.set(0.03, 0.13, 0.02);
+          group.add(apple, stem, leaf);
+        } else if (prodId === 'flour') {
+          const sack = new THREE.Mesh(
+            new THREE.BoxGeometry(0.22, 0.3, 0.14),
+            new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.75 })
+          );
+          const badge = new THREE.Mesh(
+            new THREE.BoxGeometry(0.16, 0.12, 0.145),
+            new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.5 })
+          );
+          group.add(sack, badge);
+        } else if (prodId === 'cheese') {
+          const wheel = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.14, 0.14, 0.16, 12),
+            new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.45 })
+          );
+          const wrap = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.142, 0.142, 0.05, 12),
+            new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4 })
+          );
+          group.add(wheel, wrap);
+        } else if (prodId === 'egg') {
+          const carton = new THREE.Mesh(
+            new THREE.BoxGeometry(0.26, 0.08, 0.18),
+            new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.8 })
+          );
+          const eggMat = new THREE.MeshStandardMaterial({ color: 0xfef9c3, roughness: 0.35 });
+          [-0.06, 0.06].forEach(ex => {
+            const egg = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), eggMat);
+            egg.scale.set(1, 1.3, 1);
+            egg.position.set(ex, 0.05, 0);
+            group.add(egg);
+          });
+          group.add(carton);
+        } else {
+          const bar = new THREE.Mesh(
+            new THREE.BoxGeometry(0.26, 0.06, 0.16),
+            new THREE.MeshStandardMaterial({ color: 0xca8a04, metalness: 0.85, roughness: 0.3 })
+          );
+          const wrapper = new THREE.Mesh(
+            new THREE.BoxGeometry(0.18, 0.065, 0.165),
+            new THREE.MeshStandardMaterial({ color: 0x581c87, roughness: 0.4 })
+          );
+          group.add(bar, wrapper);
+        }
+        PRODUCT_TEMPLATES[prodId] = group;
+      }
+
+      const clone = PRODUCT_TEMPLATES[prodId].clone();
+      if (castShadows) {
+        enableShadowsRecursive(clone);
+      }
+      return clone;
+    }
+
+    // Suspended Overhead Aisle Banners (Tavana Asılı Reyon Tabelaları)
+    function createOverheadAisleSign(text, x, z) {
+      const signGroup = new THREE.Group();
+      signGroup.position.set(x, 4.2, z);
+
+      const cableMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8 });
+      [-1.2, 1.2].forEach(cx => {
+        const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.4, 6), cableMat);
+        cable.position.set(cx, 0.7, 0);
+        signGroup.add(cable);
+      });
+
+      const boardMat = new THREE.MeshStandardMaterial({
+        map: createSignTexture(text, '#1e293b', '#38bdf8'),
+        roughness: 0.3
+      });
+      const board = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.6, 0.1), boardMat);
+      signGroup.add(board);
+
+      const glowMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+      const glowBorder = new THREE.Mesh(new THREE.BoxGeometry(3.25, 0.04, 0.12), glowMat);
+      glowBorder.position.y = -0.3;
+      signGroup.add(glowBorder);
+
+      scene.add(signGroup);
+    }
+
+    createOverheadAisleSign('REYON 1 • SOĞUK SÜT VE MEŞRUBAT', -5.5, -1.5);
+    createOverheadAisleSign('REYON 2 • TAHIL & ATIŞTIRMALIK', -0.5, -4.5);
+    createOverheadAisleSign('REYON 3 • TAŞ FIRIN & TAZE MANAV', 5.5, -4.5);
+
+    // Ceiling Fluorescent Light Fixtures with Glowing Tubes
+    [-5.5, -0.5, 5.5].forEach(lx => {
+      [-6, -1, 3].forEach(lz => {
+        const fixture = new THREE.Group();
+        fixture.position.set(lx, 4.8, lz);
+
+        const housing = new THREE.Mesh(
+          new THREE.BoxGeometry(2.4, 0.1, 0.4),
+          new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5 })
+        );
+        const tubeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const tube1 = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 8), tubeMat);
+        tube1.rotation.z = Math.PI / 2;
+        tube1.position.set(0, -0.06, -0.1);
+        const tube2 = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 8), tubeMat);
+        tube2.rotation.z = Math.PI / 2;
+        tube2.position.set(0, -0.06, 0.1);
+
+        fixture.add(housing, tube1, tube2);
+        scene.add(fixture);
+      });
+    });
+
+    // Shopping Baskets by Entrance
+    const basketStackGroup = new THREE.Group();
+    basketStackGroup.position.set(2.2, 0, 4.5);
+    const bStand = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.25, 0.25, 0.8, 12),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8 })
+    );
+    bStand.position.y = 0.4;
+    basketStackGroup.add(bStand);
+    for (let i = 0; i < 5; i++) {
+      const bMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.28, 0.35),
+        new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.5 })
+      );
+      bMesh.position.set(0, 0.8 + (i * 0.08), 0);
+      basketStackGroup.add(bMesh);
+    }
+    scene.add(basketStackGroup);
+
+    // Checkout Counter (Kasa) - Lively & Detailed
+    const checkoutGroup = new THREE.Group();
+    checkoutGroup.position.set(4, 0, 3.5);
+
+    const counterBase = new THREE.Mesh(
+      new THREE.BoxGeometry(3.8, 1.0, 1.4),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 })
+    );
+    counterBase.position.set(0, 0.5, 0);
+    checkoutGroup.add(counterBase);
+
+    // Warm Wood Front & Side Accent Panel
+    const counterWoodPanel = new THREE.Mesh(
+      new THREE.BoxGeometry(3.72, 0.72, 1.42),
+      new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.65 })
+    );
+    counterWoodPanel.position.set(0, 0.45, 0);
+    checkoutGroup.add(counterWoodPanel);
+
+    // Glowing Emerald LED Accent Strip under counter top
+    const counterLedStrip = new THREE.Mesh(
+      new THREE.BoxGeometry(3.82, 0.035, 1.43),
+      new THREE.MeshStandardMaterial({
+        color: 0x10b981,
+        emissive: 0x10b981,
+        emissiveIntensity: 0.9,
+        roughness: 0.2
+      })
+    );
+    counterLedStrip.position.set(0, 0.94, 0);
+    checkoutGroup.add(counterLedStrip);
+
+    // Metal trim along counter top
+    const counterTrim = new THREE.Mesh(
+      new THREE.BoxGeometry(3.84, 0.06, 1.44),
+      new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.55, roughness: 0.25 })
+    );
+    counterTrim.position.set(0, 1.0, 0);
+    checkoutGroup.add(counterTrim);
+
+    // Animated Conveyor Belt Texture
+    const conveyorCanvas = document.createElement('canvas');
+    conveyorCanvas.width = 256;
+    conveyorCanvas.height = 128;
+    const convCtx = conveyorCanvas.getContext('2d');
+    convCtx.fillStyle = '#0f172a';
+    convCtx.fillRect(0, 0, 256, 128);
+    convCtx.strokeStyle = '#334155';
+    convCtx.lineWidth = 6;
+    for (let x = -64; x < 320; x += 48) {
+      convCtx.beginPath();
+      convCtx.moveTo(x, 0);
+      convCtx.lineTo(x + 28, 64);
+      convCtx.lineTo(x, 128);
+      convCtx.stroke();
+    }
+    const conveyorTex = new THREE.CanvasTexture(conveyorCanvas);
+    conveyorTex.wrapS = THREE.RepeatWrapping;
+    conveyorTex.wrapT = THREE.ClampToEdgeWrapping;
+    conveyorTex.repeat.set(3.5, 1);
+
+    // Conveyor Belt
+    const conveyor = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 0.05, 0.82),
+      new THREE.MeshStandardMaterial({ map: conveyorTex, roughness: 0.75 })
+    );
+    conveyor.position.set(-0.65, 1.03, 0);
+    checkoutGroup.add(conveyor);
+
+    // Conveyor Side Rails
+    const railMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.6, roughness: 0.3 });
+    [-0.43, 0.43].forEach(rz => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(2.22, 0.07, 0.04), railMat);
+      rail.position.set(-0.65, 1.05, rz);
+      checkoutGroup.add(rail);
+    });
+
+    // Checkout Divider Bar ("Sonraki Müşteri")
+    const dividerBar = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.05, 0.48),
+      new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.35 })
+    );
+    dividerBar.position.set(-1.62, 1.08, 0.08);
+    checkoutGroup.add(dividerBar);
+
+    // Illuminated "KASA 1" Lane Sign Pole
+    const lanePole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.03, 1.15, 10),
+      new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.75, roughness: 0.25 })
+    );
+    lanePole.position.set(-1.68, 1.60, -0.55);
+    checkoutGroup.add(lanePole);
+
+    const laneSignCanvas = document.createElement('canvas');
+    laneSignCanvas.width = 256;
+    laneSignCanvas.height = 128;
+    const lsCtx = laneSignCanvas.getContext('2d');
+    lsCtx.fillStyle = '#065f46';
+    lsCtx.fillRect(0, 0, 256, 128);
+    lsCtx.strokeStyle = '#34d399';
+    lsCtx.lineWidth = 8;
+    lsCtx.strokeRect(6, 6, 244, 116);
+    lsCtx.fillStyle = '#ecfdf5';
+    lsCtx.font = 'bold 46px Segoe UI, sans-serif';
+    lsCtx.textAlign = 'center';
+    lsCtx.fillText('KASA 1', 128, 68);
+    lsCtx.fillStyle = '#6ee7b7';
+    lsCtx.font = 'bold 24px Segoe UI, sans-serif';
+    lsCtx.fillText('AÇIK • HOŞ GELDİNİZ', 128, 104);
+    const laneSignTex = new THREE.CanvasTexture(laneSignCanvas);
+
+    const laneSignBox = new THREE.Mesh(
+      new THREE.BoxGeometry(0.58, 0.30, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0x064e3b, roughness: 0.3 })
+    );
+    laneSignBox.position.set(-1.68, 2.22, -0.55);
+    checkoutGroup.add(laneSignBox);
+
+    [0.042, -0.042].forEach((zOff, idx) => {
+      const signFace = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.54, 0.26),
+        new THREE.MeshBasicMaterial({ map: laneSignTex })
+      );
+      signFace.position.set(0, 0, zOff);
+      if (idx === 1) signFace.rotation.y = Math.PI;
+      laneSignBox.add(signFace);
+    });
+
+    // Cash Register Drawer (pops open on payment)
+    const cashDrawerGroup = new THREE.Group();
+    cashDrawerGroup.position.set(0.95, 0.90, 0.46);
+    const cashDrawerBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.58, 0.14, 0.44),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.4, roughness: 0.4 })
+    );
+    cashDrawerGroup.add(cashDrawerBody);
+    const cashDrawerHandle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.24, 0.03, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.8, roughness: 0.2 })
+    );
+    cashDrawerHandle.position.set(0, 0, 0.23);
+    cashDrawerGroup.add(cashDrawerHandle);
+    checkoutGroup.add(cashDrawerGroup);
+
+    // Contactless Card POS Terminal
+    const cardPosGroup = new THREE.Group();
+    cardPosGroup.position.set(0.96, 1.07, -0.22);
+    cardPosGroup.rotation.y = -0.25;
+    const cardPosBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.09, 0.20),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.35 })
+    );
+    cardPosBody.rotation.x = -0.35;
+    cardPosGroup.add(cardPosBody);
+    const cardPosScreen = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.10, 0.07),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+    );
+    cardPosScreen.rotation.x = -Math.PI / 2 - 0.35;
+    cardPosScreen.position.set(0, 0.055, -0.02);
+    cardPosGroup.add(cardPosScreen);
+    checkoutGroup.add(cardPosGroup);
+
+    // Receipt Printer with paper slip
+    const printerBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.14, 0.20),
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4 })
+    );
+    printerBody.position.set(1.56, 1.10, -0.10);
+    checkoutGroup.add(printerBody);
+    const receiptPaper = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.08, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, side: THREE.DoubleSide, roughness: 0.9 })
+    );
+    receiptPaper.position.set(1.56, 1.21, -0.08);
+    receiptPaper.rotation.x = 0.25;
+    checkoutGroup.add(receiptPaper);
+
+    // Flatbed Barcode Scanner Plate + Upright Scanner Stand
+    const scannerBed = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.04, 0.56),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.6, roughness: 0.3 })
+    );
+    scannerBed.position.set(0.65, 1.03, 0);
+    checkoutGroup.add(scannerBed);
+
+    const scannerLaserSlit = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.24, 0.32),
+      new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+    );
+    scannerLaserSlit.rotation.x = -Math.PI / 2;
+    scannerLaserSlit.position.set(0.65, 1.055, 0);
+    checkoutGroup.add(scannerLaserSlit);
+
+    const scannerTower = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.38, 0.42),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 })
+    );
+    scannerTower.position.set(0.65, 1.22, -0.35);
+    checkoutGroup.add(scannerTower);
+
+    // Dynamic Red Laser Flash Beam (visible during scan)
+    const scannerLaserFlash = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, 0.35, 0.55),
+      new THREE.MeshBasicMaterial({ color: 0xff2222, transparent: true, opacity: 0.0 })
+    );
+    scannerLaserFlash.position.set(0.65, 1.24, 0);
+    checkoutGroup.add(scannerLaserFlash);
+
+    // POS Monitor with Live Canvas Screen
+    const posCanvas = document.createElement('canvas');
+    posCanvas.width = 256;
+    posCanvas.height = 192;
+    const posCtx = posCanvas.getContext('2d');
+    const posTex = new THREE.CanvasTexture(posCanvas);
+
+    function updatePosMonitorScreen(count, total, statusText = 'KASA HAZIR') {
+      posCtx.fillStyle = '#0f172a';
+      posCtx.fillRect(0, 0, 256, 192);
+      posCtx.strokeStyle = '#38bdf8';
+      posCtx.lineWidth = 4;
+      posCtx.strokeRect(4, 4, 248, 184);
+
+      posCtx.fillStyle = '#38bdf8';
+      posCtx.font = 'bold 18px Segoe UI, sans-serif';
+      posCtx.textAlign = 'left';
+      posCtx.fillText('SÜPERMARKET POS', 18, 32);
+
+      posCtx.fillStyle = '#94a3b8';
+      posCtx.font = '16px Segoe UI, sans-serif';
+      posCtx.fillText(`Okutulan: ${count} Ürün`, 18, 72);
+
+      posCtx.fillStyle = '#10b981';
+      posCtx.font = 'bold 42px Segoe UI, sans-serif';
+      posCtx.fillText(`₺${total.toFixed(2)}`, 18, 128);
+
+      posCtx.fillStyle = '#fbbf24';
+      posCtx.font = 'bold 15px Segoe UI, sans-serif';
+      posCtx.fillText(statusText, 18, 168);
+      posTex.needsUpdate = true;
+    }
+    updatePosMonitorScreen(0, 0);
+
+    const posStand = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.06, 0.35, 8),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7 })
+    );
+    posStand.position.set(1.25, 1.18, -0.35);
+    checkoutGroup.add(posStand);
+
+    const posMonitor = new THREE.Mesh(
+      new THREE.BoxGeometry(0.56, 0.42, 0.06),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 })
+    );
+    posMonitor.position.set(1.25, 1.45, -0.32);
+    posMonitor.rotation.y = -Math.PI / 6;
+    posMonitor.rotation.x = -0.15;
+    checkoutGroup.add(posMonitor);
+
+    const posScreenFace = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.5, 0.36),
+      new THREE.MeshBasicMaterial({ map: posTex })
+    );
+    posScreenFace.position.set(0, 0, 0.032);
+    posMonitor.add(posScreenFace);
+
+    // Bagging Area & 3D Paper Bag
+    const bagMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.45, 0.38, 0.35),
+      new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.85 })
+    );
+    bagMesh.position.set(1.38, 1.22, 0.22);
+    checkoutGroup.add(bagMesh);
+
+    // Container for 3D items on the conveyor belt
+    const conveyorItemsGroup = new THREE.Group();
+    checkoutGroup.add(conveyorItemsGroup);
+
+    enableShadowsRecursive(checkoutGroup);
+    scene.add(checkoutGroup);
+
+    // Warm overhead checkout light so products, scanner & customer are vividly lit
+    const checkoutLight = new THREE.PointLight(0xfffbeb, 1.15, 7.5);
+    checkoutLight.position.set(4.1, 2.75, 3.55);
+    scene.add(checkoutLight);
+
+    // Visible Cashier Auto-Enter Zone on the floor behind the counter
+    const cashierZoneGroup = new THREE.Group();
+    cashierZoneGroup.position.set(4.15, 0.014, 4.75);
+
+    const cashierMatMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1.55, 0.02, 0.96),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.85 })
+    );
+    cashierZoneGroup.add(cashierMatMesh);
+
+    const cashierZoneBorderMat = new THREE.MeshBasicMaterial({
+      color: 0x10b981,
+      transparent: true,
+      opacity: 0.75,
+      side: THREE.DoubleSide
+    });
+    const cashierZoneBorder = new THREE.Mesh(
+      new THREE.RingGeometry(0.62, 0.72, 4),
+      cashierZoneBorderMat
+    );
+    cashierZoneBorder.rotation.x = -Math.PI / 2;
+    cashierZoneBorder.rotation.z = Math.PI / 4;
+    cashierZoneBorder.scale.set(1.28, 0.82, 1);
+    cashierZoneBorder.position.y = 0.015;
+    cashierZoneGroup.add(cashierZoneBorder);
+
+    const zoneLabelCanvas = document.createElement('canvas');
+    zoneLabelCanvas.width = 256;
+    zoneLabelCanvas.height = 96;
+    const zlCtx = zoneLabelCanvas.getContext('2d');
+    zlCtx.clearRect(0, 0, 256, 96);
+    zlCtx.fillStyle = 'rgba(16, 185, 129, 0.18)';
+    zlCtx.fillRect(8, 12, 240, 72);
+    zlCtx.strokeStyle = '#34d399';
+    zlCtx.lineWidth = 4;
+    zlCtx.strokeRect(8, 12, 240, 72);
+    zlCtx.fillStyle = '#ecfdf5';
+    zlCtx.font = 'bold 26px Segoe UI, sans-serif';
+    zlCtx.textAlign = 'center';
+    zlCtx.fillText('🛎️ KASA ALANI', 128, 57);
+    const zoneLabelTex = new THREE.CanvasTexture(zoneLabelCanvas);
+
+    const zoneLabelMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.2, 0.45),
+      new THREE.MeshBasicMaterial({ map: zoneLabelTex, transparent: true, depthWrite: false })
+    );
+    zoneLabelMesh.rotation.x = -Math.PI / 2;
+    zoneLabelMesh.position.y = 0.018;
+    cashierZoneGroup.add(zoneLabelMesh);
+    scene.add(cashierZoneGroup);
+
+    const checkoutTrigger = new THREE.Mesh(
+      new THREE.BoxGeometry(4.0, 2.5, 2.5),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    checkoutTrigger.position.set(4, 1.25, 3.5);
+    checkoutTrigger.userData = { type: 'checkout' };
+    scene.add(checkoutTrigger);
+    interactiveObjects.push(checkoutTrigger);
+
+    // Computer Desk (Manager Desk)
+    const deskGroup = new THREE.Group();
+    deskGroup.position.set(-6.5, 0, 3.5);
+
+    const desk = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 0.9, 1.2),
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 })
+    );
+    desk.position.set(0, 0.45, 0);
+    deskGroup.add(desk);
+
+    const pcScreen = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 0.45, 0.05),
+      new THREE.MeshBasicMaterial({ color: 0x0284c7 })
+    );
+    pcScreen.position.set(0, 1.2, 0);
+    deskGroup.add(pcScreen);
+
+    enableShadowsRecursive(deskGroup);
+    scene.add(deskGroup);
+
+    const computerTrigger = new THREE.Mesh(
+      new THREE.BoxGeometry(2.5, 2.5, 2.0),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    computerTrigger.position.set(-6.5, 1.25, 3.5);
+    computerTrigger.userData = { type: 'computer' };
+    scene.add(computerTrigger);
+    interactiveObjects.push(computerTrigger);
+
+    // Delivery Truck
+    const truckGroup = new THREE.Group();
+    truckGroup.position.set(-24, 0, 18);
+
+    const truckBody = new THREE.Mesh(
+      new THREE.BoxGeometry(6, 2.4, 2.2),
+      new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.4 })
+    );
+    truckBody.position.set(0, 1.6, 0);
+    truckGroup.add(truckBody);
+
+    const truckCabin = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 2.0, 2.1),
+      new THREE.MeshStandardMaterial({ color: 0x1d4ed8 })
+    );
+    truckCabin.position.set(3.5, 1.4, 0);
+    truckGroup.add(truckCabin);
+
+    enableShadowsRecursive(truckGroup);
+    scene.add(truckGroup);
+
+    // 🛵 3D Moto-Courier Scooter & Delivery Bay Outside Entrance
+    const courierGroup = new THREE.Group();
+    courierGroup.position.set(4.2, 0, 8.2);
+
+    const scooterBody = new THREE.Mesh(
+      new THREE.BoxGeometry(1.1, 0.45, 0.42),
+      new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.3, metalness: 0.3 })
+    );
+    scooterBody.position.set(0, 0.42, 0);
+    courierGroup.add(scooterBody);
+
+    const wheelGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.16, 14);
+    wheelGeo.rotateX(Math.PI / 2);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.9 });
+    const fWheel = new THREE.Mesh(wheelGeo, wheelMat);
+    fWheel.position.set(-0.42, 0.24, 0);
+    const bWheel = new THREE.Mesh(wheelGeo, wheelMat);
+    bWheel.position.set(0.42, 0.24, 0);
+    courierGroup.add(fWheel, bWheel);
+
+    const courierBag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.52, 0.52, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 })
+    );
+    courierBag.position.set(0.35, 0.88, 0);
+    courierGroup.add(courierBag);
+
+    const riderTorso = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.16, 0.55, 10),
+      new THREE.MeshStandardMaterial({ color: 0x5b21b6 })
+    );
+    riderTorso.position.set(-0.08, 0.92, 0);
+    const riderHelmet = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 12, 12),
+      new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.2, metalness: 0.2 })
+    );
+    riderHelmet.position.set(-0.08, 1.34, 0);
+    courierGroup.add(riderTorso, riderHelmet);
+
+    enableShadowsRecursive(courierGroup);
+    scene.add(courierGroup);
+
+    const courierTrigger = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 2.2, 2.0),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    courierTrigger.position.set(4.2, 1.1, 8.2);
+    courierTrigger.userData = { type: 'courier' };
+    scene.add(courierTrigger);
+    interactiveObjects.push(courierTrigger);
+
+    /* =========================================================================
+       BACKYARD FARM & FIELDS (ARKA BAHÇE ÇİFTLİK & TARLALAR - 2D UYARLAMASI)
+       ========================================================================= */
+    const farmHarvestSpots = [];
+    const farmWindmillBlades = [];
+
+    function createFarmWorld() {
+      const farmGroup = new THREE.Group();
+
+      // Stone garden path from back door (-14) to farm plots (-26)
+      const pathMat = new THREE.MeshStandardMaterial({ color: 0xe7e5e4, roughness: 0.85 });
+      const mainPath = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.04, 10), pathMat);
+      mainPath.position.set(0, -0.04, -18.5);
+      mainPath.receiveShadow = true;
+      farmGroup.add(mainPath);
+
+      const crossPath = new THREE.Mesh(new THREE.BoxGeometry(38, 0.04, 2.2), pathMat);
+      crossPath.position.set(0, -0.04, -17.2);
+      crossPath.receiveShadow = true;
+      farmGroup.add(crossPath);
+
+      // Decorative colorful wildflowers & lush trees around the yard
+      const flowerColors = [0xf43f5e, 0xfbbf24, 0xec4899, 0xa855f7, 0x38bdf8];
+      for (let i = 0; i < 42; i++) {
+        const fx = (Math.sin(i * 17.3) * 18);
+        const fz = -15.5 - (Math.abs(Math.cos(i * 9.7)) * 16);
+        if (Math.abs(fx) < 2.2 && fz > -19) continue;
+        const flower = new THREE.Mesh(
+          new THREE.SphereGeometry(0.14, 6, 6),
+          new THREE.MeshStandardMaterial({ color: flowerColors[i % flowerColors.length], roughness: 0.5 })
+        );
+        flower.position.set(fx, 0.06, fz);
+        farmGroup.add(flower);
+      }
+
+      const woodMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.85 });
+      const postMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 });
+
+      function buildFencedPlot(cx, cz, w, d, groundColor, signText, signColor) {
+        const plot = new THREE.Group();
+        plot.position.set(cx, 0, cz);
+
+        const ground = new THREE.Mesh(
+          new THREE.BoxGeometry(w, 0.06, d),
+          new THREE.MeshStandardMaterial({ color: groundColor, roughness: 0.9 })
+        );
+        ground.position.set(0, -0.03, 0);
+        ground.receiveShadow = true;
+        plot.add(ground);
+
+        // Fence posts & rails (leave front gate open at +z center)
+        const hw = w / 2;
+        const hd = d / 2;
+        const railGeoX = new THREE.BoxGeometry(w, 0.08, 0.08);
+        const backRail = new THREE.Mesh(railGeoX, woodMat);
+        backRail.position.set(0, 0.55, -hd);
+        plot.add(backRail);
+
+        const sideRailGeo = new THREE.BoxGeometry(0.08, 0.08, d);
+        const leftRail = new THREE.Mesh(sideRailGeo, woodMat);
+        leftRail.position.set(-hw, 0.55, 0);
+        const rightRail = new THREE.Mesh(sideRailGeo, woodMat);
+        rightRail.position.set(hw, 0.55, 0);
+        plot.add(leftRail, rightRail);
+
+        const frontSideW = (w - 2.2) / 2;
+        const frontRailL = new THREE.Mesh(new THREE.BoxGeometry(frontSideW, 0.08, 0.08), woodMat);
+        frontRailL.position.set(-hw + frontSideW / 2, 0.55, hd);
+        const frontRailR = new THREE.Mesh(new THREE.BoxGeometry(frontSideW, 0.08, 0.08), woodMat);
+        frontRailR.position.set(hw - frontSideW / 2, 0.55, hd);
+        plot.add(frontRailL, frontRailR);
+
+        // Corner posts
+        const postGeo = new THREE.BoxGeometry(0.16, 0.9, 0.16);
+        [[-hw, -hd], [hw, -hd], [-hw, hd], [hw, hd], [-1.1, hd], [1.1, hd]].forEach(([px, pz]) => {
+          const post = new THREE.Mesh(postGeo, postMat);
+          post.position.set(px, 0.45, pz);
+          plot.add(post);
+        });
+
+        // Signboard at front-left
+        const sign = new THREE.Mesh(
+          new THREE.BoxGeometry(2.6, 0.55, 0.1),
+          new THREE.MeshStandardMaterial({ map: createSignTexture(signText, signColor), roughness: 0.35 })
+        );
+        sign.position.set(0, 1.35, hd + 0.05);
+        plot.add(sign);
+
+        farmGroup.add(plot);
+        return plot;
+      }
+
+      function addHarvestSpot(parentPlot, worldX, worldZ, localX, localZ, productId, requiredTool, label, regrowDuration, visualBuilder) {
+        const spotGroup = new THREE.Group();
+        spotGroup.position.set(localX, 0, localZ);
+        visualBuilder(spotGroup);
+        parentPlot.add(spotGroup);
+
+        const trigger = new THREE.Mesh(
+          new THREE.BoxGeometry(1.5, 1.8, 1.5),
+          new THREE.MeshBasicMaterial({ visible: false })
+        );
+        trigger.position.set(worldX, 0.9, worldZ);
+
+        const spotObj = {
+          id: `${productId}_${farmHarvestSpots.length}`,
+          productId,
+          requiredTool,
+          label,
+          ready: true,
+          regrowTimer: 0,
+          regrowDuration,
+          visualGroup: spotGroup,
+          triggerMesh: trigger
+        };
+        trigger.userData = { type: 'farmSpot', spot: spotObj };
+        scene.add(trigger);
+        interactiveObjects.push(trigger);
+        farmHarvestSpots.push(spotObj);
+      }
+
+      function addToolStand(wx, wz, toolId, label, accentColor) {
+        const stand = new THREE.Group();
+        stand.position.set(wx, 0, wz);
+        const post = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.08, 0.1, 1.0, 8),
+          postMat
+        );
+        post.position.y = 0.5;
+        const top = new THREE.Mesh(
+          new THREE.BoxGeometry(0.55, 0.12, 0.55),
+          new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.45 })
+        );
+        top.position.y = 1.02;
+        stand.add(post, top);
+        farmGroup.add(stand);
+
+        const trigger = new THREE.Mesh(
+          new THREE.BoxGeometry(1.1, 1.8, 1.1),
+          new THREE.MeshBasicMaterial({ visible: false })
+        );
+        trigger.position.set(wx, 0.9, wz);
+        trigger.userData = { type: 'toolStand', toolId, label };
+        scene.add(trigger);
+        interactiveObjects.push(trigger);
+      }
+
+      // 1. İNEK MERASI & MANDIRA (Süt - milk)
+      const barnPlot = buildFencedPlot(-15.2, -22.8, 6.4, 7.6, 0x4ade80, '🐄 İNEK MERASI', '#0284c7');
+      addToolStand(-13.3, -18.6, 'milkBucket', 'Süt Kovası Al', 0x0284c7);
+      const barnBody = new THREE.Mesh(
+        new THREE.BoxGeometry(2.4, 1.8, 1.8),
+        new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.7 })
+      );
+      barnBody.position.set(-1.6, 0.9, -2.3);
+      const barnRoof = new THREE.Mesh(
+        new THREE.ConeGeometry(1.85, 1.1, 4),
+        new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 })
+      );
+      barnRoof.rotation.y = Math.PI / 4;
+      barnRoof.position.set(-1.6, 2.35, -2.3);
+      barnPlot.add(barnBody, barnRoof);
+
+      [[-1.6, 0.2], [1.4, -1.6], [1.4, 1.4], [-1.4, 2.0]].forEach(([lx, lz]) => {
+        addHarvestSpot(barnPlot, -15.2 + lx, -22.8 + lz, lx, lz, 'milk', 'milkBucket', 'Taze Süt Sağ', 6.0, (g) => {
+          // Cute 3D Cow + Milk Can
+          const cowBody = new THREE.Mesh(
+            new THREE.BoxGeometry(0.9, 0.55, 0.5),
+            new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.6 })
+          );
+          cowBody.position.set(0, 0.55, 0);
+          const spotPatch = new THREE.Mesh(
+            new THREE.BoxGeometry(0.35, 0.3, 0.52),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b })
+          );
+          spotPatch.position.set(0.1, 0.6, 0);
+          const cowHead = new THREE.Mesh(
+            new THREE.BoxGeometry(0.34, 0.34, 0.34),
+            new THREE.MeshStandardMaterial({ color: 0xf8fafc })
+          );
+          cowHead.position.set(-0.55, 0.75, 0);
+          const milkCan = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.16, 0.18, 0.42, 10),
+            new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.4, roughness: 0.25 })
+          );
+          milkCan.position.set(0.55, 0.21, 0.35);
+          g.add(cowBody, spotPatch, cowHead, milkCan);
+        });
+      });
+
+      // 2. DEĞİRMEN & BUĞDAY TARLASI (Buğday / Un - flour)
+      const wheatPlot = buildFencedPlot(-7.6, -22.8, 6.4, 7.6, 0x92400e, '🌾 BUĞDAY TARLASI', '#d97706');
+      addToolStand(-5.7, -18.6, 'scythe', 'Hasat Tırpanı Al', 0xd97706);
+      const millTower = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.65, 0.9, 2.8, 8),
+        new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.7 })
+      );
+      millTower.position.set(1.8, 1.4, -2.2);
+      const millRoof = new THREE.Mesh(
+        new THREE.ConeGeometry(0.85, 0.85, 8),
+        new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.7 })
+      );
+      millRoof.position.set(1.8, 3.2, -2.2);
+      const bladePivot = new THREE.Group();
+      bladePivot.position.set(1.8, 2.4, -1.35);
+      for (let b = 0; b < 4; b++) {
+        const blade = new THREE.Mesh(
+          new THREE.BoxGeometry(0.22, 1.4, 0.05),
+          new THREE.MeshStandardMaterial({ color: 0xf8fafc })
+        );
+        blade.rotation.z = (b * Math.PI) / 2;
+        blade.position.set(Math.sin(b * Math.PI / 2) * -0.7, Math.cos(b * Math.PI / 2) * 0.7, 0);
+        bladePivot.add(blade);
+      }
+      farmWindmillBlades.push(bladePivot);
+      wheatPlot.add(millTower, millRoof, bladePivot);
+
+      [[-1.6, -1.5], [-1.6, 1.4], [1.2, 0.2], [1.2, 2.1]].forEach(([lx, lz]) => {
+        addHarvestSpot(wheatPlot, -7.6 + lx, -22.8 + lz, lx, lz, 'flour', 'scythe', 'Buğday Hasat Et', 5.5, (g) => {
+          const wheatMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.65 });
+          for (let s = 0; s < 5; s++) {
+            const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.85, 6), wheatMat);
+            stalk.position.set((s - 2) * 0.16, 0.42, (s % 2 === 0 ? 0.12 : -0.12));
+            g.add(stalk);
+          }
+        });
+      });
+
+      // 3. TAVUK KÜMESİ (Yumurta - egg) - Başlangıçta Açık
+      const coopPlot = buildFencedPlot(0.0, -22.8, 6.4, 7.6, 0x84cc16, '🐔 TAVUK KÜMESİ', '#eab308');
+      addToolStand(1.9, -18.6, 'eggBucket', 'Yumurta Sepeti Al', 0xeab308);
+      const coopHouse = new THREE.Mesh(
+        new THREE.BoxGeometry(2.0, 1.4, 1.5),
+        new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.75 })
+      );
+      coopHouse.position.set(0, 0.7, -2.5);
+      const coopRoof = new THREE.Mesh(
+        new THREE.ConeGeometry(1.5, 0.9, 4),
+        new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.8 })
+      );
+      coopRoof.rotation.y = Math.PI / 4;
+      coopRoof.position.set(0, 1.85, -2.5);
+      coopPlot.add(coopHouse, coopRoof);
+
+      [[-1.5, -0.6], [1.5, -0.6], [-1.5, 1.8], [1.5, 1.8]].forEach(([lx, lz]) => {
+        addHarvestSpot(coopPlot, 0.0 + lx, -22.8 + lz, lx, lz, 'egg', 'eggBucket', 'Yumurta Topla', 5.0, (g) => {
+          // Straw nest + cute hen + eggs
+          const nest = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.42, 0.48, 0.16, 10),
+            new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.9 })
+          );
+          nest.position.y = 0.08;
+          const henBody = new THREE.Mesh(
+            new THREE.BoxGeometry(0.38, 0.3, 0.3),
+            new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 })
+          );
+          henBody.position.set(-0.1, 0.3, 0);
+          const henComb = new THREE.Mesh(
+            new THREE.BoxGeometry(0.12, 0.1, 0.08),
+            new THREE.MeshStandardMaterial({ color: 0xef4444 })
+          );
+          henComb.position.set(-0.22, 0.5, 0);
+          const eggMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(0.09, 8, 8),
+            new THREE.MeshStandardMaterial({ color: 0xfef9c3, roughness: 0.3 })
+          );
+          eggMesh.scale.set(1, 1.3, 1);
+          eggMesh.position.set(0.22, 0.2, 0.1);
+          g.add(nest, henBody, henComb, eggMesh);
+        });
+      });
+
+      // 4. AMASYA ELMASI BAHÇESİ (Elma - apple - Kilitli başlayıp reyonla açılır)
+      const applePlot = buildFencedPlot(7.6, -22.8, 6.4, 7.6, 0x16a34a, '🍎 ELMA BAHÇESİ', '#dc2626');
+      addToolStand(9.5, -18.6, 'basket', 'Elma Sepeti Al', 0xdc2626);
+      [[-1.6, -1.6], [1.5, -1.6], [-1.6, 1.5], [1.5, 1.5]].forEach(([lx, lz]) => {
+        addHarvestSpot(applePlot, 7.6 + lx, -22.8 + lz, lx, lz, 'apple', 'basket', 'Elma Topla', 5.5, (g) => {
+          const trunk = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.14, 0.2, 1.1, 8),
+            new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 })
+          );
+          trunk.position.set(0, 0.55, 0);
+          const canopy = new THREE.Mesh(
+            new THREE.SphereGeometry(0.82, 10, 10),
+            new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.75 })
+          );
+          canopy.position.set(0, 1.45, 0);
+          g.add(trunk, canopy);
+          const appleMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.35 });
+          [[0.45, 1.3, 0.45], [-0.4, 1.5, 0.5], [0.2, 1.2, -0.5]].forEach(([ax, ay, az]) => {
+            const ap = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), appleMat);
+            ap.position.set(ax, ay, az);
+            g.add(ap);
+          });
+        });
+      });
+
+      // 5. MISIR & TAHIL TARLASI (Mısır Gevreği - cereal - Kilitli başlayıp reyonla açılır)
+      const cornPlot = buildFencedPlot(15.2, -22.8, 6.4, 7.6, 0x78350f, '🌽 MISIR TARLASI', '#f59e0b');
+      addToolStand(17.1, -18.6, 'scythe', 'Mısır Tırpanı Al', 0xf59e0b);
+      [[-1.6, -1.6], [1.5, -1.6], [-1.6, 1.5], [1.5, 1.5]].forEach(([lx, lz]) => {
+        addHarvestSpot(cornPlot, 15.2 + lx, -22.8 + lz, lx, lz, 'cereal', 'scythe', 'Mısır Hasat Et', 6.0, (g) => {
+          const stalkMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.7 });
+          const cobMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.4 });
+          for (let c = -1; c <= 1; c++) {
+            const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.15, 6), stalkMat);
+            stalk.position.set(c * 0.25, 0.57, 0);
+            const cob = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), cobMat);
+            cob.scale.set(0.8, 1.6, 0.8);
+            cob.position.set(c * 0.25 + 0.1, 0.75, 0.08);
+            g.add(stalk, cob);
+          }
+        });
+      });
+
+      enableShadowsRecursive(farmGroup);
+      scene.add(farmGroup);
+    }
+    createFarmWorld();
+
+    /* =========================================================================
+       3D PROCESSING STATIONS (PEYNİR MAKİNESİ & TAŞ FIRIN)
+       ========================================================================= */
+    const cheeseMachine = {
+      inputCount: 0,
+      readyBoxes: 1,
+      maxBoxes: 3,
+      timer: 0,
+      duration: 4.0,
+      pos: new THREE.Vector3(-3.4, 0, -12.4)
+    };
+    const bakeryOven = {
+      inputCount: 0,
+      readyBoxes: 1,
+      maxBoxes: 3,
+      timer: 0,
+      duration: 4.0,
+      pos: new THREE.Vector3(3.4, 0, -12.4)
+    };
+
+    function createProcessingStations() {
+      // 1. 🧀 Peynir Yapma Makinesi (-3.4, -12.4)
+      const cmGroup = new THREE.Group();
+      cmGroup.position.copy(cheeseMachine.pos);
+      const cmBase = new THREE.Mesh(
+        new THREE.BoxGeometry(1.6, 1.1, 1.1),
+        new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.45, roughness: 0.35 })
+      );
+      cmBase.position.y = 0.55;
+      const cmVat = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.45, 0.45, 0.65, 14),
+        new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.35, roughness: 0.25 })
+      );
+      cmVat.position.set(0, 1.35, 0);
+      const cmSign = new THREE.Mesh(
+        new THREE.BoxGeometry(1.7, 0.42, 0.08),
+        new THREE.MeshStandardMaterial({ map: createSignTexture('🧀 PEYNİR MAKİNESİ', '#0284c7'), roughness: 0.3 })
+      );
+      cmSign.position.set(0, 2.0, 0.4);
+      cmGroup.add(cmBase, cmVat, cmSign);
+      enableShadowsRecursive(cmGroup);
+      scene.add(cmGroup);
+
+      const cmTrigger = new THREE.Mesh(
+        new THREE.BoxGeometry(1.9, 2.2, 1.5),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      cmTrigger.position.set(cheeseMachine.pos.x, 1.1, cheeseMachine.pos.z);
+      cmTrigger.userData = { type: 'cheeseMachine' };
+      scene.add(cmTrigger);
+      interactiveObjects.push(cmTrigger);
+
+      // 2. 🔥 Taş Fırın / Un Değirmeni (3.4, -12.4)
+      const ovenGroup = new THREE.Group();
+      ovenGroup.position.copy(bakeryOven.pos);
+      const ovenBody = new THREE.Mesh(
+        new THREE.BoxGeometry(1.7, 1.35, 1.2),
+        new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.85 })
+      );
+      ovenBody.position.y = 0.675;
+      const ovenFire = new THREE.Mesh(
+        new THREE.BoxGeometry(0.75, 0.48, 0.1),
+        new THREE.MeshBasicMaterial({ color: 0xf97316 })
+      );
+      ovenFire.position.set(0, 0.52, 0.58);
+      const ovenChimney = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.22, 0.26, 1.1, 10),
+        new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 })
+      );
+      ovenChimney.position.set(0.45, 1.8, -0.2);
+      const ovenSign = new THREE.Mesh(
+        new THREE.BoxGeometry(1.7, 0.42, 0.08),
+        new THREE.MeshStandardMaterial({ map: createSignTexture('🔥 TAŞ FIRIN (EKMEK)', '#ea580c'), roughness: 0.3 })
+      );
+      ovenSign.position.set(0, 2.0, 0.45);
+      ovenGroup.add(ovenBody, ovenFire, ovenChimney, ovenSign);
+      enableShadowsRecursive(ovenGroup);
+      scene.add(ovenGroup);
+
+      const ovenTrigger = new THREE.Mesh(
+        new THREE.BoxGeometry(1.9, 2.2, 1.5),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      ovenTrigger.position.set(bakeryOven.pos.x, 1.1, bakeryOven.pos.z);
+      ovenTrigger.userData = { type: 'bakeryOven' };
+      scene.add(ovenTrigger);
+      interactiveObjects.push(ovenTrigger);
+    }
+    createProcessingStations();
+
+    let activeCourier3D = null;
+    function spawnNewCourierOrder3D() {
+      const keys = Object.keys(PRODUCTS).filter(k => PRODUCTS[k].unlocked);
+      const pKey = keys[Math.floor(Math.random() * keys.length)];
+      const prod = PRODUCTS[pKey];
+      const qty = 2 + Math.floor(Math.random() * 3);
+      const reward = Math.round(prod.sellPrice * qty * 2.2);
+      activeCourier3D = { productId: pKey, qty: qty, delivered: 0, reward: reward };
+      courierGroup.visible = true;
+      updateCourierHUD3D();
+    }
+
+    function updateCourierHUD3D() {
+      const el = document.getElementById('courier-hud-text');
+      if (!el) return;
+      if (!activeCourier3D) {
+        el.textContent = 'Yeni kurye yolda...';
+        return;
+      }
+      const prod = PRODUCTS[activeCourier3D.productId];
+      el.textContent = `${activeCourier3D.delivered}/${activeCourier3D.qty} ${prod.emoji} ${prod.name} (+₺${activeCourier3D.reward})`;
+    }
+
+    function deliverToCourier3D() {
+      if (!activeCourier3D) return;
+      const prod = PRODUCTS[activeCourier3D.productId];
+      const shelf = Game.shelves[prod.shelfId];
+      const needed = activeCourier3D.qty - activeCourier3D.delivered;
+      let supplied = 0;
+
+      if (Game.carriedBox && Game.carriedBox.productId === activeCourier3D.productId && Game.carriedBox.remaining > 0) {
+        const take = Math.min(needed, Game.carriedBox.remaining);
+        Game.carriedBox.remaining -= take;
+        activeCourier3D.delivered += take;
+        supplied += take;
+        if (Game.carriedBox.remaining <= 0) {
+          Game.carriedBox = null;
+          heldBoxMesh.visible = false;
+        }
+        updateCarriedBoxUI();
+      }
+
+      const stillNeeded = activeCourier3D.qty - activeCourier3D.delivered;
+      if (stillNeeded > 0 && shelf && shelf.stockedCount > 0) {
+        const take = Math.min(stillNeeded, shelf.stockedCount);
+        shelf.stockedCount -= take;
+        stockProductOnShelf(shelf.id, shelf.productId, 0);
+        activeCourier3D.delivered += take;
+        supplied += take;
+      }
+
+      if (supplied <= 0) {
+        showNotification(`⚠️ Kurye için ${prod.emoji} ${prod.name} stokta yok! Sipariş verip rafa dizin.`);
+        return;
+      }
+
+      if (activeCourier3D.delivered >= activeCourier3D.qty) {
+        Game.money += activeCourier3D.reward;
+        AudioEngine.cash();
+        showFloatingMoney('+₺' + activeCourier3D.reward + ' 🛵');
+        showNotification(`🛵 Kurye Siparişi Tamamlandı! +₺${activeCourier3D.reward} (2.2x Ödül)`);
+        updateUI();
+        activeCourier3D = null;
+        courierGroup.visible = false;
+        updateCourierHUD3D();
+        setTimeout(spawnNewCourierOrder3D, 5000);
+      } else {
+        AudioEngine.pop();
+        updateCourierHUD3D();
+      }
+    }
+
+    setTimeout(spawnNewCourierOrder3D, 1200);
+
+    /* =========================================================================
+       CUSTOMERS (3D Characters with AI)
+       ========================================================================= */
+    function createCustomer() {
+      const group = new THREE.Group();
+
+      const shirtColors = [0xef4444, 0x10b981, 0x3b82f6, 0x8b5cf6, 0xf59e0b, 0xec4899];
+      const shirtColor = shirtColors[Math.floor(Math.random() * shirtColors.length)];
+
+      const torso = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.22, 0.7, 12),
+        new THREE.MeshStandardMaterial({ color: shirtColor })
+      );
+      torso.position.y = 1.05;
+      group.add(torso);
+
+      const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0xfbcfe8, roughness: 0.6 })
+      );
+      head.position.y = 1.55;
+      group.add(head);
+
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+      const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.7, 0.12), legMat);
+      leftLeg.position.set(-0.12, 0.35, 0);
+      const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.7, 0.12), legMat);
+      rightLeg.position.set(0.12, 0.35, 0);
+      group.add(leftLeg, rightLeg);
+
+      const possibleKeys = Object.keys(PRODUCTS).filter(k => PRODUCTS[k].unlocked);
+      const wishKey = possibleKeys[Math.floor(Math.random() * possibleKeys.length)];
+
+      group.position.set((Math.random() - 0.5) * 6, 0, 11);
+      enableShadowsRecursive(group);
+      scene.add(group);
+
+      const customerObj = {
+        mesh: group,
+        leftLeg: leftLeg,
+        rightLeg: rightLeg,
+        wishProduct: wishKey,
+        state: 'ENTERING',
+        targetPos: new THREE.Vector3(0, 0, 4),
+        basket: [],
+        walkTimer: 0
+      };
+
+      Game.customers.push(customerObj);
+      AudioEngine.chime();
+    }
+
+    setInterval(() => {
+      if (Game.customers.length < 5) {
+        createCustomer();
+      }
+    }, 6500);
+    setTimeout(createCustomer, 1500);
+
+    /* =========================================================================
+       WHOLESALE DELIVERY LOGISTICS
+       ========================================================================= */
+    function orderWholesale(productId) {
+      const prod = PRODUCTS[productId];
+      if (Game.money < prod.costPerBox) {
+        showNotification('❌ Yetersiz Bakiye! Koli tutarı: ₺' + prod.costPerBox);
+        return;
+      }
+
+      Game.money -= prod.costPerBox;
+      updateUI();
+      closeModals();
+      showNotification('🚛 Lojistik Kamyonu Siparişi Getiriyor...');
+      AudioEngine.horn();
+
+      let progress = 0;
+      truckGroup.position.x = -24;
+
+      const driveInterval = setInterval(() => {
+        progress += 0.035;
+        if (progress < 0.5) {
+          truckGroup.position.x = -24 + (progress / 0.5) * 24;
+        } else if (progress < 0.7) {
+          if (!truckGroup.userData.unloaded) {
+            truckGroup.userData.unloaded = true;
+            spawnDeliveryBox(productId, prod.unitsPerBox);
+            AudioEngine.thud();
+          }
+        } else {
+          truckGroup.position.x = (progress - 0.7) * 45;
+        }
+
+        if (progress >= 1.25) {
+          clearInterval(driveInterval);
+          truckGroup.userData.unloaded = false;
+          truckGroup.position.x = -24;
+        }
+      }, 30);
+    }
+
+    function spawnDeliveryBox(productId, units) {
+      const prod = PRODUCTS[productId];
+      const boxGroup = new THREE.Group();
+
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.7, 0.5, 0.55),
+        new THREE.MeshStandardMaterial({
+          map: createBoxLabelTexture(prod.name, units),
+          roughness: 0.8
+        })
+      );
+      mesh.castShadow = true;
+      boxGroup.add(mesh);
+
+      const spawnX = (Math.random() - 0.5) * 8;
+      boxGroup.position.set(spawnX, 0.25, 7.5);
+      scene.add(boxGroup);
+
+      const boxData = {
+        group: boxGroup,
+        productId: productId,
+        remaining: units
+      };
+      Game.deliveryBoxes.push(boxData);
+
+      const trigger = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 1.2, 1.2),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      trigger.position.copy(boxGroup.position);
+      trigger.userData = { type: 'box', boxData: boxData };
+      scene.add(trigger);
+      interactiveObjects.push(trigger);
+      boxData.trigger = trigger;
+    }
+
+    /* =========================================================================
+       INTERACTION & RAYCASTING SYSTEM
+       ========================================================================= */
+    const raycaster = new THREE.Raycaster();
+    const centerScreen = new THREE.Vector2(0, 0);
+    let currentHoverObject = null;
+    const _promptEl = document.getElementById('interaction-prompt');
+    const _promptText = document.getElementById('prompt-text');
+    const _crosshair = document.getElementById('crosshair');
+    const _cashierTooltip = document.getElementById('cashier-hover-tooltip');
+    let _lastPromptStr = '';
+
+    function findConveyorRoot(obj) {
+      let cur = obj;
+      while (cur && cur.parent && cur.parent !== conveyorItemsGroup) {
+        cur = cur.parent;
+      }
+      return (cur && cur.parent === conveyorItemsGroup) ? cur : null;
+    }
+
+    function checkCashierHover() {
+      if (hoveredConveyorMesh && !hoveredConveyorMesh.userData.scanned) {
+        hoveredConveyorMesh.scale.set(1, 1, 1);
+      }
+      hoveredConveyorMesh = null;
+
+      if (conveyorItemMeshes.length === 0) {
+        _cashierTooltip.style.display = 'none';
+        container.style.cursor = 'default';
+        return;
+      }
+
+      raycaster.setFromCamera(mouseNormalized, camera);
+      const intersects = raycaster.intersectObjects(conveyorItemMeshes, true);
+      if (intersects.length > 0) {
+        const root = findConveyorRoot(intersects[0].object);
+        if (root && !root.userData.scanned) {
+          hoveredConveyorMesh = root;
+          root.scale.set(1.16, 1.16, 1.16);
+          const prod = root.userData.product;
+          _cashierTooltip.textContent = `${prod.emoji} ${prod.name} • ₺${prod.sellPrice.toFixed(2)} (Okut)`;
+          _cashierTooltip.style.left = eventClientX + 'px';
+          _cashierTooltip.style.top = eventClientY + 'px';
+          _cashierTooltip.style.display = 'block';
+          container.style.cursor = 'pointer';
+          return;
+        }
+      }
+      _cashierTooltip.style.display = 'none';
+      container.style.cursor = 'default';
+    }
+
+    function checkRaycast() {
+      if (Game.activeModal) return;
+
+      if (cameraMode === 'CASHIER') {
+        checkCashierHover();
+        return;
+      }
+
+      if (cameraMode === 'TOPDOWN') {
+        raycaster.setFromCamera(mouseNormalized, camera);
+      } else {
+        raycaster.setFromCamera(centerScreen, camera);
+      }
+
+      const intersects = raycaster.intersectObjects(interactiveObjects, false);
+
+      if (intersects.length > 0) {
+        const hit = intersects[0].object;
+        const playerDist = player.pos.distanceTo(hit.position);
+
+        if (playerDist < 4.2 || cameraMode === 'TOPDOWN') {
+          currentHoverObject = hit;
+          _crosshair.classList.add('active');
+          _promptEl.style.display = 'block';
+
+          const actionHint = (cameraMode === 'TOPDOWN') ? '[Tıkla / E]' : '[E]';
+          let newText = '';
+
+          if (hit.userData.type === 'box') {
+            const prod = PRODUCTS[hit.userData.boxData.productId];
+            newText = `Koliyi Al ${actionHint} - ${prod.emoji} ${prod.name} (${hit.userData.boxData.remaining} Adet)`;
+          } else if (hit.userData.type === 'shelf') {
+            const shelf = Game.shelves[hit.userData.shelfId];
+            if (Game.carriedBox) {
+              newText = `Rafa Diz ${actionHint} (${shelf.stockedCount}/${shelf.maxCapacity})`;
+            } else {
+              newText = `${shelf.title} [Stok: ${shelf.stockedCount}/${shelf.maxCapacity}]`;
+            }
+          } else if (hit.userData.type === 'lockedShelf') {
+            const shelf = Game.shelves[hit.userData.shelfId];
+            const prod = PRODUCTS[shelf.productId];
+            newText = `🔒 ${shelf.title} Reyonunu Aç ${actionHint} (₺${prod.unlockCost})`;
+          } else if (hit.userData.type === 'computer') {
+            newText = `Sipariş Bilgisayarını Aç ${actionHint}`;
+          } else if (hit.userData.type === 'checkout') {
+            const waitingCount = Game.customers.filter(c => c.state === 'WAITING_CHECKOUT').length;
+            newText = waitingCount > 0
+              ? `Kasaya Geç & Barkod Oku (${waitingCount} Müşteri Bekliyor) ${actionHint}`
+              : `Kasaya Geç (Kasiyer Görünümü) ${actionHint}`;
+          } else if (hit.userData.type === 'courier') {
+            newText = `🛵 Kuryeye Siparişi Teslim Et ${actionHint}`;
+          } else if (hit.userData.type === 'toolStand') {
+            const tInfo = FARM_TOOLS[hit.userData.toolId];
+            newText = Game.equippedTool === hit.userData.toolId
+              ? `${tInfo.emoji} ${tInfo.name} Zaten Elinizde`
+              : `${tInfo.emoji} ${hit.userData.label} ${actionHint}`;
+          } else if (hit.userData.type === 'cheeseMachine') {
+            if (Game.carriedBox && Game.carriedBox.productId === 'milk') {
+              newText = `🥛 Peynir Makinesine Süt Ekle ${actionHint} (${cheeseMachine.readyBoxes}/${cheeseMachine.maxBoxes} Hazır)`;
+            } else if (cheeseMachine.readyBoxes > 0 && !Game.carriedBox) {
+              newText = `🧀 Tulum Peyniri Al ${actionHint} (${cheeseMachine.readyBoxes}/${cheeseMachine.maxBoxes} Hazır)`;
+            } else if (cheeseMachine.inputCount > 0) {
+              newText = `⏳ Peynir Üretiliyor... (${cheeseMachine.readyBoxes}/${cheeseMachine.maxBoxes} Hazır)`;
+            } else {
+              newText = `🧀 Peynir Makinesi (İnek Merasından 🥛 Süt Getirin)`;
+            }
+          } else if (hit.userData.type === 'bakeryOven') {
+            if (Game.carriedBox && Game.carriedBox.productId === 'flour') {
+              newText = `🌾 Taş Fırına Buğday Koy ${actionHint} (${bakeryOven.readyBoxes}/${bakeryOven.maxBoxes} Hazır)`;
+            } else if (bakeryOven.readyBoxes > 0 && !Game.carriedBox) {
+              newText = `🍞 Taş Fırın Ekmeği Al ${actionHint} (${bakeryOven.readyBoxes}/${bakeryOven.maxBoxes} Hazır)`;
+            } else if (bakeryOven.inputCount > 0) {
+              newText = `🔥 Ekmek Pişiyor... (${bakeryOven.readyBoxes}/${bakeryOven.maxBoxes} Hazır)`;
+            } else {
+              newText = `🔥 Taş Fırın (Tarladan 🌾 Buğday Getirin)`;
+            }
+          } else if (hit.userData.type === 'farmSpot') {
+            const spot = hit.userData.spot;
+            const prod = PRODUCTS[spot.productId];
+            const tInfo = FARM_TOOLS[spot.requiredTool];
+            if (!prod.unlocked) {
+              newText = `🔒 Kilitli Alan - Önce Marketten ${prod.emoji} ${prod.name} Reyonunu Açın`;
+            } else if (spot.ready) {
+              newText = `${tInfo.emoji} ${spot.label} ${actionHint} - ${prod.emoji} ${prod.name}`;
+            } else {
+              newText = `⏳ Yetişiyor (${Math.ceil(spot.regrowTimer)}s) - ${prod.emoji} ${prod.name}`;
+            }
+          }
+
+          if (newText !== _lastPromptStr) {
+            _promptText.textContent = newText;
+            _lastPromptStr = newText;
+          }
+          return;
+        }
+      }
+      if (currentHoverObject !== null) {
+        currentHoverObject = null;
+        _crosshair.classList.remove('active');
+        _promptEl.style.display = 'none';
+        _lastPromptStr = '';
+      }
+
+      // Etkileşim alanı: Kasa arkasındaki kasiyer bölgesindeyse doğrudan E ile kasaya geçiş sun
+      if (isPlayerInCashierZone()) {
+        const waitingCount = Game.customers.filter(c => c.state === 'WAITING_CHECKOUT').length;
+        const zoneText = waitingCount > 0
+          ? `Kasaya Geç & Barkod Oku (${waitingCount} Müşteri Bekliyor) [E]`
+          : `Kasaya Geç (Kasiyer Görünümü) [E]`;
+        _crosshair.classList.add('active');
+        _promptEl.style.display = 'block';
+        if (zoneText !== _lastPromptStr) {
+          _promptText.textContent = zoneText;
+          _lastPromptStr = zoneText;
+        }
+      }
+    }
+
+    function handleInteraction() {
+      if (playerState !== PlayerState.WALKING) return;
+      if (!currentHoverObject) {
+        if (isPlayerInCashierZone()) {
+          openCheckoutModal();
+        }
+        return;
+      }
+      const type = currentHoverObject.userData.type;
+
+      if (type === 'box') {
+        if (Game.carriedBox) {
+          showNotification('Zaten elinizde ürün var! Önce rafa dizin veya bırakın [Q].');
+          return;
+        }
+        const bData = currentHoverObject.userData.boxData;
+        Game.carriedBox = {
+          productId: bData.productId,
+          remaining: bData.remaining,
+          maxCount: PRODUCTS[bData.productId].unitsPerBox,
+          isFromFarm: false
+        };
+        scene.remove(bData.group);
+        scene.remove(currentHoverObject);
+        const idx = Game.deliveryBoxes.indexOf(bData);
+        if (idx !== -1) Game.deliveryBoxes.splice(idx, 1);
+        const objIdx = interactiveObjects.indexOf(currentHoverObject);
+        if (objIdx !== -1) interactiveObjects.splice(objIdx, 1);
+
+        AudioEngine.pop();
+        updateCarriedBoxUI();
+      } else if (type === 'shelf') {
+        const shelf = Game.shelves[currentHoverObject.userData.shelfId];
+        if (Game.carriedBox) {
+          if (shelf.stockedCount >= shelf.maxCapacity) {
+            showNotification('Bu raf tamamen dolu!');
+            return;
+          }
+          if (Game.carriedBox.productId === 'flour' && shelf.id === 'shelf_bakery') {
+            showNotification('💡 Buğdayı 🌾 Doğal Un Rafına dizebilir veya 🔥 Taş Fırın\'da ekmeğe çevirebilirsiniz!');
+          }
+          stockProductOnShelf(shelf.id, Game.carriedBox.productId, 1);
+          Game.carriedBox.remaining--;
+          AudioEngine.pop();
+
+          if (Game.carriedBox.remaining <= 0) {
+            Game.carriedBox = null;
+            showNotification('Raf harika dolduruldu!');
+          }
+          updateCarriedBoxUI();
+        }
+      } else if (type === 'lockedShelf') {
+        unlockShelf(currentHoverObject.userData.shelfId);
+      } else if (type === 'computer') {
+        openComputerModal();
+      } else if (type === 'checkout') {
+        openCheckoutModal();
+      } else if (type === 'courier') {
+        deliverToCourier3D();
+      } else if (type === 'toolStand') {
+        const toolId = currentHoverObject.userData.toolId;
+        const tInfo = FARM_TOOLS[toolId];
+        Game.equippedTool = toolId;
+        updateToolUI();
+        AudioEngine.pop();
+        showNotification(`${tInfo.emoji} ${tInfo.name} alındı! Artık çiftlikte kullanabilirsiniz.`);
+      } else if (type === 'cheeseMachine') {
+        if (Game.carriedBox && Game.carriedBox.productId === 'milk') {
+          if (cheeseMachine.inputCount + cheeseMachine.readyBoxes >= cheeseMachine.maxBoxes + 2) {
+            showNotification('🧀 Peynir Makinesi şu an dolu!');
+            return;
+          }
+          const used = Math.min(4, Game.carriedBox.remaining);
+          Game.carriedBox.remaining -= used;
+          cheeseMachine.inputCount++;
+          if (Game.carriedBox.remaining <= 0) Game.carriedBox = null;
+          updateCarriedBoxUI();
+          AudioEngine.pop();
+          showNotification('🥛 Süt Peynir Makinesine eklendi! Tulum Peyniri hazırlanıyor...');
+        } else if (cheeseMachine.readyBoxes > 0 && !Game.carriedBox) {
+          cheeseMachine.readyBoxes--;
+          const prod = PRODUCTS.cheese;
+          Game.carriedBox = {
+            productId: 'cheese',
+            remaining: prod.unitsPerBox,
+            maxCount: prod.unitsPerBox,
+            isFromFarm: false
+          };
+          updateCarriedBoxUI();
+          AudioEngine.pop();
+          showNotification(`🧀 Tulum Peyniri alındı (${prod.unitsPerBox} Adet)! Peynir rafına dizin.`);
+        } else {
+          showNotification('🥛 İnek Merasından süt sağıp buraya getirin!');
+        }
+      } else if (type === 'bakeryOven') {
+        if (Game.carriedBox && Game.carriedBox.productId === 'flour') {
+          if (bakeryOven.inputCount + bakeryOven.readyBoxes >= bakeryOven.maxBoxes + 2) {
+            showNotification('🔥 Taş Fırın şu an dolu!');
+            return;
+          }
+          const used = Math.min(4, Game.carriedBox.remaining);
+          Game.carriedBox.remaining -= used;
+          bakeryOven.inputCount++;
+          if (Game.carriedBox.remaining <= 0) Game.carriedBox = null;
+          updateCarriedBoxUI();
+          AudioEngine.pop();
+          showNotification('🌾 Buğday Taş Fırına verildi! Sıcak ekmek pişiyor...');
+        } else if (bakeryOven.readyBoxes > 0 && !Game.carriedBox) {
+          bakeryOven.readyBoxes--;
+          const prod = PRODUCTS.bread;
+          Game.carriedBox = {
+            productId: 'bread',
+            remaining: prod.unitsPerBox,
+            maxCount: prod.unitsPerBox,
+            isFromFarm: false
+          };
+          updateCarriedBoxUI();
+          AudioEngine.pop();
+          showNotification(`🍞 Taş Fırın Ekmeği alındı (${prod.unitsPerBox} Adet)! Fırın rafına dizin.`);
+        } else {
+          showNotification('🌾 Buğday Tarlasından buğday biçip buraya getirin!');
+        }
+      } else if (type === 'farmSpot') {
+        const spot = currentHoverObject.userData.spot;
+        const prod = PRODUCTS[spot.productId];
+        if (!prod.unlocked) {
+          showNotification(`🔒 Önce marketten ${prod.emoji} ${prod.name} reyonunu açmalısınız!`);
+          return;
+        }
+        if (!spot.ready) {
+          showNotification(`⏳ Henüz hazır değil (${Math.ceil(spot.regrowTimer)} sn kaldı)`);
+          return;
+        }
+        if (Game.carriedBox) {
+          if (!Game.carriedBox.isFromFarm || Game.carriedBox.productId !== spot.productId) {
+            showNotification('Elinizde başka ürün var! Önce rafa dizin veya bırakın [Q].');
+            return;
+          }
+          if (Game.carriedBox.remaining >= Game.carriedBox.maxCount) {
+            showNotification('Elinizdeki hasat tamamen dolu! Markete götürüp rafa dizin.');
+            return;
+          }
+        }
+        // Auto-equip required tool if not already holding it
+        if (Game.equippedTool !== spot.requiredTool) {
+          Game.equippedTool = spot.requiredTool;
+          updateToolUI();
+          const tInfo = FARM_TOOLS[spot.requiredTool];
+          showNotification(`${tInfo.emoji} ${tInfo.name} kuşanıldı!`);
+        }
+        // Start timed harvest / milking action
+        if (!Game.activeHarvest || Game.activeHarvest.spot !== spot) {
+          Game.activeHarvest = { spot, progress: 0, duration: 1.1 };
+          AudioEngine.pop();
+        }
+      }
+    }
+
+    function discardCarriedBox() {
+      if (!Game.carriedBox) return;
+      spawnDeliveryBox(Game.carriedBox.productId, Game.carriedBox.remaining);
+      Game.carriedBox = null;
+      updateCarriedBoxUI();
+      AudioEngine.thud();
+    }
+
+    function dropEquippedTool() {
+      if (!Game.equippedTool) return;
+      const tInfo = FARM_TOOLS[Game.equippedTool];
+      Game.equippedTool = null;
+      Game.activeHarvest = null;
+      updateToolUI();
+      showNotification(`${tInfo.emoji} ${tInfo.name} bırakıldı.`);
+    }
+
+    function setGroupVariant(group, variantName, crateColor) {
+      group.children.forEach(ch => {
+        if (ch.name === 'variant_box') ch.visible = (variantName === 'box');
+        else if (ch.name === 'variant_milk') ch.visible = (variantName === 'milk');
+        else if (ch.name === 'variant_flour') ch.visible = (variantName === 'flour');
+        else if (ch.name === 'variant_crate') {
+          ch.visible = (variantName === 'crate');
+          if (variantName === 'crate' && crateColor) {
+            ch.children.forEach(c => {
+              if (c.name === 'crate_fruit') c.material.color.setHex(crateColor);
+            });
+          }
+        }
+      });
+    }
+
+    function updateCarriedVisuals() {
+      if (!Game.carriedBox) {
+        heldBoxMesh.visible = false;
+        pCarriedBox.visible = false;
+        return;
+      }
+      let variant = 'box';
+      let crateColor = null;
+      if (Game.carriedBox.isFromFarm) {
+        if (Game.carriedBox.productId === 'milk') variant = 'milk';
+        else if (Game.carriedBox.productId === 'flour') variant = 'flour';
+        else if (Game.carriedBox.productId === 'egg') { variant = 'crate'; crateColor = 0xfef08a; }
+        else if (Game.carriedBox.productId === 'apple') { variant = 'crate'; crateColor = 0xef4444; }
+        else if (Game.carriedBox.productId === 'cereal') { variant = 'crate'; crateColor = 0xfacc15; }
+      }
+      setGroupVariant(heldBoxMesh, variant, crateColor);
+      setGroupVariant(pCarriedBox, variant, crateColor);
+      heldBoxMesh.visible = (cameraMode === 'FPS');
+      pCarriedBox.visible = (cameraMode === 'TOPDOWN');
+    }
+
+    function updateToolUI() {
+      const ind = document.getElementById('tool-indicator');
+      const em = document.getElementById('tool-emoji');
+      const txt = document.getElementById('tool-text');
+      if (Game.equippedTool) {
+        const tInfo = FARM_TOOLS[Game.equippedTool];
+        em.textContent = tInfo.emoji;
+        txt.textContent = `Ekipman: ${tInfo.name}`;
+        ind.style.display = 'flex';
+      } else {
+        ind.style.display = 'none';
+      }
+      [fpsToolMesh, pToolMesh].forEach(tg => {
+        tg.children.forEach(ch => {
+          ch.visible = (Game.equippedTool && ch.name === `tool_${Game.equippedTool}`);
+        });
+      });
+      fpsToolMesh.visible = (Game.equippedTool !== null && cameraMode === 'FPS');
+      pToolMesh.visible = (Game.equippedTool !== null && cameraMode === 'TOPDOWN');
+    }
+
+    function getFarmCarryLabel(prodId) {
+      if (prodId === 'milk') return { emoji: '🥛', name: 'Sağılmış Taze Süt' };
+      if (prodId === 'flour') return { emoji: '🌾', name: 'Biçilmiş Buğday Demeti' };
+      if (prodId === 'egg') return { emoji: '🥚', name: 'Taze Köy Yumurtası' };
+      if (prodId === 'apple') return { emoji: '🍎', name: 'Taze Elma Sepeti' };
+      if (prodId === 'cereal') return { emoji: '🌽', name: 'Taze Mısır Sepeti' };
+      const p = PRODUCTS[prodId];
+      return { emoji: p.emoji, name: p.name };
+    }
+
+    function updateCarriedBoxUI() {
+      const ind = document.getElementById('hand-indicator');
+      const txt = document.getElementById('hand-text');
+      const em = document.getElementById('hand-emoji');
+      if (Game.carriedBox) {
+        const prod = PRODUCTS[Game.carriedBox.productId];
+        const maxC = Game.carriedBox.maxCount || prod.unitsPerBox;
+        if (Game.carriedBox.isFromFarm) {
+          const fl = getFarmCarryLabel(Game.carriedBox.productId);
+          em.textContent = fl.emoji;
+          txt.textContent = `Elinizde: ${fl.name} (${Game.carriedBox.remaining}/${maxC})`;
+        } else {
+          em.textContent = '📦';
+          txt.textContent = `Elinizde: ${prod.emoji} ${prod.name} (${Game.carriedBox.remaining}/${maxC})`;
+        }
+        ind.style.display = 'flex';
+      } else {
+        ind.style.display = 'none';
+      }
+      updateCarriedVisuals();
+      updateToolUI();
+    }
+
+    /* =========================================================================
+       3D CASHIER VIEW & INTERACTIVE CONVEYOR SCANNING LOGIC
+       ========================================================================= */
+    let currentCheckoutCustomer = null;
+    let checkoutItemsToScan = [];
+    let scannedTotal = 0;
+    let previousCameraMode = 'TOPDOWN';
+    let conveyorItemMeshes = [];
+    let hoveredConveyorMesh = null;
+    let scannerFlashTimer = 0;
+    let cashDrawerTimer = 0;
+    let cashierAutoExitLock = false;
+
+    // Player & Camera State Machine
+    const PlayerState = {
+      WALKING: 'WALKING',
+      ENTERING_CASHIER: 'ENTERING_CASHIER',
+      CASHIER: 'CASHIER',
+      EXITING_CASHIER: 'EXITING_CASHIER'
+    };
+    let playerState = PlayerState.WALKING;
+
+    // Owner's Eye-Level Cashier Camera Point (1.72m owner eye height, natural gaze over conveyor, scanner & customer)
+    const CASHIER_DEFAULT_YAW = 0.24;
+    const CASHIER_DEFAULT_PITCH = THREE.MathUtils.degToRad(-20);
+    let cashierLookYaw = CASHIER_DEFAULT_YAW;
+    let cashierLookPitch = CASHIER_DEFAULT_PITCH;
+    let isCashierLooking = false;
+
+    const CashierCameraPoint = new THREE.Object3D();
+    CashierCameraPoint.position.set(4.05, 1.72, 4.95);
+    CashierCameraPoint.rotation.order = 'YXZ';
+    CashierCameraPoint.rotation.x = CASHIER_DEFAULT_PITCH;
+    CashierCameraPoint.rotation.y = CASHIER_DEFAULT_YAW;
+    CashierCameraPoint.updateMatrixWorld(true);
+    scene.add(CashierCameraPoint);
+
+    const _cashierParallaxEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+    const _cashierParallaxQuat = new THREE.Quaternion();
+    const _cashierTargetPos = new THREE.Vector3();
+
+    const cameraTransition = {
+      active: false,
+      fromPos: new THREE.Vector3(),
+      fromQuat: new THREE.Quaternion(),
+      toPos: new THREE.Vector3(),
+      toQuat: new THREE.Quaternion(),
+      progress: 0,
+      duration: 0.45,
+      onComplete: null
+    };
+
+    function isPlayerInCashierZone() {
+      // Kasa arkasındaki etkileşim alanı (x: 2.0..6.0, z: 3.9..5.7)
+      return (
+        player.pos.x >= 2.0 && player.pos.x <= 6.0 &&
+        player.pos.z >= 3.9 && player.pos.z <= 5.7
+      );
+    }
+
+    function isPlayerInCashierTriggerZone() {
+      // Kasa arkasındaki alana girince otomatik kasiyer bakışına geçer
+      return (
+        player.pos.x >= 2.2 && player.pos.x <= 5.8 &&
+        player.pos.z >= 4.05 && player.pos.z <= 5.60
+      );
+    }
+
+    function clearMovementKeys() {
+      keys.w = false;
+      keys.a = false;
+      keys.s = false;
+      keys.d = false;
+      keys.shift = false;
+    }
+
+    function startCameraTransition(toPos, toQuat, duration, onComplete) {
+      cameraTransition.fromPos.copy(camera.position);
+      cameraTransition.fromQuat.copy(camera.quaternion);
+      cameraTransition.toPos.copy(toPos);
+      cameraTransition.toQuat.copy(toQuat);
+      cameraTransition.progress = 0;
+      cameraTransition.duration = duration || 0.45;
+      cameraTransition.onComplete = onComplete || null;
+      cameraTransition.active = true;
+    }
+
+    function getWalkingCameraTarget(mode) {
+      const pos = new THREE.Vector3();
+      const quat = new THREE.Quaternion();
+      if (mode === 'FPS') {
+        pos.set(player.pos.x, player.pos.y, player.pos.z);
+        const euler = new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ');
+        quat.setFromEuler(euler);
+      } else {
+        pos.set(
+          player.pos.x * 0.35,
+          15.0 + cameraZoom,
+          player.pos.z + 11.5 + cameraZoom * 0.7
+        );
+        const lookTarget = new THREE.Vector3(player.pos.x * 0.35, 0.6, player.pos.z - 1.2);
+        const m = new THREE.Matrix4().lookAt(pos, lookTarget, _yAxis);
+        quat.setFromRotationMatrix(m);
+      }
+      return { pos, quat };
+    }
+
+    function openCheckoutModal() {
+      enterCashierMode();
+    }
+
+    function enterCashierMode() {
+      if (cameraMode === 'CASHIER' || playerState === PlayerState.ENTERING_CASHIER) return;
+      previousCameraMode = cameraMode;
+      cameraMode = 'CASHIER';
+      playerState = PlayerState.ENTERING_CASHIER;
+      clearMovementKeys();
+      isCashierLooking = false;
+
+      if (document.exitPointerLock) {
+        try { document.exitPointerLock(); } catch (_) {}
+      }
+
+      // Position the shop owner behind the register at ideal eye-level cashier framing
+      player.pos.x = 4.05;
+      player.pos.z = 4.95;
+      playerMesh.position.set(player.pos.x, 0, player.pos.z);
+      playerMesh.rotation.y = Math.PI;
+
+      CashierCameraPoint.position.set(player.pos.x, 1.72, player.pos.z);
+      cashierLookYaw = CASHIER_DEFAULT_YAW;
+      cashierLookPitch = CASHIER_DEFAULT_PITCH;
+      CashierCameraPoint.rotation.x = cashierLookPitch;
+      CashierCameraPoint.rotation.y = cashierLookYaw;
+      CashierCameraPoint.updateMatrixWorld(true);
+
+      playerMesh.visible = false;
+      heldBoxMesh.visible = false;
+      document.getElementById('crosshair-container').style.display = 'none';
+      document.getElementById('interaction-prompt').style.display = 'none';
+      document.getElementById('cashier-hud').style.display = 'block';
+
+      loadNextWaitingCustomer();
+
+      startCameraTransition(
+        CashierCameraPoint.position,
+        CashierCameraPoint.quaternion,
+        0.45,
+        () => {
+          playerState = PlayerState.CASHIER;
+        }
+      );
+    }
+
+    function exitCashierMode() {
+      if (cameraMode !== 'CASHIER' && playerState !== PlayerState.ENTERING_CASHIER) return;
+      clearConveyorItems();
+      currentCheckoutCustomer = null;
+      hoveredConveyorMesh = null;
+      isCashierLooking = false;
+      cashierAutoExitLock = true;
+      clearMovementKeys();
+      document.getElementById('cashier-hud').style.display = 'none';
+      document.getElementById('cashier-hover-tooltip').style.display = 'none';
+
+      // Sync owner's FPS gaze with where they were looking at the counter
+      player.yaw = cashierLookYaw;
+      player.pitch = cashierLookPitch;
+
+      cameraMode = previousCameraMode;
+      playerState = PlayerState.EXITING_CASHIER;
+
+      if (cameraMode === 'FPS') {
+        playerMesh.visible = false;
+        heldBoxMesh.visible = (Game.carriedBox !== null);
+        document.getElementById('crosshair-container').style.display = 'flex';
+        try { container.requestPointerLock(); } catch (_) {}
+      } else {
+        playerMesh.visible = true;
+        heldBoxMesh.visible = false;
+      }
+
+      const target = getWalkingCameraTarget(cameraMode);
+      startCameraTransition(target.pos, target.quat, 0.4, () => {
+        playerState = PlayerState.WALKING;
+      });
+    }
+
+    function clearConveyorItems() {
+      while (conveyorItemsGroup.children.length > 0) {
+        conveyorItemsGroup.remove(conveyorItemsGroup.children[0]);
+      }
+      conveyorItemMeshes = [];
+      hoveredConveyorMesh = null;
+      document.getElementById('cashier-hover-tooltip').style.display = 'none';
+    }
+
+    function loadNextWaitingCustomer() {
+      clearConveyorItems();
+      const waiting = Game.customers.find(c => c.state === 'WAITING_CHECKOUT');
+
+      if (!waiting) {
+        currentCheckoutCustomer = null;
+        checkoutItemsToScan = [];
+        scannedTotal = 0;
+        updatePosMonitorScreen(0, 0, 'MÜŞTERİ BEKLENİYOR');
+        updateCashierHUD();
+        return;
+      }
+
+      currentCheckoutCustomer = waiting;
+      if (!currentCheckoutCustomer.basket || currentCheckoutCustomer.basket.length === 0) {
+        currentCheckoutCustomer.basket = ['milk', 'soda'];
+      }
+
+      checkoutItemsToScan = currentCheckoutCustomer.basket.map((pId, idx) => {
+        const prod = PRODUCTS[pId];
+        const mesh = createProductMesh(pId, false);
+        // Line items up nicely on the conveyor belt (local x: -1.45 to +0.25)
+        const spacing = Math.min(0.42, 1.6 / Math.max(1, currentCheckoutCustomer.basket.length));
+        const startX = -1.35;
+        const posX = startX + idx * spacing;
+        const posZ = ((idx % 2) - 0.5) * 0.22;
+        mesh.position.set(posX, 1.22, posZ);
+        mesh.rotation.y = (idx * 0.6) - 0.3;
+        mesh.userData = {
+          checkoutIndex: idx,
+          product: prod,
+          scanned: false,
+          animState: 'IDLE', // 'IDLE' | 'SLIDING' | 'BAGGED'
+          slideProgress: 0,
+          startPos: mesh.position.clone()
+        };
+        conveyorItemsGroup.add(mesh);
+        conveyorItemMeshes.push(mesh);
+
+        return {
+          product: prod,
+          scanned: false,
+          mesh: mesh
+        };
+      });
+
+      scannedTotal = 0;
+      updatePosMonitorScreen(0, 0, 'OKUTMAYA HAZIR');
+      updateCashierHUD();
+    }
+
+    function spawnQuickCheckoutCustomer() {
+      createCustomer();
+      const c = Game.customers[Game.customers.length - 1];
+      if (!c) return;
+      const keys = Object.keys(PRODUCTS);
+      const count = 2 + Math.floor(Math.random() * 3);
+      c.basket = [];
+      for (let i = 0; i < count; i++) {
+        c.basket.push(keys[Math.floor(Math.random() * keys.length)]);
+      }
+      c.mesh.position.set(3.25, 0, 2.35);
+      c.mesh.rotation.y = 0;
+      c.state = 'WAITING_CHECKOUT';
+      if (cameraMode === 'CASHIER' && !currentCheckoutCustomer) {
+        loadNextWaitingCustomer();
+      }
+    }
+
+    function updateCashierHUD() {
+      const receiptContainer = document.getElementById('cashier-receipt-list');
+      const totalEl = document.getElementById('cashier-total-price');
+      const payBtn = document.getElementById('btn-cashier-pay');
+      const statusPill = document.getElementById('cashier-status-pill');
+
+      receiptContainer.innerHTML = '';
+
+      if (!currentCheckoutCustomer) {
+        statusPill.innerHTML = '⏳ Kasada müşteri bekleniyor...<br><button onclick="spawnQuickCheckoutCustomer()" style="margin-top:8px;padding:6px 12px;border-radius:8px;border:1px solid #38bdf8;background:#0284c7;color:#fff;font-weight:700;cursor:pointer;">🛎️ Müşteri Çağır</button>';
+        totalEl.textContent = '₺0.00';
+        payBtn.disabled = true;
+        return;
+      }
+
+      let scannedCount = 0;
+      let allScanned = checkoutItemsToScan.length > 0;
+
+      checkoutItemsToScan.forEach(item => {
+        if (item.scanned) {
+          scannedCount++;
+          const row = document.createElement('div');
+          row.className = 'receipt-row';
+          row.innerHTML = `<span>${item.product.emoji} ${item.product.name}</span><span>₺${item.product.sellPrice.toFixed(2)}</span>`;
+          receiptContainer.appendChild(row);
+        } else {
+          allScanned = false;
+        }
+      });
+
+      if (allScanned) {
+        statusPill.textContent = '✅ Tüm ürünler okutuldu! Ödemeyi alabilirsiniz.';
+      } else {
+        statusPill.textContent = `🔴 Banttaki ürünlere tıklayın (${scannedCount}/${checkoutItemsToScan.length})`;
+      }
+
+      totalEl.textContent = '₺' + scannedTotal.toFixed(2);
+      payBtn.disabled = !allScanned;
+    }
+
+    function scanConveyorItem(idx) {
+      const item = checkoutItemsToScan[idx];
+      if (!item || item.scanned) return;
+      item.scanned = true;
+      item.mesh.userData.scanned = true;
+      item.mesh.userData.animState = 'SLIDING';
+      item.mesh.userData.slideProgress = 0;
+      item.mesh.scale.set(1, 1, 1);
+
+      scannedTotal += item.product.sellPrice;
+      scannerFlashTimer = 0.22;
+      AudioEngine.beep();
+
+      const scannedCount = checkoutItemsToScan.filter(i => i.scanned).length;
+      const allDone = scannedCount === checkoutItemsToScan.length;
+      updatePosMonitorScreen(scannedCount, scannedTotal, allDone ? 'ÖDEME ALINABİLİR' : 'OKUTULUYOR...');
+      updateCashierHUD();
+    }
+
+    function completeCheckoutPayment() {
+      if (!currentCheckoutCustomer) return;
+      const allScanned = checkoutItemsToScan.length > 0 && checkoutItemsToScan.every(i => i.scanned);
+      if (!allScanned) return;
+
+      Game.money += scannedTotal;
+      cashDrawerTimer = 1.1;
+      AudioEngine.cash();
+      showFloatingMoney('+' + scannedTotal.toFixed(2) + ' ₺');
+      showNotification(`🎉 Müşteri ₺${scannedTotal.toFixed(2)} ödeme yaptı ve teşekkür etti!`);
+
+      if (currentCheckoutCustomer.mesh) {
+        currentCheckoutCustomer.state = 'LEAVING';
+        currentCheckoutCustomer.targetPos.set(0, 0, 16);
+      }
+
+      updateUI();
+      clearConveyorItems();
+      currentCheckoutCustomer = null;
+      checkoutItemsToScan = [];
+      scannedTotal = 0;
+      updatePosMonitorScreen(0, 0, 'TEŞEKKÜRLER!');
+
+      // Load next waiting customer if there's a queue
+      setTimeout(() => {
+        if (cameraMode === 'CASHIER') {
+          loadNextWaitingCustomer();
+        }
+      }, 350);
+    }
+
+    /* =========================================================================
+       COMPUTER & UPGRADES MODALS
+       ========================================================================= */
+    function openComputerModal() {
+      document.exitPointerLock();
+      Game.activeModal = true;
+      document.getElementById('modal-computer').style.display = 'flex';
+
+      const grid = document.getElementById('wholesale-products-list');
+      grid.innerHTML = '';
+
+      Object.values(PRODUCTS).filter(p => p.unlocked).forEach(prod => {
+        const card = document.createElement('div');
+        card.className = 'product-card';
+        card.innerHTML = `
+          <div class="product-icon">${prod.emoji}</div>
+          <div class="product-name">${prod.name}</div>
+          <div class="product-detail">Koli: ${prod.unitsPerBox} Adet (Adet Satış: ₺${prod.sellPrice})</div>
+          <div class="product-cost">₺${prod.costPerBox} / Koli</div>
+          <button class="btn-buy" onclick="orderWholesale('${prod.id}')">Koli Sipariş Et 📦</button>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function openUpgradesModal() {
+      document.exitPointerLock();
+      Game.activeModal = true;
+      document.getElementById('modal-upgrades').style.display = 'flex';
+
+      const list = document.getElementById('upgrades-list');
+      const lockedShelvesHtml = Object.values(Game.shelves)
+        .filter(s => !s.unlocked && s.productId)
+        .map(s => {
+          const prod = PRODUCTS[s.productId];
+          return `
+            <div class="upgrade-item">
+              <div class="upgrade-info">
+                <h4>${prod.emoji} Yeni Reyon: ${s.title}</h4>
+                <p>${prod.name} ürününü marketinizde satışa açar (Başlangıçta 4 adet stok ile gelir).</p>
+              </div>
+              <button class="btn-buy" style="width: auto; padding: 10px 22px;" onclick="unlockShelf('${s.id}', true)">
+                ₺${prod.unlockCost} Reyon Aç 🔓
+              </button>
+            </div>
+          `;
+        }).join('');
+
+      list.innerHTML = `
+        ${lockedShelvesHtml}
+        <div class="upgrade-item">
+          <div class="upgrade-info">
+            <h4>👩‍💼 Otomatik Kasiyer (Ayşe Hanım)</h4>
+            <p>Siz başka işlerle uğraşırken kasadaki müşterileri otomatik geçirir ve kasanıza para aktarır.</p>
+          </div>
+          <button class="btn-buy" style="width: auto; padding: 10px 22px;" onclick="buyAutoCashier()">
+            ${Game.autoCashier ? '✅ Aktif' : '₺500 Satın Al'}
+          </button>
+        </div>
+        <div class="upgrade-item">
+          <div class="upgrade-info">
+            <h4>⚡ Hızlı Koşu Ayakkabısı</h4>
+            <p>Karakterinizin yürüme ve koli taşıma hızını %40 arttırır.</p>
+          </div>
+          <button class="btn-buy" style="width: auto; padding: 10px 22px;" onclick="buySpeedUpgrade()">
+            ${Game.speedUpgrade ? '✅ Aktif' : '₺300 Satın Al'}
+          </button>
+        </div>
+      `;
+    }
+
+    function unlockShelf(shelfId, fromModal = false) {
+      const shelf = Game.shelves[shelfId];
+      if (!shelf || shelf.unlocked) return;
+      const prod = PRODUCTS[shelf.productId];
+      if (Game.money < prod.unlockCost) {
+        showNotification(`❌ Yetersiz Bakiye! Gereken: ₺${prod.unlockCost}`);
+        return;
+      }
+      Game.money -= prod.unlockCost;
+      prod.unlocked = true;
+      shelf.unlocked = true;
+      shelf.group.visible = true;
+      shelf.lockedPad.visible = false;
+      shelf.trigger.userData = { type: 'shelf', shelfId: shelf.id };
+      Game.level++;
+
+      stockProductOnShelf(shelf.id, prod.id, 4);
+      AudioEngine.cash();
+      updateUI();
+      showNotification(`🎉 ${shelf.title} reyonu açıldı! (${prod.emoji} ${prod.name} artık satışta!)`);
+      if (fromModal) {
+        openUpgradesModal();
+      }
+    }
+
+    function buyAutoCashier() {
+      if (Game.autoCashier) return;
+      if (Game.money < 500) {
+        showNotification('❌ Yetersiz Bakiye! Gereken: ₺500');
+        return;
+      }
+      Game.money -= 500;
+      Game.autoCashier = true;
+      AudioEngine.cash();
+      showNotification('✅ Kasiyer Ayşe işe alındı! Müşteriler artık otomatik ödeme yapacak.');
+
+      const cashierMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.25, 0.25, 1.4, 12),
+        new THREE.MeshStandardMaterial({ color: 0x0284c7 })
+      );
+      cashierMesh.position.set(4, 1.2, 2.2);
+      scene.add(cashierMesh);
+
+      updateUI();
+      openUpgradesModal();
+    }
+
+    function buySpeedUpgrade() {
+      if (Game.speedUpgrade) return;
+      if (Game.money < 300) {
+        showNotification('❌ Yetersiz Bakiye! Gereken: ₺300');
+        return;
+      }
+      Game.money -= 300;
+      Game.speedUpgrade = true;
+      player.speed = 9.8;
+      AudioEngine.cash();
+      showNotification('⚡ Hız geliştirildi! Artık çok daha hızlı koşuyorsunuz.');
+      updateUI();
+      openUpgradesModal();
+    }
+
+    function closeModals() {
+      document.querySelectorAll('.modal-backdrop').forEach(m => m.style.display = 'none');
+      Game.activeModal = false;
+      if (cameraMode === 'CASHIER' && isCashierLooking) {
+        const sensitivity = 0.0032;
+        cashierLookYaw -= (e.clientX - prevMouseX) * sensitivity;
+        cashierLookPitch -= (e.clientY - prevMouseY) * sensitivity;
+        cashierLookYaw = THREE.MathUtils.clamp(cashierLookYaw, -1.65, 1.65);
+        cashierLookPitch = THREE.MathUtils.clamp(cashierLookPitch, -0.95, 0.75);
+        prevMouseX = e.clientX;
+        prevMouseY = e.clientY;
+        return;
+      }
+
+      if (cameraMode === 'FPS' && playerState === PlayerState.WALKING) {
+        try { container.requestPointerLock(); } catch (_) {}
+      }
+    }
+
+    function showNotification(msg) {
+      const el = document.getElementById('notification-pill');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 3500);
+    }
+
+    function showFloatingMoney(txt) {
+      const el = document.createElement('div');
+      el.className = 'floating-text';
+      el.textContent = txt;
+      el.style.left = '50%';
+      el.style.top = '45%';
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1200);
+    }
+
+    function updateUI() {
+      document.getElementById('hud-money').textContent = '₺' + Game.money.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+      document.getElementById('store-level').textContent = Game.level;
+    }
+
+    /* =========================================================================
+       INPUT CONTROLS & POINTER LOCK
+       ========================================================================= */
+    const keys = { w: false, a: false, s: false, d: false, shift: false };
+    let isMouseDown = false;
+    let prevMouseX = 0;
+    let prevMouseY = 0;
+
+    function setMovementKey(e, isDown) {
+      const code = e.code;
+      const k = (e.key || '').toLowerCase();
+
+      if (code === 'KeyW' || code === 'ArrowUp' || k === 'w') keys.w = isDown;
+      if (code === 'KeyS' || code === 'ArrowDown' || k === 's') keys.s = isDown;
+      if (code === 'KeyA' || code === 'ArrowLeft' || k === 'a') keys.a = isDown;
+      if (code === 'KeyD' || code === 'ArrowRight' || k === 'd') keys.d = isDown;
+      if (code === 'ShiftLeft' || code === 'ShiftRight' || k === 'shift') keys.shift = isDown;
+    }
+
+    function toggleCameraMode() {
+      if (cameraMode === 'CASHIER') {
+        exitCashierMode();
+      }
+
+      if (cameraMode === 'TOPDOWN') {
+        cameraMode = 'FPS';
+        playerMesh.visible = false;
+        updateCarriedVisuals();
+        updateToolUI();
+        document.getElementById('crosshair-container').style.display = 'flex';
+        const btn = document.getElementById('btn-toggle-camera');
+        if (btn) btn.textContent = '🎥 Kamera: 1. Şahıs FPS (V)';
+        showNotification('🎥 1. Şahıs (FPS) Moduna Geçildi');
+        try { container.requestPointerLock(); } catch (_) {}
+      } else {
+        cameraMode = 'TOPDOWN';
+        playerMesh.visible = true;
+        updateCarriedVisuals();
+        updateToolUI();
+        document.getElementById('crosshair-container').style.display = 'none';
+        const btn = document.getElementById('btn-toggle-camera');
+        if (btn) btn.textContent = '🎥 Kamera: Üstten 3D (V)';
+        showNotification('🎥 Üstten 3D Simülasyon Görünümüne Geçildi');
+        if (document.exitPointerLock) document.exitPointerLock();
+      }
+    }
+
+    window.addEventListener('wheel', e => {
+      if (cameraMode === 'TOPDOWN') {
+        cameraZoom = Math.max(-5, Math.min(12, cameraZoom + (e.deltaY > 0 ? 1 : -1) * 0.9));
+      }
+    });
+
+    window.addEventListener('keydown', e => {
+      if (Game.activeModal) {
+        if (e.key === 'Escape') closeModals();
+        return;
+      }
+
+      if (cameraMode === 'CASHIER' || playerState === PlayerState.ENTERING_CASHIER) {
+        if (e.key === 'Escape' || e.key === 'Tab' || e.code === 'KeyV' || (e.key || '').toLowerCase() === 'v') {
+          e.preventDefault();
+          exitCashierMode();
+        } else if (e.code === 'Space' || e.code === 'Enter') {
+          e.preventDefault();
+          completeCheckoutPayment();
+        }
+        return;
+      }
+
+      if (playerState !== PlayerState.WALKING) {
+        return;
+      }
+
+      // Herhangi bir hareket tuşuna basıldığında overlay'i otomatik kapat ve oyunu başlat
+      const overlay = document.getElementById('start-overlay');
+      if (overlay && overlay.style.display !== 'none') {
+        overlay.style.display = 'none';
+        AudioEngine.init();
+      }
+
+      setMovementKey(e, true);
+
+      const code = e.code;
+      const k = (e.key || '').toLowerCase();
+      if (code === 'KeyV' || k === 'v') {
+        toggleCameraMode();
+      }
+      if (code === 'KeyE' || code === 'Space' || code === 'Enter' || k === 'e') {
+        handleInteraction();
+      }
+      if (code === 'KeyQ' || k === 'q') {
+        discardCarriedBox();
+      }
+    });
+
+    window.addEventListener('keyup', e => {
+      setMovementKey(e, false);
+    });
+
+    function requestGameStart() {
+      AudioEngine.init();
+      const overlay = document.getElementById('start-overlay');
+      if (overlay) overlay.style.display = 'none';
+
+      if (cameraMode === 'FPS' && playerState === PlayerState.WALKING) {
+        try {
+          container.requestPointerLock();
+        } catch (err) {
+          console.warn('Pointer lock request error:', err);
+        }
+      }
+    }
+
+    document.addEventListener('pointerlockchange', () => {
+      if (document.pointerLockElement === container) {
+        Game.isPointerLocked = true;
+        const overlay = document.getElementById('start-overlay');
+        if (overlay) overlay.style.display = 'none';
+      } else {
+        Game.isPointerLocked = false;
+      }
+    });
+
+    window.addEventListener('mousemove', e => {
+      mouseNormalized.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouseNormalized.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      eventClientX = e.clientX;
+      eventClientY = e.clientY;
+
+      if (Game.activeModal) return;
+
+      if (cameraMode === 'CASHIER' && isCashierLooking) {
+        const sensitivity = 0.0032;
+        cashierLookYaw -= (e.clientX - prevMouseX) * sensitivity;
+        cashierLookPitch -= (e.clientY - prevMouseY) * sensitivity;
+        cashierLookYaw = THREE.MathUtils.clamp(cashierLookYaw, -1.65, 1.65);
+        cashierLookPitch = THREE.MathUtils.clamp(cashierLookPitch, -0.95, 0.75);
+        prevMouseX = e.clientX;
+        prevMouseY = e.clientY;
+        return;
+      }
+
+      if (cameraMode === 'FPS' && playerState === PlayerState.WALKING) {
+        if (Game.isPointerLocked) {
+          const sensitivity = 0.0022;
+          player.yaw -= e.movementX * sensitivity;
+          player.pitch -= e.movementY * sensitivity;
+          player.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, player.pitch));
+        } else if (isMouseDown) {
+          const sensitivity = 0.003;
+          player.yaw -= (e.clientX - prevMouseX) * sensitivity;
+          player.pitch -= (e.clientY - prevMouseY) * sensitivity;
+          player.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, player.pitch));
+          prevMouseX = e.clientX;
+          prevMouseY = e.clientY;
+        }
+      }
+    });
+
+    window.addEventListener('mousedown', e => {
+      isMouseDown = true;
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+
+      if (e.target.closest('.modal-content') || e.target.closest('button')) {
+        return;
+      }
+
+      const overlay = document.getElementById('start-overlay');
+      if (overlay && overlay.style.display !== 'none') {
+        requestGameStart();
+        return;
+      }
+
+      if (cameraMode === 'CASHIER') {
+        if (e.button === 2) {
+          isCashierLooking = true;
+          return;
+        }
+        mouseNormalized.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouseNormalized.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        eventClientX = e.clientX;
+        eventClientY = e.clientY;
+        checkCashierHover();
+        if (hoveredConveyorMesh && !hoveredConveyorMesh.userData.scanned) {
+          scanConveyorItem(hoveredConveyorMesh.userData.checkoutIndex);
+        }
+        return;
+      }
+
+      if (cameraMode === 'TOPDOWN') {
+        if (currentHoverObject) {
+          const dist = player.pos.distanceTo(currentHoverObject.position);
+          if (dist <= 4.2) {
+            handleInteraction();
+          }
+        }
+        return;
+      }
+
+      if (!Game.isPointerLocked && !Game.activeModal) {
+        try {
+          container.requestPointerLock();
+        } catch (_) {}
+      } else if (Game.isPointerLocked) {
+        handleInteraction();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      isMouseDown = false;
+      isCashierLooking = false;
+    });
+
+    window.addEventListener('contextmenu', e => {
+      if (cameraMode === 'CASHIER') {
+        e.preventDefault();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    /* =========================================================================
+       MAIN GAME LOOP & ANIMATIONS
+       ========================================================================= */
+    let lastTime = performance.now();
+    const _dayClockEl = document.getElementById('day-clock');
+    let _lastClockStr = '';
+    const _moveVec = new THREE.Vector3();
+    const _yAxis = new THREE.Vector3(0, 1, 0);
+    const _tmpWaypoint = new THREE.Vector3();
+    const _tmpDiff = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      // In-game Clock (only touch DOM when minute changes)
+      Game.clockMinutes += dt * 8;
+      if (Game.clockMinutes >= 60) {
+        Game.clockMinutes = 0;
+        Game.clockHours++;
+        if (Game.clockHours >= 23) {
+          Game.clockHours = 8;
+          Game.day++;
+          showNotification(`🌅 Yeni Gün Başladı: GÜN ${Game.day}`);
+        }
+      }
+      const hh = String(Math.floor(Game.clockHours)).padStart(2, '0');
+      const mm = String(Math.floor(Game.clockMinutes)).padStart(2, '0');
+      const clockStr = `GÜN ${Game.day} • SAAT: ${hh}:${mm}`;
+      if (clockStr !== _lastClockStr) {
+        _dayClockEl.textContent = clockStr;
+        _lastClockStr = clockStr;
+      }
+
+      // Farm Windmill & Crop Regrow Animations
+      for (let i = 0; i < farmWindmillBlades.length; i++) {
+        farmWindmillBlades[i].rotation.z += dt * 1.4;
+      }
+      for (let i = 0; i < farmHarvestSpots.length; i++) {
+        const spot = farmHarvestSpots[i];
+        if (!spot.ready) {
+          spot.regrowTimer -= dt;
+          const progress = Math.max(0.28, 1 - Math.max(0, spot.regrowTimer) / spot.regrowDuration);
+          spot.visualGroup.scale.set(progress, progress, progress);
+          if (spot.regrowTimer <= 0) {
+            spot.ready = true;
+            spot.regrowTimer = 0;
+            spot.visualGroup.scale.set(1, 1, 1);
+          }
+        }
+      }
+
+      // Processing Stations (Cheese Machine & Bakery Oven)
+      if (cheeseMachine.inputCount > 0 && cheeseMachine.readyBoxes < cheeseMachine.maxBoxes) {
+        cheeseMachine.timer += dt;
+        if (cheeseMachine.timer >= cheeseMachine.duration) {
+          cheeseMachine.timer = 0;
+          cheeseMachine.inputCount--;
+          cheeseMachine.readyBoxes++;
+          AudioEngine.pop();
+          showNotification(`🧀 Tulum Peyniri Hazır! (${cheeseMachine.readyBoxes}/${cheeseMachine.maxBoxes})`);
+        }
+      }
+      if (bakeryOven.inputCount > 0 && bakeryOven.readyBoxes < bakeryOven.maxBoxes) {
+        bakeryOven.timer += dt;
+        if (bakeryOven.timer >= bakeryOven.duration) {
+          bakeryOven.timer = 0;
+          bakeryOven.inputCount--;
+          bakeryOven.readyBoxes++;
+          AudioEngine.pop();
+          showNotification(`🍞 Taş Fırın Ekmeği Hazır! (${bakeryOven.readyBoxes}/${bakeryOven.maxBoxes})`);
+        }
+      }
+
+      // Auto-return farm tool when walking back inside the market
+      if (Game.equippedTool && player.pos.z > -13.4) {
+        const dropped = FARM_TOOLS[Game.equippedTool];
+        Game.equippedTool = null;
+        Game.activeHarvest = null;
+        updateToolUI();
+        showNotification(`${dropped.emoji} ${dropped.name} çiftlik girişine bırakıldı.`);
+      }
+
+      // Active Timed Farm Harvest / Milking
+      const _progWrap = document.getElementById('harvest-progress-wrap');
+      if (Game.activeHarvest) {
+        const ah = Game.activeHarvest;
+        const dist = player.pos.distanceTo(ah.spot.triggerMesh.position);
+        if (!ah.spot.ready || dist > 4.6) {
+          Game.activeHarvest = null;
+          _progWrap.style.display = 'none';
+          pToolMesh.rotation.x = 0;
+          fpsToolMesh.rotation.x = 0;
+        } else {
+          ah.progress += dt / ah.duration;
+          const pct = Math.min(100, Math.floor(ah.progress * 100));
+          const tInfo = FARM_TOOLS[ah.spot.requiredTool];
+          document.getElementById('harvest-progress-label').textContent = `${tInfo.emoji} ${tInfo.actionVerb}... %${pct}`;
+          document.getElementById('harvest-progress-fill').style.width = `${pct}%`;
+          _progWrap.style.display = 'flex';
+
+          // Tool swing animation
+          const swing = Math.sin(ah.progress * Math.PI * 6) * 0.45;
+          pToolMesh.rotation.x = swing;
+          fpsToolMesh.rotation.x = swing;
+
+          if (ah.progress >= 1.0) {
+            const spot = ah.spot;
+            spot.ready = false;
+            spot.regrowTimer = spot.regrowDuration;
+            spot.visualGroup.scale.set(0.28, 0.28, 0.28);
+
+            const prod = PRODUCTS[spot.productId];
+            const gain = Math.ceil(prod.unitsPerBox / 2); // 2 spots = full load!
+            if (!Game.carriedBox) {
+              Game.carriedBox = {
+                productId: spot.productId,
+                remaining: gain,
+                maxCount: prod.unitsPerBox,
+                isFromFarm: true
+              };
+            } else {
+              Game.carriedBox.remaining = Math.min(Game.carriedBox.maxCount, Game.carriedBox.remaining + gain);
+            }
+
+            const isFull = Game.carriedBox.remaining >= Game.carriedBox.maxCount;
+            if (isFull) {
+              Game.equippedTool = null;
+            }
+            Game.activeHarvest = null;
+            _progWrap.style.display = 'none';
+            pToolMesh.rotation.x = 0;
+            fpsToolMesh.rotation.x = 0;
+            AudioEngine.cash();
+            updateCarriedBoxUI();
+
+            const fl = getFarmCarryLabel(spot.productId);
+            showNotification(
+              isFull
+                ? `${fl.emoji} ${fl.name} Doldu (${Game.carriedBox.remaining}/${Game.carriedBox.maxCount})! Markete götürün.`
+                : `+${gain} ${fl.emoji} ${fl.name} (${Game.carriedBox.remaining}/${Game.carriedBox.maxCount}) - İsterseniz bir tane daha toplayın!`
+            );
+          }
+        }
+      } else if (_progWrap.style.display !== 'none') {
+        _progWrap.style.display = 'none';
+      }
+
+      // Scanner laser flash fade, cash drawer pop, conveyor belt motion & floor zone pulse
+      if (scannerFlashTimer > 0) {
+        scannerFlashTimer = Math.max(0, scannerFlashTimer - dt);
+        scannerLaserFlash.material.opacity = (scannerFlashTimer / 0.22) * 0.9;
+      } else if (scannerLaserFlash.material.opacity !== 0) {
+        scannerLaserFlash.material.opacity = 0;
+      }
+
+      if (cashDrawerTimer > 0) {
+        cashDrawerTimer = Math.max(0, cashDrawerTimer - dt);
+        const pop = Math.sin((cashDrawerTimer / 1.1) * Math.PI);
+        cashDrawerGroup.position.z = 0.46 + pop * 0.24;
+      } else if (cashDrawerGroup.position.z !== 0.46) {
+        cashDrawerGroup.position.z = 0.46;
+      }
+
+      const hasActiveBeltItems = conveyorItemMeshes.some(m => m.userData.animState === 'SLIDING');
+      if (hasActiveBeltItems) {
+        conveyorTex.offset.x -= dt * 0.95;
+      } else if (currentCheckoutCustomer && cameraMode === 'CASHIER') {
+        conveyorTex.offset.x -= dt * 0.12;
+      }
+
+      const nowSec = performance.now() * 0.001;
+      cashierZoneBorderMat.opacity = 0.45 + Math.sin(nowSec * 3.5) * 0.25;
+      scannerLaserSlit.material.opacity = 0.40 + Math.sin(nowSec * 5.0) * 0.15;
+
+      // Auto-enter Cashier View when walking onto the glowing floor zone
+      if (playerState === PlayerState.WALKING && cameraMode !== 'CASHIER' && !Game.activeModal) {
+        if (isPlayerInCashierTriggerZone()) {
+          if (!cashierAutoExitLock) {
+            enterCashierMode();
+          }
+        } else {
+          cashierAutoExitLock = false;
+        }
+      }
+
+      for (let i = 0; i < conveyorItemMeshes.length; i++) {
+        const m = conveyorItemMeshes[i];
+        const ud = m.userData;
+        if (ud.animState === 'SLIDING') {
+          ud.slideProgress = Math.min(1, ud.slideProgress + dt * 2.4);
+          const t = ud.slideProgress;
+          if (t < 0.6) {
+            const p = t / 0.6;
+            m.position.x = ud.startPos.x + (0.65 - ud.startPos.x) * p;
+            m.position.z = ud.startPos.z * (1 - p);
+            m.position.y = 1.22 + Math.sin(p * Math.PI) * 0.06;
+          } else {
+            const p = (t - 0.6) / 0.4;
+            m.position.x = 0.65 + (1.38 - 0.65) * p;
+            m.position.z = 0.22 * p;
+            m.position.y = 1.22 + Math.sin(p * Math.PI) * 0.28 - p * 0.12;
+            const s = Math.max(0.45, 1 - p * 0.55);
+            m.scale.set(s, s, s);
+          }
+          if (t >= 1) {
+            ud.animState = 'BAGGED';
+            m.visible = false;
+          }
+        }
+      }
+
+      // Player Movement & Camera Control
+      if (!Game.activeModal) {
+        _moveVec.set(0, 0, 0);
+        if (keys.w) _moveVec.z -= 1;
+        if (keys.s) _moveVec.z += 1;
+        if (keys.a) _moveVec.x -= 1;
+        if (keys.d) _moveVec.x += 1;
+
+        const isMoving = _moveVec.lengthSq() > 0;
+
+        if (cameraTransition.active) {
+          // Smooth Lerp (position) + Slerp (rotation) transition between Walking and Cashier POV
+          cameraTransition.progress = Math.min(1, cameraTransition.progress + dt / cameraTransition.duration);
+          const p = cameraTransition.progress;
+          const ease = p * p * (3 - 2 * p);
+
+          camera.position.lerpVectors(cameraTransition.fromPos, cameraTransition.toPos, ease);
+          camera.quaternion.slerpQuaternions(cameraTransition.fromQuat, cameraTransition.toQuat, ease);
+
+          if (p >= 1) {
+            cameraTransition.active = false;
+            if (cameraTransition.onComplete) {
+              const cb = cameraTransition.onComplete;
+              cameraTransition.onComplete = null;
+              cb();
+            }
+          }
+        } else if (cameraMode === 'CASHIER') {
+          // Shop Owner First-Person Eye View behind the counter (1.70m eye height + natural head look)
+          playerMesh.visible = false;
+          heldBoxMesh.visible = false;
+          fpsToolMesh.visible = false;
+          pToolMesh.visible = false;
+
+          const mx = mouseNormalized.x > -2 ? mouseNormalized.x : 0;
+          const my = mouseNormalized.y > -2 ? mouseNormalized.y : 0;
+          const idleBreath = Math.sin(performance.now() * 0.0018) * 0.004;
+
+          _cashierTargetPos.set(
+            CashierCameraPoint.position.x + mx * 0.03,
+            CashierCameraPoint.position.y + idleBreath,
+            CashierCameraPoint.position.z
+          );
+          camera.position.lerp(_cashierTargetPos, Math.min(1, dt * 12));
+
+          _cashierParallaxEuler.set(
+            cashierLookPitch + my * 0.08,
+            cashierLookYaw - mx * 0.12,
+            0,
+            'YXZ'
+          );
+          _cashierParallaxQuat.setFromEuler(_cashierParallaxEuler);
+          camera.quaternion.slerp(_cashierParallaxQuat, Math.min(1, dt * 12));
+        } else if (cameraMode === 'TOPDOWN') {
+          playerMesh.visible = true;
+          heldBoxMesh.visible = false;
+          fpsToolMesh.visible = false;
+          pCarriedBox.visible = (Game.carriedBox !== null);
+          pToolMesh.visible = (Game.equippedTool !== null);
+
+          if (isMoving) {
+            _moveVec.normalize();
+            const currentSpeed = keys.shift ? player.speed * 1.5 : player.speed;
+            player.pos.x += _moveVec.x * currentSpeed * dt;
+            player.pos.z += _moveVec.z * currentSpeed * dt;
+
+            player.pos.x = Math.max(-20, Math.min(20, player.pos.x));
+            player.pos.z = Math.max(-30, Math.min(10.5, player.pos.z));
+            if (player.pos.z > -13.6) {
+              player.pos.x = Math.max(-STORE_W / 2 + 0.8, Math.min(STORE_W / 2 - 0.8, player.pos.x));
+            }
+
+            // Smoothly rotate character to face walk direction
+            const targetYaw = Math.atan2(_moveVec.x, _moveVec.z);
+            let diff = targetYaw - playerMesh.rotation.y;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            playerMesh.rotation.y += diff * 12 * dt;
+
+            // Leg & Arm Animation
+            player.walkTimer += dt * (keys.shift ? 16 : 10);
+            pLeftLeg.rotation.x = Math.sin(player.walkTimer) * 0.55;
+            pRightLeg.rotation.x = -Math.sin(player.walkTimer) * 0.55;
+            pLeftArm.rotation.x = -Math.sin(player.walkTimer) * 0.45;
+            pRightArm.rotation.x = Math.sin(player.walkTimer) * 0.45;
+          } else {
+            pLeftLeg.rotation.x = 0;
+            pRightLeg.rotation.x = 0;
+            pLeftArm.rotation.x = 0;
+            pRightArm.rotation.x = 0;
+          }
+
+          playerMesh.position.set(player.pos.x, 0, player.pos.z);
+
+          // Top-Down Isometric Camera follows player smoothly
+          const targetCamX = player.pos.x * 0.35;
+          const targetCamY = 15.0 + cameraZoom;
+          const targetCamZ = player.pos.z + 11.5 + cameraZoom * 0.7;
+
+          camera.position.x += (targetCamX - camera.position.x) * 0.12;
+          camera.position.y += (targetCamY - camera.position.y) * 0.12;
+          camera.position.z += (targetCamZ - camera.position.z) * 0.12;
+          camera.lookAt(player.pos.x * 0.35, 0.6, player.pos.z - 1.2);
+        } else {
+          // FPS Mode
+          playerMesh.visible = false;
+          pToolMesh.visible = false;
+          heldBoxMesh.visible = (Game.carriedBox !== null);
+          fpsToolMesh.visible = (Game.equippedTool !== null);
+
+          if (isMoving) {
+            _moveVec.normalize();
+            _moveVec.applyAxisAngle(_yAxis, player.yaw);
+
+            const currentSpeed = keys.shift ? player.speed * 1.5 : player.speed;
+            player.pos.x += _moveVec.x * currentSpeed * dt;
+            player.pos.z += _moveVec.z * currentSpeed * dt;
+
+            player.pos.x = Math.max(-20, Math.min(20, player.pos.x));
+            player.pos.z = Math.max(-30, Math.min(10.5, player.pos.z));
+            if (player.pos.z > -13.6) {
+              player.pos.x = Math.max(-STORE_W / 2 + 0.8, Math.min(STORE_W / 2 - 0.8, player.pos.x));
+            }
+
+            // FPS Head Bobbing & Hand Sway
+            player.walkTimer += dt * (keys.shift ? 14 : 9);
+            camera.position.y = player.pos.y + Math.sin(player.walkTimer) * 0.04;
+            heldBoxMesh.position.y = -0.32 + Math.sin(player.walkTimer) * 0.02;
+            heldBoxMesh.position.x = 0.28 + Math.cos(player.walkTimer * 0.5) * 0.02;
+          } else {
+            camera.position.y = player.pos.y;
+            heldBoxMesh.position.set(0.28, -0.32, -0.65);
+          }
+
+          camera.rotation.set(0, 0, 0);
+          camera.rotation.y = player.yaw;
+          camera.rotation.x = player.pitch;
+          camera.position.x = player.pos.x;
+          camera.position.z = player.pos.z;
+        }
+
+        checkRaycast();
+      }
+
+      // Customer AI Updates
+      for (let idx = Game.customers.length - 1; idx >= 0; idx--) {
+        const c = Game.customers[idx];
+        if (c.state !== 'WAITING_CHECKOUT') {
+          c.walkTimer += dt * 8;
+          c.leftLeg.rotation.x = Math.sin(c.walkTimer) * 0.45;
+          c.rightLeg.rotation.x = -Math.sin(c.walkTimer) * 0.45;
+        } else {
+          c.leftLeg.rotation.x = 0;
+          c.rightLeg.rotation.x = 0;
+          c.mesh.rotation.y = 0; // Face the cashier across the counter
+        }
+
+        if (c.state === 'ENTERING') {
+          c.targetPos.set(0, 0, 3);
+          moveTowardsAvoidingShelves(c.mesh, c.targetPos, 2.2 * dt);
+          if (c.mesh.position.distanceTo(c.targetPos) < 0.6) {
+            c.state = 'BROWSING';
+            const prod = PRODUCTS[c.wishProduct];
+            const shelf = Game.shelves[prod.shelfId];
+            if (shelf) {
+              c.targetPos.copy(shelf.group.position).add(new THREE.Vector3(0, 0, 1.35));
+            }
+          }
+        } else if (c.state === 'BROWSING') {
+          moveTowardsAvoidingShelves(c.mesh, c.targetPos, 2.0 * dt);
+          if (c.mesh.position.distanceTo(c.targetPos) < 0.8) {
+            const prod = PRODUCTS[c.wishProduct];
+            const shelf = Game.shelves[prod.shelfId];
+            if (shelf && shelf.stockedCount > 0) {
+              shelf.stockedCount--;
+              stockProductOnShelf(shelf.id, shelf.productId, 0);
+              c.basket.push(c.wishProduct);
+            }
+            const queueCount = Game.customers.filter(x => x.state === 'WAITING_CHECKOUT' || x.state === 'GOING_CHECKOUT').length;
+            c.state = 'GOING_CHECKOUT';
+            c.targetPos.set(3.25, 0, 2.35 - Math.min(queueCount, 3) * 0.95);
+          }
+        } else if (c.state === 'GOING_CHECKOUT') {
+          moveTowardsAvoidingShelves(c.mesh, c.targetPos, 2.2 * dt);
+          if (c.mesh.position.distanceTo(c.targetPos) < 0.5) {
+            c.state = 'WAITING_CHECKOUT';
+            if (cameraMode === 'CASHIER' && !currentCheckoutCustomer) {
+              loadNextWaitingCustomer();
+            } else if (Game.autoCashier) {
+              setTimeout(() => {
+                if (c.state === 'WAITING_CHECKOUT') {
+                  const bill = c.basket.reduce((acc, pId) => acc + PRODUCTS[pId].sellPrice, 0) || 35;
+                  Game.money += bill;
+                  showFloatingMoney('+' + bill + ' ₺ 💵');
+                  AudioEngine.cash();
+                  c.state = 'LEAVING';
+                  c.targetPos.set(0, 0, 15);
+                  updateUI();
+                }
+              }, 1800);
+            } else {
+              showNotification('🛎️ Kasada müşteri bekliyor! Kasaya geçip ürünleri okutun.');
+            }
+          }
+        } else if (c.state === 'LEAVING') {
+          moveTowardsAvoidingShelves(c.mesh, c.targetPos, 2.5 * dt);
+          if (c.mesh.position.distanceTo(c.targetPos) < 1.0) {
+            scene.remove(c.mesh);
+            Game.customers.splice(idx, 1);
+          }
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    function moveTowardsAvoidingShelves(mesh, target, maxDist) {
+      const current = mesh.position;
+      let waypoint = target;
+
+      // Eğer müşteri arka veya yan reyonların arasındaysa, doğrudan reyonların içinden geçmek yerine koridorlardan (x = -3.0 veya x = 2.5) yürüsün
+      if (current.z < 1.2 && target.z > 1.2) {
+        const aisleX = Math.abs(current.x - (-3.0)) < Math.abs(current.x - 2.5) ? -3.0 : 2.5;
+        if (Math.abs(current.x - aisleX) > 0.45 && current.z < 0.5) {
+          _tmpWaypoint.set(aisleX, 0, current.z);
+        } else {
+          _tmpWaypoint.set(aisleX, 0, 1.8);
+        }
+        waypoint = _tmpWaypoint;
+      } else if (current.z > 1.2 && target.z < 0.5) {
+        const aisleX = Math.abs(target.x - (-3.0)) < Math.abs(target.x - 2.5) ? -3.0 : 2.5;
+        if (Math.abs(current.x - aisleX) > 0.45) {
+          _tmpWaypoint.set(aisleX, 0, 1.8);
+          waypoint = _tmpWaypoint;
+        } else if (Math.abs(current.z - target.z) > 0.6) {
+          _tmpWaypoint.set(aisleX, 0, target.z);
+          waypoint = _tmpWaypoint;
+        }
+      }
+
+      _tmpDiff.subVectors(waypoint, current);
+      _tmpDiff.y = 0;
+      const len = _tmpDiff.length();
+      if (len > 0.01) {
+        mesh.rotation.y = Math.atan2(_tmpDiff.x, _tmpDiff.z);
+      }
+      if (len <= maxDist) {
+        current.x = waypoint.x;
+        current.z = waypoint.z;
+      } else {
+        _tmpDiff.normalize().multiplyScalar(maxDist);
+        current.add(_tmpDiff);
+      }
+    }
+
+    animate();
+  </script>
+</body>
+</html>
