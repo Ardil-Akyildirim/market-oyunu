@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide Text;
+import '../../widgets/pixel_ui.dart';
 import '../simulation_engine.dart';
 
 class ManageStoreDialog extends StatefulWidget {
@@ -20,10 +21,12 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
     final isRestockerUnlocked = engine.storeLevel >= 3;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
-      backgroundColor: const Color(0xFFE9DFC6),
-      child: Container(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: SingleChildScrollView(
+        child: Container(
         width: 490,
+        decoration: pixelDeco(kParchment, bw: 4, shadow: 6),
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -31,7 +34,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
           children: [
             Row(
               children: [
-                const Text('⚙️', style: TextStyle(fontSize: 26)),
+                const Text('{gear}', style: TextStyle(fontSize: 26)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -50,7 +53,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
+                  icon: PixelIcon('x', size: 24, dark: true),
                 ),
               ],
             ),
@@ -66,21 +69,21 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
               ),
               child: Row(
                 children: [
-                  const Text('🏬', style: TextStyle(fontSize: 32)),
+                  const Text('{shop}', style: TextStyle(fontSize: 32)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Upgrade Store Level (Level ${engine.storeLevel} ➔ ${engine.storeLevel + 1})',
+                          'Upgrade Store Level (Level ${engine.storeLevel} -> ${engine.storeLevel + 1})',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                         Text(
                           engine.storeLevel == 1
-                              ? '🔓 Level 2 expands the store, opens the 2nd Checkout Counter and the Auto Cashier (Ayşe)!'
+                              ? '{unlock} Level 2 expands the store, opens the 2nd Checkout Counter and the Auto Cashier (Ayşe)!'
                               : (engine.storeLevel == 2
-                                  ? '🔓 Level 3 expands the store again and opens the 3rd Checkout Counter and Stocker Ali!'
+                                  ? '{unlock} Level 3 expands the store again and opens the 3rd Checkout Counter and Stocker Ali!'
                                   : 'Increases customer capacity and income rate (3/3 Counters Open).'),
                           style: TextStyle(fontSize: 11, color: Colors.orange.shade900, fontWeight: FontWeight.w600),
                         ),
@@ -95,12 +98,12 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                               engine.storeLevel++;
                               final opened = engine.refreshShelfUnlocks();
                               for (final name in opened) {
-                                engine.spawnParticle(engine.playerX, engine.playerY - 64, '🆕 $name is now on sale!', Colors.lightGreenAccent, size: 16);
+                                engine.spawnParticle(engine.playerX, engine.playerY - 64, '{star} $name is now on sale!', Colors.lightGreenAccent, size: 16);
                               }
                               engine.spawnParticle(
                                 engine.playerX,
                                 engine.playerY - 40,
-                                '🎉 Store Reached Level ${engine.storeLevel}!',
+                                '{star} Store Reached Level ${engine.storeLevel}!',
                                 Colors.amberAccent,
                                 size: 18,
                               );
@@ -109,7 +112,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                                 engine.spawnParticle(
                                   newCounter.center.dx,
                                   newCounter.top - 16,
-                                  '🔓 🛎️ Register ${engine.storeLevel} Is Now Open!',
+                                  '{unlock} {bell} Register ${engine.storeLevel} Is Now Open!',
                                   Colors.greenAccent,
                                   size: 18,
                                 );
@@ -142,7 +145,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
               ),
               child: Row(
                 children: [
-                  const Text('👩‍💼', style: TextStyle(fontSize: 32)),
+                  const Text('{face}', style: TextStyle(fontSize: 32)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -171,7 +174,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         ),
                         Text(
                           !isCashierUnlocked
-                              ? '🔒 Upgrade the store to Level 2 first to hire a cashier.'
+                              ? '{lock} Upgrade the store to Level 2 first to hire a cashier.'
                               : (engine.hasAutoCashier
                                   ? 'The cashier works the register and rings up customers automatically!'
                                   : 'They collect customer payments automatically while you restock and guard the shop.'),
@@ -187,7 +190,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         color: Colors.grey.shade300,
                         borderRadius: BorderRadius.zero,
                       ),
-                      child: const Text('🔒 Level 2 Required', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: const Text('{lock} Level 2 Required', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     )
                   else if (!engine.hasAutoCashier)
                     ElevatedButton(
@@ -199,7 +202,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                                 engine.spawnParticle(
                                   engine.checkoutCounter.center.dx,
                                   engine.checkoutCounter.top - 20,
-                                  '👩‍💼 Cashier Ayşe Started Working!',
+                                  '{face} Cashier Ayşe Started Working!',
                                   Colors.greenAccent,
                                   size: 16,
                                 );
@@ -219,7 +222,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         color: Colors.green.shade100,
                         borderRadius: BorderRadius.zero,
                       ),
-                      child: Text('Working ✅', style: TextStyle(color: Colors.green.shade900, fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: Text('Working {check}', style: TextStyle(color: Colors.green.shade900, fontSize: 11, fontWeight: FontWeight.bold)),
                     ),
                 ],
               ),
@@ -237,7 +240,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
               ),
               child: Row(
                 children: [
-                  const Text('👷', style: TextStyle(fontSize: 32)),
+                  const Text('{hardhat}', style: TextStyle(fontSize: 32)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -266,7 +269,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         ),
                         Text(
                           !isRestockerUnlocked
-                              ? '🔒 Upgrade the store to Level 3 first to hire Stocker Ali.'
+                              ? '{lock} Upgrade the store to Level 3 first to hire Stocker Ali.'
                               : (engine.isRestockerHired
                                   ? 'Picks up delivered boxes and fills the shelves for you!'
                                   : 'Picks up delivered boxes and fills the shelves automatically.'),
@@ -282,7 +285,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         color: Colors.grey.shade300,
                         borderRadius: BorderRadius.zero,
                       ),
-                      child: const Text('🔒 Level 3 Required', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: const Text('{lock} Level 3 Required', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     )
                   else if (!engine.isRestockerHired)
                     ElevatedButton(
@@ -295,7 +298,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                                 engine.spawnParticle(
                                   engine.restocker.x,
                                   engine.restocker.y - 30,
-                                  '👷 Stocker Ali Started Working!',
+                                  '{hardhat} Stocker Ali Started Working!',
                                   Colors.cyanAccent,
                                   size: 16,
                                 );
@@ -309,21 +312,24 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                       child: const Text('Hire (\$350)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     )
                   else
-                    Switch(
-                      value: engine.hasRestocker,
-                      activeThumbColor: Colors.cyan.shade700,
-                      onChanged: (val) {
-                        setState(() {
-                          engine.hasRestocker = val;
-                        });
-                      },
+                    SizedBox(
+                      width: 140,
+                      child: PixelToggle(
+                        label: 'On duty',
+                        value: engine.hasRestocker,
+                        onChanged: (val) {
+                          setState(() {
+                            engine.hasRestocker = val;
+                          });
+                        },
+                      ),
                     ),
                 ],
               ),
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

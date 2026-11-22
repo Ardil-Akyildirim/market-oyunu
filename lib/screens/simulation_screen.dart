@@ -1,5 +1,6 @@
 import 'dart:math';
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide Text;
+import '../widgets/pixel_ui.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import '../simulation/simulation_engine.dart';
@@ -358,10 +359,10 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => PixelDialog(
         backgroundColor: const Color(0xFF2A221C),
         title: Text(
-          '☀️ Dawn of Day ${survivedDay + 1}',
+          '{sun} Dawn of Day ${survivedDay + 1}',
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
         ),
         content: Column(
@@ -373,17 +374,17 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
               style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            Text('🦹 Thieves driven off: ${e.nightThievesRepelled}',
+            Text('{thief} Thieves driven off: ${e.nightThievesRepelled}',
                 style: const TextStyle(color: Colors.white70)),
-            Text('💰 Bounty earned: \$${e.nightBounty.toStringAsFixed(0)}',
+            Text('{coin} Bounty earned: \$${e.nightBounty.toStringAsFixed(0)}',
                 style: const TextStyle(color: Colors.greenAccent)),
-            Text('📦 Items stolen: ${e.nightStolenItems} (worth \$${e.nightStolenValue.toStringAsFixed(0)})',
+            Text('{box} Items stolen: ${e.nightStolenItems} (worth \$${e.nightStolenValue.toStringAsFixed(0)})',
                 style: const TextStyle(color: Colors.redAccent)),
-            Text('↩️ Items recovered: ${e.nightRecoveredItems}',
+            Text('{undo} Items recovered: ${e.nightRecoveredItems}',
                 style: const TextStyle(color: Colors.lightBlueAccent)),
             if (e.dawnUnlocks.isNotEmpty) ...[
               const SizedBox(height: 10),
-              Text('🆕 New on sale today: ${e.dawnUnlocks.join(', ')}',
+              Text('{star} New on sale today: ${e.dawnUnlocks.join(', ')}',
                   style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold)),
             ],
           ],
@@ -406,7 +407,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     _engine.tutorialFreeze = true;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => PixelDialog(
         backgroundColor: const Color(0xFF2A221C),
         title: const Text('Paused', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
         content: StatefulBuilder(
@@ -419,20 +420,16 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                 style: TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 10),
-              SwitchListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Music', style: TextStyle(color: Colors.white)),
+              PixelToggle(
+                label: 'Music',
                 value: AudioService.instance.musicOn,
                 onChanged: (v) async {
                   await AudioService.instance.setMusicOn(v);
                   setLocal(() {});
                 },
               ),
-              SwitchListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Sound effects', style: TextStyle(color: Colors.white)),
+              PixelToggle(
+                label: 'Sound effects',
                 value: AudioService.instance.sfxOn,
                 onChanged: (v) async {
                   await AudioService.instance.setSfxOn(v);
@@ -528,7 +525,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('🛍️ Package delivered and +\$${earned.toStringAsFixed(0)} collected! 😊'),
+          content: Text('{bag} Package delivered and +\$${earned.toStringAsFixed(0)} collected! '),
           backgroundColor: Colors.green.shade700,
           duration: const Duration(seconds: 2),
         ),
@@ -675,7 +672,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                       _engine.spawnParticle(
                                         r.center.dx,
                                         r.top - 16,
-                                        '🚫 No courier packages at the register! 📦 Go to the Packing Station!',
+                                        '{redx} No courier packages at the register! {box} Go to the Packing Station!',
                                         Colors.orangeAccent,
                                         size: 14,
                                       );
@@ -687,13 +684,13 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                   }
                                 }
 
-                                // Tıklanan yer 📦 Kurye Paketleme Masası ise
+                                // Tıklanan yer {box} Kurye Paketleme Masası ise
                                 if (_engine.courierPackingDesk.inflate(16).contains(worldPos)) {
                                   _engine.handleCourierPackingDeskClick();
                                   return;
                                 }
 
-                                // Tıklanan yer 🛵 Hızlı Kurye Durağı ise
+                                // Tıklanan yer {bike} Hızlı Kurye Durağı ise
                                 if (_engine.courierStation.inflate(35).contains(worldPos)) {
                                   _engine.deliverToCourier();
                                   return;
@@ -754,7 +751,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                       boxShadow: [
                                         BoxShadow(
                                           color: Colors.black.withValues(alpha: 0.4),
-                                          blurRadius: 8,
+                                          offset: const Offset(3, 4), blurRadius: 0,
                                         ),
                                       ],
                                     ),
@@ -785,17 +782,17 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                         children: [
                                           IconButton(
                                             visualDensity: VisualDensity.compact,
-                                            icon: const Icon(Icons.remove, color: Colors.white, size: 16),
+                                            icon: PixelIcon('minus', size: 16),
                                             onPressed: () => _engine.adjustZoom(-0.10),
                                             tooltip: 'Zoom Out (down to 50%)',
                                           ),
                                           Text(
-                                            '🔍 ${(100 * _engine.cameraZoom).round()}%',
+                                            '{magnifier} ${(100 * _engine.cameraZoom).round()}%',
                                             style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                                           ),
                                           IconButton(
                                             visualDensity: VisualDensity.compact,
-                                            icon: const Icon(Icons.add, color: Colors.white, size: 16),
+                                            icon: PixelIcon('plus', size: 16),
                                             onPressed: () => _engine.adjustZoom(0.10),
                                             tooltip: 'Zoom In',
                                           ),
@@ -880,8 +877,8 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                           border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.6)),
                                         ),
                                         child: Text(
-                                          '🌙 Night ${_engine.day} • Dawn in ${left}s\n'
-                                          '🦹 On the prowl: ${_engine.thieves.length} • Driven off: ${_engine.nightThievesRepelled} • Stolen: ${_engine.nightStolenItems}',
+                                          '{moon} Night ${_engine.day} • Dawn in ${left}s\n'
+                                          '{thief} On the prowl: ${_engine.thieves.length} • Driven off: ${_engine.nightThievesRepelled} • Stolen: ${_engine.nightStolenItems}',
                                           style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
                                         ),
                                       );
@@ -903,18 +900,11 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                         child: Container(
                                           width: 84,
                                           height: 84,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: const Color(0xFFB45309),
-                                            border: Border.all(color: Colors.amberAccent, width: 3),
-                                            boxShadow: [
-                                              BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 8),
-                                            ],
-                                          ),
+                                          decoration: pixelDeco(const Color(0xFFB45309), border: kGold, bw: 4, shadow: 4),
                                           child: const Column(
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
-                                              Text('🏏', style: TextStyle(fontSize: 30)),
+                                              Text('{bat}', style: TextStyle(fontSize: 30)),
                                               Text('SWING (F)',
                                                   style: TextStyle(
                                                       color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
@@ -949,7 +939,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                               boxShadow: [
                                                 BoxShadow(
                                                   color: Colors.black.withValues(alpha: 0.25),
-                                                  blurRadius: 8,
+                                                  blurRadius: 0,
                                                   offset: const Offset(0, 3),
                                                 ),
                                               ],
@@ -998,8 +988,8 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     required String icon,
     required String label,
     required VoidCallback onTap,
-    Color surfaceColor = const Color(0xFFF8FAFC),
-    Color bevelColor = const Color(0xFFCBD5E1),
+    Color surfaceColor = const Color(0xFFF4EBD3),
+    Color bevelColor = const Color(0xFFCDBF9F),
     Color textColor = const Color(0xFF2A221C),
   }) {
     return Material(
@@ -1012,23 +1002,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
         borderRadius: BorderRadius.zero,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-          decoration: BoxDecoration(
-            color: surfaceColor,
-            borderRadius: BorderRadius.zero,
-            border: Border.all(color: bevelColor, width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: bevelColor,
-                offset: const Offset(0, 3),
-                blurRadius: 0,
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                offset: const Offset(0, 4),
-                blurRadius: 4,
-              ),
-            ],
-          ),
+          decoration: pixelDeco(surfaceColor, border: kInk, bw: 3, shadow: 3),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1055,21 +1029,17 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
         color: Color(0xFF2A221C),
-        border: Border(bottom: BorderSide(color: Color(0xFF4A3C30), width: 1.5)),
+        border: Border(bottom: BorderSide(color: Color(0xFF14100E), width: 4)),
       ),
       child: Row(
         children: [
           // Kasa Parası
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-            decoration: BoxDecoration(
-              color: const Color(0xFF17120F),
-              borderRadius: BorderRadius.zero,
-              border: Border.all(color: const Color(0xFF4A3C30), width: 1.5),
-            ),
+            decoration: pixelDeco(const Color(0xFF17120F), border: kInk, bw: 3, shadow: 0),
             child: Row(
               children: [
-                const Text('💵', style: TextStyle(fontSize: 17)),
+                const Text('{coin}', style: TextStyle(fontSize: 17)),
                 const SizedBox(width: 8),
                 Text(
                   '\$${_engine.cash.toStringAsFixed(1)}',
@@ -1087,16 +1057,14 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
           // Day / night clock
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: _engine.isNight ? const Color(0xFF1E2431) : const Color(0xFF17120F),
-              borderRadius: BorderRadius.zero,
-              border: Border.all(
-                color: _engine.isNight ? Colors.lightBlueAccent : const Color(0xFF4A3C30),
-                width: 1.5,
-              ),
+            decoration: pixelDeco(
+              _engine.isNight ? const Color(0xFF1E2431) : const Color(0xFF17120F),
+              border: _engine.isNight ? const Color(0xFF6FA2DD) : kInk,
+              bw: 3,
+              shadow: 0,
             ),
             child: Text(
-              '${_engine.isNight ? '🌙' : '☀️'} Day ${_engine.day} • '
+              '${_engine.isNight ? '{moon}' : '{sun}'} Day ${_engine.day} • '
               '${_engine.closingTime ? 'CLOSING 0:00' : '${_engine.phaseTimeLeft.ceil() ~/ 60}:${(_engine.phaseTimeLeft.ceil() % 60).toString().padLeft(2, '0')}'}',
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
             ),
@@ -1105,7 +1073,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
           IconButton(
             tooltip: 'Menu',
             onPressed: _showPauseMenu,
-            icon: const Icon(Icons.menu, color: Colors.white70),
+            icon: PixelIcon('menu', size: 24),
           ),
           const SizedBox(width: 4),
 
@@ -1126,9 +1094,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
               child: Row(
                 children: [
                   Text(
-                    _engine.carriedBox != null
-                        ? _engine.carriedBox!.containerEmoji
-                        : (_engine.playerTool != null ? _engine.playerTool!.emoji : '🖐️'),
+                    _engine.carriedBox != null ? '{box}' : '{hand}',
                     style: const TextStyle(fontSize: 16),
                   ),
                   const SizedBox(width: 8),
@@ -1159,7 +1125,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                         _engine.spawnParticle(
                           _engine.playerX,
                           _engine.playerY - 28,
-                          '↩️ Returned to Shelf',
+                          '{undo} Returned to Shelf',
                           Colors.lightBlueAccent,
                           size: 14,
                         );
@@ -1173,7 +1139,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                           border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.7)),
                         ),
                         child: const Text(
-                          '↩️ Returned to Shelf',
+                          '{undo} Returned to Shelf',
                           style: TextStyle(color: Colors.lightBlueAccent, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -1185,7 +1151,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
           ),
           const SizedBox(width: 10),
 
-          // 🛵 Aktif Kurye Siparişi Rozeti (Paketleme & Hızlı Teslimat Butonu)
+          // {bike} Aktif Kurye Siparişi Rozeti (Paketleme & Hızlı Teslimat Butonu)
           if (_engine.courierState == CourierState.waitingForOrder && _engine.activeCourierOrder != null) ...[
             Builder(
               builder: (context) {
@@ -1197,12 +1163,12 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                 final isPackingNow = _engine.courierStagedCount > 0 &&
                     _engine.courierStagedProduct == ord.productType;
                 return _buildNaturalButton(
-                  icon: hasSealedPkg ? '🛵' : '📦',
+                  icon: hasSealedPkg ? '{bike}' : '{box}',
                   label: hasSealedPkg
                       ? 'Hand Package to Courier (${ord.remainingTime.toInt()}s)'
                       : (isPackingNow
                           ? 'Pack (${(_engine.courierPackingProgress * 100).toInt()}%) (${ord.remainingTime.toInt()}s)'
-                          : '${ord.deliveredQty}/${ord.requiredQty} ${def.emoji} Pack & Send (${ord.remainingTime.toInt()}s)'),
+                          : '${ord.deliveredQty}/${ord.requiredQty} ${def.ico} Pack & Send (${ord.remainingTime.toInt()}s)'),
                   surfaceColor: hasSealedPkg ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
                   bevelColor: hasSealedPkg ? const Color(0xFF16A34A) : const Color(0xFFD97706),
                   textColor: hasSealedPkg ? const Color(0xFF14532D) : const Color(0xFF78350F),
@@ -1215,10 +1181,10 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
 
           // 1. Şahıs Kasiyer Bakış Açısı Tuşu
           _buildNaturalButton(
-            icon: '🎥',
+            icon: '{register}',
             label: _isCashierViewOpen ? 'Back to Store' : 'Cashier View',
             surfaceColor: _isCashierViewOpen ? const Color(0xFFDCFCE7) : const Color(0xFFE0F2FE),
-            bevelColor: _isCashierViewOpen ? const Color(0xFF16A34A) : const Color(0xFF0284C7),
+            bevelColor: _isCashierViewOpen ? const Color(0xFF16A34A) : const Color(0xFF8A5A33),
             textColor: _isCashierViewOpen ? const Color(0xFF14532D) : const Color(0xFF0C4A6E),
             onTap: () {
               if (_isCashierViewOpen) {
@@ -1232,7 +1198,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
 
           // Bilgisayar (Toptan Sipariş) Doğal Tuşu
           _buildNaturalButton(
-            icon: '💻',
+            icon: '{computer}',
             label: 'Computer',
             onTap: () {
               showDialog(
@@ -1245,7 +1211,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
 
           // Yönetici & Market Yönetimi Doğal Tuşu
           _buildNaturalButton(
-            icon: '👔',
+            icon: '{case}',
             label: 'Manager (Lv.${_engine.storeLevel})',
             surfaceColor: const Color(0xFFEDE9FE),
             bevelColor: const Color(0xFFC4B5FD),

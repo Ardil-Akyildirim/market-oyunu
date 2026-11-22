@@ -85,7 +85,7 @@ class PixelPainter extends CustomPainter {
         style: TextStyle(
           color: color,
           fontSize: size,
-          fontFamily: 'monospace',
+          fontFamily: 'Pixelify',
           fontWeight: bold ? FontWeight.bold : FontWeight.normal,
           height: 1.0,
         ),
@@ -101,6 +101,10 @@ class PixelPainter extends CustomPainter {
       {double size = 10, Color color = Colors.white, bool bold = true, bool plate = false}) {
     final clean = _clean(text);
     if (clean.isEmpty) return;
+    // Tiny text turns digits like 2/3/8 into blobs, so keep a readable minimum
+    // and put every label that holds numbers on a dark plate.
+    if (size < 13) size = 13;
+    if (RegExp(r'[0-9]').hasMatch(clean)) plate = true;
     final tp = _tp(clean, size, color, bold);
     final dx = x - tp.width / 2;
     final dy = y - tp.height / 2;
@@ -119,7 +123,9 @@ class PixelPainter extends CustomPainter {
   static final RegExp _emoji = RegExp(
       r'[\u{1F000}-\u{1FFFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]',
       unicode: true);
-  String _clean(String s) => s.replaceAll(_emoji, '').replaceAll(RegExp(r'\s+'), ' ').trim();
+  static final RegExp _iconToken = RegExp(r'\{[a-z_]+\}');
+  String _clean(String s) =>
+      s.replaceAll(_emoji, '').replaceAll(_iconToken, '').replaceAll(RegExp(r'\s+'), ' ').trim();
 
   // ---------------------------------------------------------------------------
   // paint

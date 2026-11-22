@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide Text;
+import '../../widgets/pixel_ui.dart';
 import '../simulation_engine.dart';
 import '../simulation_models.dart';
 
@@ -35,10 +36,12 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
     final canAfford = widget.engine.cash >= _totalCost && _totalCost > 0;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
-      backgroundColor: const Color(0xFFE9DFC6),
-      child: Container(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: SingleChildScrollView(
+        child: Container(
         width: 580,
+        decoration: pixelDeco(kParchment, bw: 4, shadow: 6),
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -53,7 +56,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                     color: Colors.blue.shade100,
                     borderRadius: BorderRadius.zero,
                   ),
-                  child: const Text('💻', style: TextStyle(fontSize: 24)),
+                  child: const Text('{computer}', style: TextStyle(fontSize: 24)),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
@@ -73,7 +76,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
+                  icon: PixelIcon('x', size: 24, dark: true),
                 ),
               ],
             ),
@@ -91,7 +94,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
               ),
               child: const Row(
                 children: [
-                  Text('📦', style: TextStyle(fontSize: 18)),
+                  Text('{box}', style: TextStyle(fontSize: 18)),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -124,7 +127,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                       ),
                       child: Row(
                         children: [
-                          Text(def.emoji, style: const TextStyle(fontSize: 26)),
+                          Text(def.ico, style: const TextStyle(fontSize: 26)),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -168,7 +171,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                             Row(
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline, size: 20),
+                                  icon: PixelIcon('minus', size: 20, dark: true),
                                   onPressed: qty > 0
                                       ? () {
                                           widget.engine.playSfx('click');
@@ -178,9 +181,9 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                                         }
                                       : null,
                                 ),
-                                Text('$qty Box', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                Text('${qty} Box', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                 IconButton(
-                                  icon: const Icon(Icons.add_circle_outline, size: 20, color: Colors.blue),
+                                  icon: PixelIcon('plus', size: 20, dark: true),
                                   onPressed: () {
                                     widget.engine.playSfx('click');
                                     setState(() {
@@ -198,7 +201,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                                 borderRadius: BorderRadius.zero,
                               ),
                               child: Text(
-                                '🔒 ${widget.engine.shelfLockReason(shelf)}',
+                                '{lock} ${widget.engine.shelfLockReason(shelf)}',
                                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange.shade900),
                               ),
                             ),
@@ -238,14 +241,14 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('🚚 The truck got your order and is on its way! Pulling up to the door...'),
+                              content: Text('{truck} The truck got your order and is on its way! Pulling up to the door...'),
                               backgroundColor: Colors.blue,
                             ),
                           );
                         }
                       : null,
-                  icon: const Icon(Icons.local_shipping, size: 18),
-                  label: const Text('CALL THE TRUCK 🚛', style: TextStyle(fontWeight: FontWeight.bold)),
+                  icon: PixelIcon('truck', size: 18),
+                  label: const Text('CALL THE TRUCK {truck}', style: TextStyle(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade600,
                     foregroundColor: Colors.white,
@@ -258,7 +261,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

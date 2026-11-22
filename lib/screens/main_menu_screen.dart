@@ -1,5 +1,6 @@
 import 'dart:math';
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide Text;
+import '../widgets/pixel_ui.dart';
 import '../widgets/tutorial_overlay.dart';
 import '../audio/audio_service.dart';
 import 'simulation_screen.dart';
@@ -42,20 +43,20 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
   void _showHowToPlay() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
+      builder: (ctx) => PixelDialog(
+        backgroundColor: const Color(0xFF2A221C),
         title: const Text('How to Play', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
         content: const SingleChildScrollView(
           child: Text(
-            '☀️ DAY\n'
-            '• Keep the shelves stocked (💻 Computer → order → carry the box to a shelf).\n'
+            '{sun} DAY\n'
+            '• Keep the shelves stocked ({computer} Computer -> order -> carry the box to a shelf).\n'
             '• Customers pay at the register: tap the counter to open Cashier View.\n'
-            '• Upgrade your store with 👔 Manager.\n\n'
-            '🌙 NIGHT\n'
+            '• Upgrade your store with {case} Manager.\n\n'
+            '{moon} NIGHT\n'
             '• Thieves sneak in and steal from your shelves.\n'
-            '• Walk up to them and press F (or tap 🏏 SWING) to hit them with your stick.\n'
+            '• Walk up to them and press F (or tap {bat} SWING) to hit them with your stick.\n'
             '• Driven-off thieves drop their loot and pay you a bounty.\n\n'
-            '⌨️ CONTROLS\n'
+            'CONTROLS\n'
             '• WASD / arrows or tap to move • E / Space to interact • F to swing the stick.',
             style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.45),
           ),
@@ -174,10 +175,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
                             await AudioService.instance.setMusicOn(!AudioService.instance.musicOn);
                             if (mounted) setState(() {});
                           },
-                          icon: Icon(
-                            AudioService.instance.musicOn ? Icons.music_note : Icons.music_off,
-                            color: Colors.white70,
-                          ),
+                          icon: PixelIcon('note', size: 24, slash: !AudioService.instance.musicOn),
                         ),
                         IconButton(
                           tooltip: 'Sound effects',
@@ -185,10 +183,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
                             await AudioService.instance.setSfxOn(!AudioService.instance.sfxOn);
                             if (mounted) setState(() {});
                           },
-                          icon: Icon(
-                            AudioService.instance.sfxOn ? Icons.volume_up : Icons.volume_off,
-                            color: Colors.white70,
-                          ),
+                          icon: PixelIcon('speaker', size: 24, slash: !AudioService.instance.sfxOn),
                         ),
                       ],
                     ),

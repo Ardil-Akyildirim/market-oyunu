@@ -33,6 +33,9 @@ class SimProductDef {
     required this.boxSize,
   });
 
+  /// Pixel icon token for UI strings, e.g. '{milk}' (see widgets/pixel_ui.dart).
+  String get ico => '{${type.name}}';
+
   double get boxCost => orderCostPerItem * boxSize;
   double get profitPerItem => retailPrice - orderCostPerItem;
 }
@@ -611,6 +614,7 @@ class Thief {
   double knockY;
   double walkAngle;
   double walkAnim;
+  bool fromBack = false; // sneaked in through the back door
 
   Thief({
     required this.id,

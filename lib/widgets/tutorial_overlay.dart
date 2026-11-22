@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide Text;
+import 'pixel_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../simulation/simulation_engine.dart';
 
@@ -52,13 +53,13 @@ class TutorialPrefs {
 List<TutorialStep> buildDayTutorial(double startX, double startY) {
   return [
     const TutorialStep(
-      icon: '🏪',
+      icon: '{shop}',
       title: 'Welcome to Village Market!',
       body: 'You run a little village market. By day you serve customers and keep the shelves '
           'full. By night, thieves sneak in to steal your stock. This quick tour covers the basics.',
     ),
     TutorialStep(
-      icon: '🚶',
+      icon: '{boots}',
       title: 'Try walking around',
       body: 'Move with WASD / arrow keys, or tap / click anywhere on the floor and your '
           'character will walk there.',
@@ -69,25 +70,25 @@ List<TutorialStep> buildDayTutorial(double startX, double startY) {
       },
     ),
     const TutorialStep(
-      icon: '📦',
+      icon: '{box}',
       title: 'Keep the shelves stocked',
-      body: 'Customers buy products from the shelves. When one runs low, open the 💻 Computer '
+      body: 'Customers buy products from the shelves. When one runs low, open the {computer} Computer '
           'to order stock. When the delivery arrives, pick up the box and tap a shelf to fill it.',
     ),
     const TutorialStep(
-      icon: '🛒',
+      icon: '{cart}',
       title: 'Customers and the register',
       body: 'Shoppers line up at a register when they are done. Tap the counter (or walk behind it) '
           'to switch to Cashier View, scan their items and collect the payment.',
     ),
     const TutorialStep(
-      icon: '👔',
+      icon: '{case}',
       title: 'Grow your store',
-      body: 'Use the 👔 Manager button to upgrade your store, unlock new products and hire help. '
+      body: 'Use the {case} Manager button to upgrade your store, unlock new products and hire help. '
           'Reinvest your profit wisely!',
     ),
     const TutorialStep(
-      icon: '🌙',
+      icon: '{moon}',
       title: 'Watch the clock',
       body: 'The clock in the top bar counts down to nightfall. When the sun sets the shop closes '
           'and thieves arrive. Have your shelves stocked and your stick ready!',
@@ -98,31 +99,31 @@ List<TutorialStep> buildDayTutorial(double startX, double startY) {
 List<TutorialStep> buildNightTutorial() {
   return [
     const TutorialStep(
-      icon: '🌙',
+      icon: '{moon}',
       title: 'Night has fallen!',
       body: 'The shop is closed to customers. Masked thieves are sneaking in to grab products '
           'off your shelves. Do not let them get away with it!',
     ),
     const TutorialStep(
-      icon: '🏏',
+      icon: '{bat}',
       title: 'Fight back with your stick',
-      body: 'Walk up to a thief and press F, or tap the 🏏 SWING button, to hit everyone close to you. '
+      body: 'Walk up to a thief and press F, or tap the {bat} SWING button, to hit everyone close to you. '
           'Tapping directly on a thief also runs you to him and attacks.',
     ),
     TutorialStep(
-      icon: '💥',
+      icon: '{burst}',
       title: 'Hit a thief!',
-      body: 'Get close to a thief and swing your stick (F / 🏏 button).',
+      body: 'Get close to a thief and swing your stick (F / {bat} button).',
       isDone: (e) => e.totalThiefHits > 0 || !e.isNight,
     ),
     const TutorialStep(
-      icon: '🦹',
+      icon: '{thief}',
       title: 'Stolen goods',
       body: 'Every hit knocks a thief back. Enough hits drive him off: he drops his loot back on the '
           'shelf and you earn a bounty. Thieves who escape through the door keep what they stole.',
     ),
     const TutorialStep(
-      icon: '☀️',
+      icon: '{sun}',
       title: 'Survive until sunrise',
       body: 'Hold out until dawn. Each night brings more (and tougher) thieves, so keep your shelves '
           'stocked and your cash growing.',
@@ -164,11 +165,7 @@ class TutorialOverlay extends StatelessWidget {
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 12),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xEE2A221C),
-                borderRadius: BorderRadius.zero,
-                border: Border.all(color: Colors.amberAccent, width: 1.6),
-              ),
+              decoration: pixelDeco(const Color(0xF0241B15), border: kGold, bw: 3, shadow: 4),
               child: Row(
                 children: [
                   Text(step.icon, style: const TextStyle(fontSize: 26)),
@@ -216,11 +213,7 @@ class TutorialOverlay extends StatelessWidget {
             child: Container(
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.fromLTRB(22, 20, 22, 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A221C),
-                borderRadius: BorderRadius.zero,
-                border: Border.all(color: Colors.amberAccent, width: 2),
-              ),
+              decoration: pixelDeco(kPanelDark, border: kGold, bw: 4, shadow: 6),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,9 +226,9 @@ class TutorialOverlay extends StatelessWidget {
                         child: Text(
                           step.title,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: kGold,
                             fontWeight: FontWeight.w900,
-                            fontSize: 19,
+                            fontSize: 22,
                           ),
                         ),
                       ),

@@ -650,7 +650,7 @@ class SimulationEngine with ChangeNotifier {
       }
 
       // Made it out of the door
-      if (t.state == ThiefState.fleeing && t.y <= 60) {
+      if (t.state == ThiefState.fleeing && (t.fromBack ? t.y >= 1025 : t.y <= 60)) {
         if (t.carried > 0 && t.loot != null) {
           final def = productCatalog[t.loot!];
           nightStolenItems += t.carried;
@@ -666,19 +666,25 @@ class SimulationEngine with ChangeNotifier {
     final r = Random();
     final hp = 2 + (day ~/ 4).clamp(0, 3).toInt();
     _thiefCounter++;
+    // About 40% of the thieves sneak in through the back door (south alley)
+    final fromBack = r.nextDouble() < 0.4;
     final t = Thief(
       id: 'thief_$_thiefCounter',
-      x: worldWidth / 2 + (r.nextDouble() - 0.5) * 160,
-      y: 25,
+      x: worldWidth / 2 + (r.nextDouble() - 0.5) * (fromBack ? 160 : 160),
+      y: fromBack ? 1035 : 25,
       hp: hp,
       speed: 105 + r.nextDouble() * 35 + min(day, 10) * 4.0,
     );
+    t.fromBack = fromBack;
     final target = _pickThiefTarget();
     if (target == null) {
       t.state = ThiefState.fleeing;
     } else {
       t.targetShelfId = target.id;
       t.loot = target.assignedProduct;
+    }
+    if (fromBack) {
+      showToast('A thief is sneaking in through the BACK DOOR!', kind: 0, seconds: 3.5);
     }
     thieves.add(t);
     nightThievesSpawned++;
@@ -744,13 +750,20 @@ class SimulationEngine with ChangeNotifier {
     // Once outside the shop the thief just runs straight up the street.
     double gx = targetX;
     double gy = targetY;
-    if (isExit && t.y <= 235) {
+    final doorCenter = worldWidth / 2;
+    if (isExit && t.fromBack) {
+      // Back-door thieves leave the same way they came in
+      gx = doorCenter;
+      gy = 1040;
+    } else if (isExit && t.y <= 235) {
       gx = worldWidth / 2;
       gy = -40;
     }
-    final doorCenter = worldWidth / 2;
     Offset wp;
-    if (t.y < 235 && gy >= 225 && (t.x - doorCenter).abs() > 100) {
+    if (t.fromBack && !isExit && t.y > 982) {
+      // Still in the back alley: go through the back door first
+      wp = Offset(t.x.clamp(doorCenter - 100, doorCenter + 100).toDouble(), 955.0);
+    } else if (t.y < 235 && gy >= 225 && (t.x - doorCenter).abs() > 100) {
       // Outside: walk to the door first, never through the front wall
       wp = Offset(doorCenter, 28);
     } else if (t.y < 235 && gy >= 225) {
@@ -788,7 +801,12 @@ class SimulationEngine with ChangeNotifier {
   bool _thiefPosOk(double ox, double oy, double nx, double ny) {
     final doorCenter = worldWidth / 2;
     if (ny >= 225) {
-      if (nx < storeMinX || nx > storeMaxX || ny > 975) return false;
+      if (ny > 975) {
+        // Only the back door opening leads out of the shop
+        if ((nx - doorCenter).abs() > 125 || ny > 1055) return false;
+      } else if (nx < storeMinX || nx > storeMaxX) {
+        return false;
+      }
     }
     if ((oy < 230 && ny >= 230) || (oy >= 230 && ny < 230)) {
       if ((nx - doorCenter).abs() > 130) return false;
@@ -809,6 +827,8 @@ class SimulationEngine with ChangeNotifier {
 
   /// Swing the stick. Hits every thief close to the player.
   void swingStick() {
+    // The stick only comes out after dark
+    if (!isNight) return;
     if (stickCooldown > 0) return;
     stickCooldown = 0.42;
     stickSwingTimer = 1.0;
@@ -866,6 +886,8 @@ class SimulationEngine with ChangeNotifier {
   }
 
   void _hitThief(Thief t) {
+    // A thief that was already driven off can't be hit again (no bounty farming)
+    if (t.hp <= 0) return;
     totalThiefHits++;
     _sfx('hit');
     t.hp--;
@@ -974,7 +996,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           cheeseMachineRect.center.dx,
           cheeseMachineRect.top - 16,
-          '🧀 Tulum Cheese Ready! ($cheeseMachineReadyBoxes/$cheeseMachineMaxBoxes)',
+          '🧀 Tulum Cheese Ready! (${cheeseMachineReadyBoxes}/${cheeseMachineMaxBoxes})',
           Colors.greenAccent,
           size: 16,
         );
@@ -1506,7 +1528,7 @@ class SimulationEngine with ChangeNotifier {
             spawnParticle(
               courierPackingDesk.center.dx,
               courierPackingDesk.top - 22,
-              '⚠️ Too many! The courier wants $needed ${def.emoji} ($excess extra)!',
+              '⚠️ Too many! The courier wants ${needed} ${def.emoji} (${excess} extra)!',
               Colors.orangeAccent,
               size: 16,
             );
@@ -1569,7 +1591,7 @@ class SimulationEngine with ChangeNotifier {
           spawnParticle(
             courierPackingDesk.center.dx,
             courierPackingDesk.top - 22,
-            '📦 ${def.emoji} Courier Package Ready! Take It to the Bike! ($packedQty/${order.requiredQty})',
+            '📦 ${def.emoji} Courier Package Ready! Take It to the Bike! (${packedQty}/${order.requiredQty})',
             Colors.greenAccent,
             size: 16,
           );
@@ -1701,7 +1723,7 @@ class SimulationEngine with ChangeNotifier {
       if (total > needed) {
         msg = '+1 ${def.emoji} (In Hand: ${carriedBox!.currentCount} • ⚠️ ${total - needed} extra for the courier!)';
       } else {
-        msg = '+1 ${def.emoji} Picked ($total/$needed for the courier)';
+        msg = '+1 ${def.emoji} Picked (${total}/${needed} for the courier)';
       }
     }
 
@@ -1798,8 +1820,8 @@ class SimulationEngine with ChangeNotifier {
       courierPackingDesk.center.dx,
       courierPackingDesk.top - 14,
       remAfter > 0
-          ? '📦 +$take ${def.emoji} Placed on the Table ($courierStagedCount/${order.requiredQty}) — bring $remAfter more!'
-          : '📦 +$take ${def.emoji} Complete! Taping the Package...',
+          ? '📦 +${take} ${def.emoji} Placed on the Table (${courierStagedCount}/${order.requiredQty}) — bring ${remAfter} more!'
+          : '📦 +${take} ${def.emoji} Complete! Taping the Package...',
       Colors.amberAccent,
       size: 15,
     );
@@ -1819,7 +1841,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         courierPackingDesk.left - 18,
         courierPackingDesk.top - 12,
-        '↩️ $excessReturned extra ${def.emoji} returned to the shelf',
+        '↩️ ${excessReturned} extra ${def.emoji} returned to the shelf',
         Colors.lightBlueAccent,
         size: 14,
       );
@@ -1842,7 +1864,7 @@ class SimulationEngine with ChangeNotifier {
     spawnParticle(
       courierPackingDesk.center.dx,
       courierPackingDesk.top - 22,
-      '📦 ${def.emoji} Courier Package Ready! ($packCount/${order.requiredQty}) Take It to the Bike!',
+      '📦 ${def.emoji} Courier Package Ready! (${packCount}/${order.requiredQty}) Take It to the Bike!',
       Colors.greenAccent,
       size: 16,
     );
@@ -1866,7 +1888,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         courierPackingDesk.center.dx,
         courierPackingDesk.top - 16,
-        '📦 $stageCount/${order.remainingQty} ${def.emoji} waiting on the table!',
+        '📦 ${stageCount}/${order.remainingQty} ${def.emoji} waiting on the table!',
         Colors.amberAccent,
         size: 14,
       );
@@ -1924,7 +1946,7 @@ class SimulationEngine with ChangeNotifier {
           spawnParticle(
             courierPackingDesk.center.dx,
             courierPackingDesk.top - 18,
-            '⚠️ Too many! The courier wants ${order.remainingQty} ${def.emoji} ($excess extra)!',
+            '⚠️ Too many! The courier wants ${order.remainingQty} ${def.emoji} (${excess} extra)!',
             Colors.orangeAccent,
             size: 16,
           );
@@ -2063,7 +2085,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           courierStation.center.dx,
           courierStation.top - 15,
-          '📦 +$take ${def.emoji} Package Loaded to the Courier (${order.deliveredQty}/${order.requiredQty})',
+          '📦 +${take} ${def.emoji} Package Loaded to the Courier (${order.deliveredQty}/${order.requiredQty})',
           Colors.lightBlueAccent,
           size: 15,
         );
@@ -3429,10 +3451,10 @@ class SimulationEngine with ChangeNotifier {
           if (total > order.remainingQty) {
             final excess = total - order.remainingQty;
             activeInteractionText =
-                '⚠️ Too many! The courier wants ${order.remainingQty} ${def.emoji} ($excess extra!) — Open Packing [E / Click]';
+                '⚠️ Too many! The courier wants ${order.remainingQty} ${def.emoji} (${excess} extra!) — Open Packing [E / Click]';
           } else {
             activeInteractionText =
-                '📦 ${def.emoji} ${def.name} Packing ($total/${order.remainingQty}) [E / Click]';
+                '📦 ${def.emoji} ${def.name} Packing (${total}/${order.remainingQty}) [E / Click]';
           }
           activeInteractionAction = () {
             handleCourierPackingDeskClick();
@@ -3441,11 +3463,11 @@ class SimulationEngine with ChangeNotifier {
           if (courierStagedCount >= order.remainingQty) {
             final pct = (courierPackingProgress * 100).toInt().clamp(0, 100);
             activeInteractionText =
-                '📦 ${def.emoji} ${def.name} Courier Package Being Taped... $pct% ($courierStagedCount/${order.requiredQty})';
+                '📦 ${def.emoji} ${def.name} Courier Package Being Taped... ${pct}% (${courierStagedCount}/${order.requiredQty})';
           } else {
             final rem = order.remainingQty - courierStagedCount;
             activeInteractionText =
-                '📦 On the Table $courierStagedCount/${order.remainingQty} ${def.emoji} Ready (bring $rem more!) [E / Click]';
+                '📦 On the Table ${courierStagedCount}/${order.remainingQty} ${def.emoji} Ready (bring ${rem} more!) [E / Click]';
             activeInteractionAction = () {
               handleCourierPackingDeskClick();
             };
@@ -3507,7 +3529,7 @@ class SimulationEngine with ChangeNotifier {
           activeInteractionAction = null;
         } else {
           activeInteractionText = hasAutoCashier
-              ? '🛎️ Register ${i + 1} Counter (Cashier on Duty - $unlockedCheckoutCount/3 Registers Open)'
+              ? '🛎️ Register ${i + 1} Counter (Cashier on Duty - ${unlockedCheckoutCount}/3 Registers Open)'
               : '🛎️ Register ${i + 1} Counter (Scan Items at the Barcode When a Customer Arrives)';
           activeInteractionAction = null;
         }
@@ -3535,7 +3557,7 @@ class SimulationEngine with ChangeNotifier {
         return;
       } else if (cheeseMachineMilkInput > 0) {
         final pct = ((cheeseMachineTimer / cheeseMachineDuration) * 100).toInt().clamp(0, 100);
-        activeInteractionText = '⏳ Cheese Machine Running... $pct%';
+        activeInteractionText = '⏳ Cheese Machine Running... ${pct}%';
       } else {
         activeInteractionText = '🧀 Cheese Machine: Bring Milk from the Barn!';
         activeInteractionAction = () {
@@ -3598,7 +3620,7 @@ class SimulationEngine with ChangeNotifier {
             actionDesc = 'Enter the Coop & Collect Eggs in the Bucket';
           }
           activeInteractionText =
-              '${farm.requiredTool.emoji} $actionDesc (${farm.readySpotCount} Ready Spots)';
+              '${farm.requiredTool.emoji} ${actionDesc} (${farm.readySpotCount} Ready Spots)';
           activeInteractionAction = () {
             startAutoFarmHarvest(farm);
           };

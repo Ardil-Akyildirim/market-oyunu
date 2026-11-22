@@ -1,5 +1,6 @@
 import 'dart:math';
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide Text;
+import '../../widgets/pixel_ui.dart';
 import '../simulation_engine.dart';
 import '../simulation_models.dart';
 
@@ -25,11 +26,7 @@ class CheckoutRegisterDialog extends StatelessWidget {
       child: Container(
         width: dialogW,
         height: dialogH,
-        decoration: BoxDecoration(
-          color: const Color(0xFF17120F),
-          borderRadius: BorderRadius.zero,
-          border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.45), width: 2),
-        ),
+        decoration: pixelDeco(const Color(0xFF17120F), border: kInk, bw: 4, shadow: 6),
         clipBehavior: Clip.antiAlias,
         child: CashierFirstPersonView(
           engine: engine,
@@ -39,7 +36,7 @@ class CheckoutRegisterDialog extends StatelessWidget {
             Navigator.pop(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('🛍️ Package delivered and +\$${earned.toStringAsFixed(0)} collected! 😊'),
+                content: Text('{bag} Package delivered and +\$${earned.toStringAsFixed(0)} collected! '),
                 backgroundColor: Colors.green.shade700,
                 duration: const Duration(seconds: 2),
               ),
@@ -165,7 +162,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               decoration: const BoxDecoration(
-                color: Color(0xFF090D16),
+                color: Color(0xFF17120F),
                 border: Border(bottom: BorderSide(color: Color(0xFF2A221C), width: 1.5)),
               ),
               child: Row(
@@ -173,19 +170,19 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0284C7).withValues(alpha: 0.25),
+                      color: const Color(0xFF8A5A33).withValues(alpha: 0.25),
                       borderRadius: BorderRadius.zero,
-                      border: Border.all(color: const Color(0xFF38BDF8)),
+                      border: Border.all(color: const Color(0xFFE8B84A)),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('🎥', style: TextStyle(fontSize: 14)),
+                        Text('{register}', style: TextStyle(fontSize: 14)),
                         SizedBox(width: 6),
                         Text(
                           '1ST-PERSON CASHIER CAMERA',
                           style: TextStyle(
-                            color: Color(0xFF38BDF8),
+                            color: Color(0xFFE8B84A),
                             fontSize: 11,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.5,
@@ -195,7 +192,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                     ),
                   ),
                   const SizedBox(width: 14),
-                  Text(cust?.avatar ?? '🛎️', style: const TextStyle(fontSize: 22)),
+                  Text(cust != null ? '{face}' : '{bell}', style: const TextStyle(fontSize: 22)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -226,14 +223,14 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                         ),
                         Text(
                           cust == null
-                              ? '⏳ Customers will appear here when they finish shopping and reach the register...'
+                              ? '{clock} Customers will appear here when they finish shopping and reach the register...'
                               : (isAllPacked
-                                  ? '✅ All items scanned! Hand the bag to the customer and take payment.'
-                                  : '🖱️ CLICK an item on the belt or DRAG it to the LASER SCANNER ($packedCount/${cust.basket.length})'),
+                                  ? '{check} All items scanned! Hand the bag to the customer and take payment.'
+                                  : 'CLICK an item on the belt or DRAG it to the LASER SCANNER (${packedCount}/${cust.basket.length})'),
                           style: TextStyle(
                             color: cust == null
                                 ? Colors.amberAccent
-                                : (isAllPacked ? const Color(0xFF4ADE80) : const Color(0xFF94A3B8)),
+                                : (isAllPacked ? const Color(0xFF4ADE80) : const Color(0xFFB8A890)),
                             fontSize: 11.5,
                           ),
                         ),
@@ -242,7 +239,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                   ),
                   TextButton.icon(
                     onPressed: widget.onClose,
-                    icon: const Icon(Icons.arrow_back, color: Colors.white70, size: 18),
+                    icon: PixelIcon('back', size: 18),
                     label: const Text('Back to Store [ESC / Tab]', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ],
@@ -311,7 +308,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                       border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.6)),
                                     ),
                                     child: const Text(
-                                      '🔴 Items on the Belt (Click to Scan or Drag to the Laser Glass)',
+                                      '{dot} Items on the Belt (Click to Scan or Drag to the Laser Glass)',
                                       style: TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold),
                                     ),
                                   ),
@@ -363,16 +360,10 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                             width: 84,
                                             padding: const EdgeInsets.all(8),
                                             decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors: isNext
-                                                    ? [const Color(0xFFFFFFFF), const Color(0xFFFEF3C7)]
-                                                    : [const Color(0xFFF8FAFC), const Color(0xFFE2E8F0)],
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                              ),
+                                              color: isNext ? const Color(0xFFFEF3C7) : const Color(0xFFE9DFC6),
                                               borderRadius: BorderRadius.zero,
                                               border: Border.all(
-                                                color: isNext ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
+                                                color: isNext ? const Color(0xFFF59E0B) : const Color(0xFFB8A890),
                                                 width: isNext ? 2.6 : 1.4,
                                               ),
                                               boxShadow: [
@@ -380,7 +371,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                                   color: isNext
                                                       ? Colors.amber.withValues(alpha: 0.45)
                                                       : Colors.black.withValues(alpha: 0.35),
-                                                  blurRadius: isNext ? 12 : 6,
+                                                  blurRadius: 0,
                                                   offset: const Offset(0, 4),
                                                 ),
                                               ],
@@ -390,7 +381,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                               child: Column(
                                                 mainAxisAlignment: MainAxisAlignment.center,
                                                 children: [
-                                                  Text(def.emoji, style: const TextStyle(fontSize: 30)),
+                                                  Text(def.ico, style: const TextStyle(fontSize: 30)),
                                                   const SizedBox(height: 3),
                                                   Text(
                                                     def.name,
@@ -442,10 +433,10 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                       borderRadius: BorderRadius.zero,
                                       border: Border.all(color: Colors.redAccent, width: 2.5),
                                       boxShadow: [
-                                        BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 12),
+                                        BoxShadow(color: Colors.black.withValues(alpha: 0.45), offset: const Offset(3, 4), blurRadius: 0),
                                       ],
                                     ),
-                                    child: Center(child: Text(def.emoji, style: const TextStyle(fontSize: 34))),
+                                    child: Center(child: Text(def.ico, style: const TextStyle(fontSize: 34))),
                                   ),
                                 ),
                               );
@@ -460,7 +451,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                               child: Center(
                                 child: ElevatedButton.icon(
                                   onPressed: _handPackageAndCollect,
-                                  icon: const Text('💳', style: TextStyle(fontSize: 22)),
+                                  icon: const Text('{card}', style: TextStyle(fontSize: 22)),
                                   label: Text(
                                     'HAND OVER BAG & TAKE PAYMENT (+\$${_totalAmount.toStringAsFixed(0)})',
                                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
@@ -488,23 +479,23 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF17120F).withValues(alpha: 0.88),
                                     borderRadius: BorderRadius.zero,
-                                    border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.65), width: 1.5),
+                                    border: Border.all(color: const Color(0xFFE8B84A).withValues(alpha: 0.65), width: 1.5),
                                     boxShadow: [
-                                      BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 14),
+                                      BoxShadow(color: Colors.black.withValues(alpha: 0.45), offset: const Offset(3, 4), blurRadius: 0),
                                     ],
                                   ),
                                   child: const Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        '⏳ Waiting for a Customer at the Register...',
+                                        '{clock} Waiting for a Customer at the Register...',
                                         style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900),
                                       ),
                                       SizedBox(height: 4),
                                       Text(
                                         'The store keeps running in the background. It will pop up here automatically when a customer arrives!',
                                         textAlign: TextAlign.center,
-                                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5),
+                                        style: TextStyle(color: Color(0xFFB8A890), fontSize: 11.5),
                                       ),
                                     ],
                                   ),
@@ -536,7 +527,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
           width: inLaserPhase ? 2.0 : 1.4,
         ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 12),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.45), offset: const Offset(3, 4), blurRadius: 0),
         ],
       ),
       child: Column(
@@ -547,8 +538,8 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                '🖥️ REGISTER POS RECEIPT',
-                style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.w900),
+                '{register} REGISTER POS RECEIPT',
+                style: TextStyle(color: Color(0xFFE8B84A), fontSize: 11, fontWeight: FontWeight.w900),
               ),
               Text(
                 cust == null ? '0/0' : '$packedCount/${cust.basket.length}',
@@ -587,7 +578,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                           children: [
                             Flexible(
                               child: Text(
-                                '${def.emoji} ${def.name}',
+                                '${def.ico} ${def.name}',
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(color: Colors.white, fontSize: 11),
                               ),
@@ -779,7 +770,8 @@ class _CashierFirstPersonPainter extends CustomPainter {
     if (customer != null) {
       for (int i = 0; i < min(packedCount, 6); i++) {
         final def = productCatalog[customer!.basket[i]]!;
-        _text(canvas, def.emoji, bagRect.center.dx - 32 + (i % 3) * 32, bagRect.top + 28 + (i ~/ 3) * 26, fontSize: 22);
+        PixelSprites.paint(canvas, def.type.name,
+            Offset(bagRect.center.dx - 44 + (i % 3) * 30, bagRect.top + 14 + (i ~/ 3) * 26), 3);
       }
     }
     _text(
@@ -824,7 +816,7 @@ class _CashierFirstPersonPainter extends CustomPainter {
       final card = Rect.fromCenter(center: cur, width: 64, height: 64);
       _box(canvas, card, Colors.white);
       _r(canvas, card.left, card.bottom - u * 2, card.width, u * 2, inLaser ? const Color(0xFFEF4444) : def.primaryColor);
-      _text(canvas, def.emoji, cur.dx, cur.dy - 4, fontSize: 30);
+      PixelSprites.paint(canvas, def.type.name, Offset(cur.dx - 16, cur.dy - 20), 4);
     }
   }
 
@@ -891,7 +883,7 @@ class _CashierFirstPersonPainter extends CustomPainter {
       tp = TextPainter(
         text: TextSpan(
           text: text,
-          style: TextStyle(color: color, fontSize: fontSize, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+          style: TextStyle(color: color, fontSize: fontSize, fontWeight: FontWeight.bold, fontFamily: 'Pixelify'),
         ),
         textDirection: TextDirection.ltr,
         textAlign: TextAlign.center,

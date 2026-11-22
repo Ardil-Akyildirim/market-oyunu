@@ -1,8 +1,9 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide Text;
+import '../../widgets/pixel_ui.dart';
 import '../simulation_engine.dart';
 import '../simulation_models.dart';
 
-/// 📦 Kurye Siparişi Paketleme İstasyonu Penceresi
+/// {box} Kurye Siparişi Paketleme İstasyonu Penceresi
 /// Kasadan tamamen ayrıdır. Fazla ürün getirilirse "Bu fazla!" uyarısı verir ve tam siparişe göre paketletir.
 class CourierPackingDialog extends StatefulWidget {
   final SimulationEngine engine;
@@ -63,7 +64,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('📦 There is no active courier order right now.', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('{box} There is no active courier order right now.', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
             ],
@@ -80,10 +81,11 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
     final bool hasExcess = excess > 0;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       child: Container(
         width: 500,
+        decoration: pixelDeco(kParchment, bw: 4, shadow: 6),
         padding: const EdgeInsets.all(20),
         child: SingleChildScrollView(
           child: Column(
@@ -100,7 +102,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                     borderRadius: BorderRadius.zero,
                     border: Border.all(color: Colors.deepPurple.shade200),
                   ),
-                  child: const Text('📦', style: TextStyle(fontSize: 26)),
+                  child: const Text('{box}', style: TextStyle(fontSize: 26)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -112,7 +114,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                         style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF2A221C)),
                       ),
                       Text(
-                        '🛵 ${order.customerName} • Reward: +\$${order.rewardAmount.toStringAsFixed(0)} • ${order.remainingTime.toInt()}s',
+                        '{bike} ${order.customerName} • Reward: +\$${order.rewardAmount.toStringAsFixed(0)} • ${order.remainingTime.toInt()}s',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.deepPurple.shade700),
                       ),
                     ],
@@ -120,7 +122,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
+                  icon: PixelIcon('x', size: 24, dark: true),
                 ),
               ],
             ),
@@ -131,9 +133,9 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: const Color(0xFFF4EBD3),
                 borderRadius: BorderRadius.zero,
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: const Color(0xFFE9DFC6)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -141,7 +143,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                   Expanded(
                     child: Row(
                       children: [
-                        Text(def.emoji, style: const TextStyle(fontSize: 28)),
+                        Text(def.ico, style: const TextStyle(fontSize: 28)),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -153,7 +155,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                'Courier Wants: $needed pcs',
+                                'Courier Wants: ${needed} pcs',
                                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -212,19 +214,19 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
               child: Row(
                 children: [
                   Text(
-                    hasExcess ? '⚠️' : (isExact ? '✅' : 'ℹ️'),
+                    hasExcess ? '{warn}' : (isExact ? '{check}' : '{info}'),
                     style: const TextStyle(fontSize: 20),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       hasExcess
-                          ? 'Too many! The courier wants $needed x ${def.emoji}, you brought $_trayCount ($excess extra!). Remove the extras and pack accordingly!'
+                          ? 'Too many! The courier wants ${needed} x ${def.ico}, you brought ${_trayCount} (${excess} extra!). Remove the extras and pack accordingly!'
                           : (isExact
-                              ? 'Exactly the courier order ($needed/$needed)! Now tape the package and take it to the bike.'
+                              ? 'Exactly the courier order (${needed}/${needed})! Now tape the package and take it to the bike.'
                               : (_trayCount == 0
-                                  ? 'Each press takes 1 ${def.emoji} ${def.name} from the cabinet; bring it to this table ($needed needed).'
-                                  : 'There are $_trayCount here now. Grab $missing more ${def.emoji} from the cabinet!')),
+                                  ? 'Each press takes 1 ${def.ico} ${def.name} from the cabinet; bring it to this table (${needed} needed).'
+                                  : 'There are ${_trayCount} here now. Grab ${missing} more ${def.ico} from the cabinet!')),
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
@@ -255,7 +257,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
               child: _trayCount == 0
                   ? Center(
                       child: Text(
-                        '📦 Courier Box Empty (0/$needed ${def.emoji})',
+                        '{box} Courier Box Empty (0/${needed} ${def.ico})',
                         style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 12.5),
                       ),
                     )
@@ -281,10 +283,10 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(def.emoji, style: const TextStyle(fontSize: 18)),
+                                Text(def.ico, style: const TextStyle(fontSize: 18)),
                                 const SizedBox(width: 4),
                                 Text(
-                                  isExtra ? 'EXTRA ✕' : '#${index + 1}',
+                                  isExtra ? 'EXTRA x' : '#${index + 1}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -308,7 +310,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _removeOneExcess,
-                      icon: const Icon(Icons.remove_circle_outline),
+                      icon: PixelIcon('minus', size: 24, dark: true),
                       label: const Text('Remove 1 Extra (-1)', style: TextStyle(fontWeight: FontWeight.bold)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red.shade700,
@@ -321,8 +323,8 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => _trimAllExcess(needed),
-                      icon: const Icon(Icons.content_cut_rounded),
-                      label: Text('Set to $needed ($excess Returned)',
+                      icon: PixelIcon('x', size: 24, dark: true),
+                      label: Text('Set to ${needed} (${excess} Returned)',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange.shade600,
@@ -345,9 +347,9 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                   );
                   Navigator.pop(context);
                 },
-                icon: const Icon(Icons.inventory_2_rounded),
+                icon: PixelIcon('box', size: 24),
                 label: Text(
-                  '📦 Prepare & Tape the Courier Package ($needed/$needed)',
+                  '{box} Prepare & Tape the Courier Package (${needed}/${needed})',
                   style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -366,9 +368,9 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                   );
                   Navigator.pop(context);
                 },
-                icon: const Icon(Icons.save_alt_rounded),
+                icon: PixelIcon('bag', size: 24),
                 label: Text(
-                  'Leave on Table ($_trayCount/$needed) & Take from Cabinet',
+                  'Leave on Table (${_trayCount}/${needed}) & Take from Cabinet',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
