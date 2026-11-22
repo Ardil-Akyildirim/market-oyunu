@@ -500,7 +500,7 @@ class PixelPainter extends CustomPainter {
       plate: false,
     );
 
-    final subText = shelf != null ? engine.shelfLockReason(shelf) : 'Kilitli';
+    final subText = shelf != null ? engine.shelfLockReason(shelf) : 'Locked';
     _text(
       c,
       subText,
@@ -577,7 +577,7 @@ class PixelPainter extends CustomPainter {
       _p.style = PaintingStyle.fill;
     }
 
-    final label = isEquipped ? 'Elde: ${farm.requiredTool.name}' : '${farm.requiredTool.name} Al';
+    final label = isEquipped ? 'Equipped: ${farm.requiredTool.name}' : 'Take ${farm.requiredTool.name}';
     _text(
       c,
       label,
@@ -625,12 +625,12 @@ class PixelPainter extends CustomPainter {
       final ox = _snap(spot.x + sin(phase) * 4);
       final oy = _snap(spot.y + cos(phase * 0.7) * 2);
       _drawPixelCow(c, ox, oy, spot);
-      _drawSpotBadge(c, spot, 'Süt Sağ', const Color(0xFF5DADE2));
+      _drawSpotBadge(c, spot, 'Milk Cow', const Color(0xFF5DADE2));
     }
 
     _text(
       c,
-      'İNEK ÇİFTLİĞİ (Süt Kovası)  ${farm.readySpotCount}/${farm.spots.length}',
+      '${farm.name.toUpperCase()} (Milk Bucket)  ${farm.readySpotCount}/${farm.spots.length}',
       r.left + 150,
       r.top - 14,
       size: 12,
@@ -726,12 +726,12 @@ class PixelPainter extends CustomPainter {
     // Crop / orchard spots
     for (final spot in farm.spots) {
       _drawPixelWheatSpot(c, spot);
-      _drawSpotBadge(c, spot, 'Çapa Vur', const Color(0xFFF2CF4A));
+      _drawSpotBadge(c, spot, 'Harvest', const Color(0xFFF2CF4A));
     }
 
     _text(
       c,
-      '${farm.name.toUpperCase()} (Çapa)  ${farm.readySpotCount}/${farm.spots.length}',
+      '${farm.name.toUpperCase()} (Hoe)  ${farm.readySpotCount}/${farm.spots.length}',
       r.left + 145,
       r.top - 14,
       size: 12,
@@ -813,12 +813,12 @@ class PixelPainter extends CustomPainter {
     for (int i = 0; i < farm.spots.length; i++) {
       final spot = farm.spots[i];
       _drawPixelChickenSpot(c, spot, i);
-      _drawSpotBadge(c, spot, 'Yumurta Al', const Color(0xFFFFB74D));
+      _drawSpotBadge(c, spot, 'Take Eggs', const Color(0xFFFFB74D));
     }
 
     _text(
       c,
-      'TAVUK ÇİFTLİĞİ (Tavuk Kovası)  ${farm.readySpotCount}/${farm.spots.length}',
+      '${farm.name.toUpperCase()} (Egg Bucket)  ${farm.readySpotCount}/${farm.spots.length}',
       r.right - 155,
       r.top - 14,
       size: 12,
@@ -1078,8 +1078,7 @@ class PixelPainter extends CustomPainter {
       _p.style = PaintingStyle.fill;
     }
     // price/stock plate
-    final def = productCatalog[s.assignedProduct]!;
-    _text(c, '${def.name}  ${s.currentStock}/${s.maxCapacity}', r.center.dx, r.top - 9,
+    _text(c, '${s.name}  ${s.currentStock}/${s.maxCapacity}', r.center.dx, r.top - 9,
         size: 9, color: s.currentStock == 0 ? const Color(0xFFFF8A80) : Colors.white, plate: true);
   }
 
@@ -1433,7 +1432,7 @@ class PixelPainter extends CustomPainter {
       // Çiftliğin içindeyken Süt Kovası
       _drawPixelMilkBucket(c, _snap(px), by + 4 * kPx, hasMilk: true);
       if (showLabel) {
-        _text(c, 'Süt Kovası ${b.currentCount}/${b.maxCount}', px, py - 94, size: 11, color: const Color(0xFF9AD7FF), plate: true);
+        _text(c, 'Milk Bucket ${b.currentCount}/${b.maxCount}', px, py - 94, size: 11, color: const Color(0xFF9AD7FF), plate: true);
       }
       return;
     }
@@ -1441,7 +1440,7 @@ class PixelPainter extends CustomPainter {
       // Çiftliğin içindeyken Tavuk Kovası
       _drawPixelEggBucket(c, _snap(px), by + 4 * kPx, hasEggs: true);
       if (showLabel) {
-        _text(c, 'Tavuk Kovası ${b.currentCount}/${b.maxCount}', px, py - 94, size: 11, color: const Color(0xFFFFE082), plate: true);
+        _text(c, 'Egg Bucket ${b.currentCount}/${b.maxCount}', px, py - 94, size: 11, color: const Color(0xFFFFE082), plate: true);
       }
       return;
     }
@@ -1453,7 +1452,7 @@ class PixelPainter extends CustomPainter {
       _r(c, bx, by, 2, 2, 6, 1, const Color(0xFF8A5220));
       _icon(c, SimProductType.flour, bx + 2.5 * kPx, by + 2.5 * kPx);
       if (showLabel) {
-        _text(c, 'Un ${b.currentCount}/${b.maxCount}', px, py - 94, size: 11, color: const Color(0xFFFDE68A), plate: true);
+        _text(c, 'Flour ${b.currentCount}/${b.maxCount}', px, py - 94, size: 11, color: const Color(0xFFFDE68A), plate: true);
       }
       return;
     }

@@ -7,6 +7,16 @@ echo   VILLAGE MARKET - starting...
 echo ======================================================================
 echo.
 
+if exist "%~dp0build\web\index.html" (
+    echo Ready build found! Press R within 2 seconds to force a full rebuild,
+    echo or wait to launch the latest build immediately.
+    echo.
+    choice /c LR /t 2 /d L /n /m "[L] Launch immediately (default) / [R] Rebuild from source: "
+    if errorlevel 2 goto rebuild
+    goto serve
+)
+
+:rebuild
 where flutter >nul 2>nul
 if errorlevel 1 (
     echo Flutter was not found. Open this folder in a terminal where "flutter" works.
@@ -14,12 +24,6 @@ if errorlevel 1 (
     pause
     exit /b
 )
-
-echo Rebuilding the game from the current code so you always play the latest version.
-echo Press N within 5 seconds to skip the rebuild and use the last build.
-echo.
-choice /c YN /t 5 /d Y /n /m "Rebuild now? [Y/N] "
-if errorlevel 2 goto serve
 
 call flutter pub get
 if errorlevel 1 goto failed

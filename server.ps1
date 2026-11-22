@@ -6,22 +6,35 @@ if (-not (Test-Path $root)) {
     exit
 }
 
+# Daha onceden 8080 portunda calisan eski bir PowerShell sunucusu varsa kapat ki yeni klasorden sunulsun
+try {
+    $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+    foreach ($c in $conns) {
+        if ($c.OwningProcess -and $c.OwningProcess -ne $PID) {
+            Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 400
+        }
+    }
+} catch {}
+
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:$port/")
 try {
     $listener.Start()
 } catch {
-    Start-Process "http://127.0.0.1:$port/"
+    $ts = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    Start-Process "http://127.0.0.1:$port/?v=$ts"
     exit
 }
 
 Write-Host "======================================================"
-Write-Host "  Market Oyunu (2D) Yerel Sunucusu Calisiyor..."
-Write-Host "  Adres: http://127.0.0.1:$port/"
+Write-Host "  Village Market (2D) Local Server Running..."
+Write-Host "  URL: http://127.0.0.1:$port/"
 Write-Host "======================================================"
 Write-Host "Oyundan cikmak icin bu siyah pencereyi kapatabilirsiniz.`n"
 
-Start-Process "http://127.0.0.1:$port/"
+$ts = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+Start-Process "http://127.0.0.1:$port/?v=$ts"
 
 $mimeTypes = @{
     ".html" = "text/html; charset=utf-8"

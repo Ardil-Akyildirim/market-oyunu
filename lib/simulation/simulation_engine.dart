@@ -214,7 +214,7 @@ class SimulationEngine with ChangeNotifier {
       // open one by one as the days pass (see unlockDay / zoneLevel).
       StoreShelf(
         id: 'shelf_milk',
-        name: 'Taze Süt Dolabı',
+        name: 'Fresh Milk Cooler',
         assignedProduct: SimProductType.milk,
         rect: const Rect.fromLTWH(540, 540, 145, 175),
         currentStock: 12,
@@ -226,7 +226,7 @@ class SimulationEngine with ChangeNotifier {
       ),
       StoreShelf(
         id: 'shelf_flour',
-        name: 'Doğal Un Reyonu',
+        name: 'Natural Flour Shelf',
         assignedProduct: SimProductType.flour,
         rect: const Rect.fromLTWH(1150, 560, 210, 120),
         currentStock: 12,
@@ -238,7 +238,7 @@ class SimulationEngine with ChangeNotifier {
       ),
       StoreShelf(
         id: 'shelf_egg',
-        name: 'Köy Yumurtası Reyonu',
+        name: 'Village Eggs Shelf',
         assignedProduct: SimProductType.egg,
         rect: const Rect.fromLTWH(540, 780, 155, 155),
         currentStock: 12,
@@ -251,7 +251,7 @@ class SimulationEngine with ChangeNotifier {
       // Seviye arttıkça açılabilen 3 ek reyon (açılana kadar sadece adları görünür!)
       StoreShelf(
         id: 'shelf_tomato',
-        name: 'Domates Reyonu',
+        name: 'Tomato Stand',
         assignedProduct: SimProductType.tomato,
         rect: const Rect.fromLTWH(1150, 770, 210, 120),
         currentStock: 0,
@@ -263,7 +263,7 @@ class SimulationEngine with ChangeNotifier {
       ),
       StoreShelf(
         id: 'shelf_pepper',
-        name: 'Biber Reyonu',
+        name: 'Pepper Stand',
         assignedProduct: SimProductType.pepper,
         rect: const Rect.fromLTWH(310, 560, 180, 125),
         currentStock: 0,
@@ -275,7 +275,7 @@ class SimulationEngine with ChangeNotifier {
       ),
       StoreShelf(
         id: 'shelf_apple',
-        name: 'Elma Reyonu',
+        name: 'Apple Stand',
         assignedProduct: SimProductType.apple,
         rect: const Rect.fromLTWH(1510, 560, 180, 125),
         currentStock: 0,
@@ -288,12 +288,12 @@ class SimulationEngine with ChangeNotifier {
     ];
 
     // Arka Bahçe Çiftlikleri:
-    // 1. Sıra (Başlangıçta Açık): İnek Çiftliği (Süt Kovası), Un Tarlası (Çapa), Tavuk Çiftliği (Tavuk Kovası)
-    // 2. Sıra (Seviye Artınca Açılan 3 Kilitli Tarla): Domates Tarlası, Biber Tarlası, Elma Tarlası
+    // 1. Sıra (Başlangıçta Açık): Cow Farm (Milk Bucket), Flour Field (Hoe), Chicken Farm (Egg Bucket)
+    // 2. Sıra (Seviye Artınca Açılan 3 Kilitli Tarla): Tomato Field, Pepper Field, Apple Field
     farmProducers = [
       FarmProducer(
         id: 'farm_barn',
-        name: 'İnek Çiftliği',
+        name: 'Cow Farm',
         emoji: '🐄',
         zoneType: FarmZoneType.barn,
         rect: const Rect.fromLTWH(140, 1160, 440, 290),
@@ -316,7 +316,7 @@ class SimulationEngine with ChangeNotifier {
       ),
       FarmProducer(
         id: 'farm_field',
-        name: 'Un Tarlası',
+        name: 'Flour Field',
         emoji: '🌾',
         zoneType: FarmZoneType.field,
         rect: const Rect.fromLTWH(780, 1160, 440, 290),
@@ -341,7 +341,7 @@ class SimulationEngine with ChangeNotifier {
       ),
       FarmProducer(
         id: 'farm_coop',
-        name: 'Tavuk Çiftliği',
+        name: 'Chicken Farm',
         emoji: '🐔',
         zoneType: FarmZoneType.coop,
         rect: const Rect.fromLTWH(1420, 1160, 440, 290),
@@ -365,7 +365,7 @@ class SimulationEngine with ChangeNotifier {
       // 2. Sıra: Seviye arttıkça açılan 3 kilitli tarla (Domates, Biber, Elma)
       FarmProducer(
         id: 'farm_tomato',
-        name: 'Domates Tarlası',
+        name: 'Tomato Field',
         emoji: '🍅',
         zoneType: FarmZoneType.field,
         rect: const Rect.fromLTWH(140, 1555, 440, 265),
@@ -388,7 +388,7 @@ class SimulationEngine with ChangeNotifier {
       ),
       FarmProducer(
         id: 'farm_pepper',
-        name: 'Biber Tarlası',
+        name: 'Pepper Field',
         emoji: '🌶️',
         zoneType: FarmZoneType.field,
         rect: const Rect.fromLTWH(780, 1555, 440, 265),
@@ -411,7 +411,7 @@ class SimulationEngine with ChangeNotifier {
       ),
       FarmProducer(
         id: 'farm_apple',
-        name: 'Elma Tarlası',
+        name: 'Apple Field',
         emoji: '🍎',
         zoneType: FarmZoneType.field,
         rect: const Rect.fromLTWH(1420, 1555, 440, 265),
@@ -470,10 +470,10 @@ class SimulationEngine with ChangeNotifier {
 
   /// Short text explaining why a shelf / field is still closed or how to unlock it.
   String shelfLockReason(StoreShelf s) {
-    if (storeLevel < s.zoneLevel) return 'Seviye ${s.zoneLevel} Gerekli';
-    if (day < s.unlockDay) return 'Gün ${s.unlockDay} Gerekli';
-    if (s.unlockCost > 0) return 'Açmak İçin Tıkla (\$${s.unlockCost.toInt()})';
-    return 'Açmak İçin Tıkla';
+    if (storeLevel < s.zoneLevel) return 'Level ${s.zoneLevel} Required';
+    if (day < s.unlockDay) return 'Day ${s.unlockDay} Required';
+    if (s.unlockCost > 0) return 'Click to Unlock (\$${s.unlockCost.toInt()})';
+    return 'Click to Unlock';
   }
 
   bool tryUnlockShelfOrFarm(StoreShelf shelf, {Offset? feedbackPos}) {
@@ -484,7 +484,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         pos.dx,
         pos.dy - 14,
-        '🔒 Seviye ${shelf.zoneLevel} Gerekli! (Yöneticiden Marketi Yükselt)',
+        '🔒 Level ${shelf.zoneLevel} Required! (Upgrade Store via Manager)',
         Colors.orangeAccent,
         size: 15,
       );
@@ -495,7 +495,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         pos.dx,
         pos.dy - 14,
-        '⚠️ Açmak için \$${shelf.unlockCost.toInt()} gerekli!',
+        '⚠️ \$${shelf.unlockCost.toInt()} required to unlock!',
         Colors.redAccent,
         size: 15,
       );
@@ -1420,7 +1420,7 @@ class SimulationEngine with ChangeNotifier {
     spawnParticle(
       playerX,
       playerY - 38,
-      '${farm.requiredTool.emoji} ${farm.requiredTool.name} Alındı!',
+      '${farm.requiredTool.emoji} ${farm.requiredTool.name} Picked Up!',
       Colors.amberAccent,
       size: 16,
     );
@@ -1581,7 +1581,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           playerX,
           playerY - 24,
-          '${droppedTool.emoji} ${droppedTool.name} Tarlada Bırakıldı',
+          '${droppedTool.emoji} ${droppedTool.name} Left at the Field',
           Colors.white70,
           size: 14,
         );
@@ -1654,13 +1654,13 @@ class SimulationEngine with ChangeNotifier {
             pendingAutoFarmId = null;
             playerTool = null;
 
-            String msg = '${def.emoji} ${def.name} Toplandı! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+            String msg = '${def.emoji} ${def.name} Harvested! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             if (farm.zoneType == FarmZoneType.barn) {
-              msg = '🥛 Süt Kovası Doldu! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+              msg = '🥛 Milk Bucket Full! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             } else if (farm.primaryProduct == SimProductType.flour) {
-              msg = '🌾 Çapa ile Un Hasat Edildi! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+              msg = '🌾 Flour Harvested with Hoe! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             } else if (farm.zoneType == FarmZoneType.coop) {
-              msg = '🥚 Tavuk Kovası Doldu! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+              msg = '🥚 Egg Bucket Full! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             }
             spawnParticle(playerX, playerY - 40, msg, Colors.greenAccent, size: 15);
 
@@ -3000,10 +3000,10 @@ class SimulationEngine with ChangeNotifier {
   List<Rect>? _obstacleCache;
   int _obstacleSig = -1;
 
-  /// The obstacle list only changes when a shelf / register is unlocked, so build it once
-  /// and reuse it (it used to be rebuilt several times per frame per thief).
+  /// The obstacle list only changes when a shelf / register is unlocked or store level expands,
+  /// so build it once and reuse it (it used to be rebuilt several times per frame per thief).
   List<Rect> _getStoreObstacleRects() {
-    int sig = unlockedCheckouts.length + 1;
+    int sig = (storeLevel * 13) + unlockedCheckouts.length + 1;
     for (final sh in shelves) {
       sig = sig * 31 + (sh.isUnlocked ? 7 : 3);
       sig &= 0x3FFFFFFFFFFF;
@@ -3043,11 +3043,16 @@ class SimulationEngine with ChangeNotifier {
 
     for (final shelf in shelves) {
       if (!shelf.isUnlocked) continue;
-      // Duvara yakın reyonların duvar tarafını kapatarak karakterlerin dar duvar arasına sıkışmasını önle
-      final double left = shelf.rect.left < 180 ? 85.0 : shelf.rect.left - 22.0;
-      final double right = shelf.rect.right > 1750 ? 1915.0 : shelf.rect.right + 32.0;
-      final double top = shelf.rect.top - 46.0;
-      final double bottom = shelf.rect.bottom + 18.0;
+      // Duvara veya kilitli market sınırına (storeMinX / storeMaxX) yakın reyonların sınır tarafını kapatarak
+      // müşterilerin ve karakterlerin reyon ile sınır arasındaki dar boşluğa sıkışmasını önle!
+      // Reyonlar arasındaki dar dikey ve yatay koridorların (örn. Biber x=490 ile Süt x=540 arası 50px)
+      // kapanmaması için yatay/dikey marginleri dar tutuyoruz.
+      final double rawLeft = shelf.rect.left - 12.0;
+      final double rawRight = shelf.rect.right + 12.0;
+      final double left = (rawLeft - storeMinX < 34.0) ? min(storeMinX, 85.0) : rawLeft;
+      final double right = (storeMaxX - rawRight < 34.0) ? max(storeMaxX, worldWidth - 85.0) : rawRight;
+      final double top = shelf.rect.top - 22.0;
+      final double bottom = shelf.rect.bottom + 12.0;
       obstacles.add(Rect.fromLTRB(left, top, right, bottom));
     }
 
@@ -3118,20 +3123,23 @@ class SimulationEngine with ChangeNotifier {
     final dTop = (p.dy - r.top).abs();
     final dBottom = (r.bottom - p.dy).abs();
 
-    double minD = dBottom;
-    Offset out = Offset(p.dx, r.bottom + 7);
+    final minValidX = max(102.0, storeMinX + 8.0);
+    final maxValidX = min(worldWidth - 102.0, storeMaxX - 8.0);
 
-    if (r.left > 105 && dLeft < minD) {
+    double minD = dBottom;
+    Offset out = Offset(p.dx.clamp(minValidX, maxValidX), r.bottom + 8);
+
+    if (r.left - 8 >= minValidX && dLeft < minD) {
       minD = dLeft;
-      out = Offset(r.left - 7, p.dy);
+      out = Offset(r.left - 8, p.dy);
     }
-    if (r.right < worldWidth - 105 && dRight < minD) {
+    if (r.right + 8 <= maxValidX && dRight < minD) {
       minD = dRight;
-      out = Offset(r.right + 7, p.dy);
+      out = Offset(r.right + 8, p.dy);
     }
     if (r.top > 250 && dTop < minD) {
       minD = dTop;
-      out = Offset(p.dx, r.top - 7);
+      out = Offset(p.dx.clamp(minValidX, maxValidX), r.top - 8);
     }
     return out;
   }
@@ -3158,8 +3166,18 @@ class SimulationEngine with ChangeNotifier {
     }
 
     final obstacles = _getStoreObstacleRects();
+    final minValidX = max(102.0, storeMinX + 8.0);
+    final maxValidX = min(worldWidth - 102.0, storeMaxX - 8.0);
 
-    // 1. Eğer karakter şu an bir reyonun / engelin sınırının içindeyse, önce en yakın koridor kenarına çıkar!
+    // 1. Eğer karakter şu an kilitli alanın veya bir reyonun / engelin sınırının içindeyse, önce en yakın koridor kenarına çıkar!
+    if (startY >= 235 && startY <= 980) {
+      if (startX < minValidX) {
+        return Offset(minValidX + 4, startY);
+      }
+      if (startX > maxValidX) {
+        return Offset(maxValidX - 4, startY);
+      }
+    }
     for (final obs in obstacles) {
       if (obs.deflate(1.5).contains(start)) {
         return _pushOutOfRect(start, obs);
@@ -3168,6 +3186,9 @@ class SimulationEngine with ChangeNotifier {
 
     // 2. Eğer hedef nokta yanlışlıkla bir engelin içindeyse, hedefi engelin dışına çek
     Offset safeGoal = effectiveGoal;
+    if (safeGoal.dy >= 235 && safeGoal.dy <= 980) {
+      safeGoal = Offset(safeGoal.dx.clamp(minValidX, maxValidX), safeGoal.dy);
+    }
     for (final obs in obstacles) {
       if (obs.deflate(1.5).contains(safeGoal)) {
         safeGoal = _pushOutOfRect(safeGoal, obs);
@@ -3180,13 +3201,13 @@ class SimulationEngine with ChangeNotifier {
     }
 
     // 4. Reyonların etrafından dolaşan en kısa koridor yolunu (Visibility Graph Dijkstra) hesapla
-    const double cornerOffset = 7.0;
-    const double minNodeDist = 7.0;
+    const double cornerOffset = 6.0;
+    const double minNodeDist = 1.5;
 
     final List<Offset> nodes = [start, safeGoal];
 
     bool isPointValid(Offset pt) {
-      if (pt.dx < 102 || pt.dx > worldWidth - 102 || pt.dy < 238 || pt.dy > 978) {
+      if (pt.dx < minValidX || pt.dx > maxValidX || pt.dy < 238 || pt.dy > 978) {
         return false;
       }
       for (final obs in obstacles) {
@@ -3199,7 +3220,7 @@ class SimulationEngine with ChangeNotifier {
       if ((pt - start).distance < minNodeDist) return;
       if (!isPointValid(pt)) return;
       for (final existing in nodes) {
-        if ((existing - pt).distance < 5.0) return;
+        if ((existing - pt).distance < 4.0) return;
       }
       nodes.add(pt);
     }
@@ -3209,6 +3230,10 @@ class SimulationEngine with ChangeNotifier {
       tryAddWaypoint(Offset(obs.right + cornerOffset, obs.top - cornerOffset));
       tryAddWaypoint(Offset(obs.left - cornerOffset, obs.bottom + cornerOffset));
       tryAddWaypoint(Offset(obs.right + cornerOffset, obs.bottom + cornerOffset));
+      tryAddWaypoint(Offset(obs.center.dx, obs.top - cornerOffset));
+      tryAddWaypoint(Offset(obs.center.dx, obs.bottom + cornerOffset));
+      tryAddWaypoint(Offset(obs.left - cornerOffset, obs.center.dy));
+      tryAddWaypoint(Offset(obs.right + cornerOffset, obs.center.dy));
     }
 
     // Ana market koridor kavşak noktaları
@@ -3216,18 +3241,38 @@ class SimulationEngine with ChangeNotifier {
       Offset(1000, 290), // Ön giriş koridoru
       Offset(1000, 488), // Orta koridor - Kasa koridoru kavşağı
       Offset(840, 488),  // Kasa koridoru doğu ucu
-      Offset(600, 488),  // Kasa koridoru orta
+      Offset(720, 488),  // Sol-orta reyon üst kavşağı
+      Offset(610, 488),  // Kasa 1 önü / Süt dolabı üstü
+      Offset(610, 745),  // Süt dolabı ile Yumurta reyonu arası yatay koridor
+      Offset(610, 955),  // Yumurta reyonu altı
+      Offset(740, 620),  // Süt dolabı sağ koridoru
+      Offset(740, 745),  // Orta-sol ara kavşak
+      Offset(740, 860),  // Yumurta reyonu sağ koridoru
+      Offset(740, 955),  // Sol-alt koridor kavşağı
+      Offset(505, 500),  // Biber-Süt arası üst geçiş
+      Offset(505, 620),  // Biber-Süt arası orta geçiş
+      Offset(505, 745),  // Biber-Yumurta arası kavşak
+      Offset(505, 955),  // Sol alt geçiş
       Offset(380, 488),  // Sol reyon koridoru üst kavşağı
-      Offset(380, 722),  // Sol reyon koridoru orta kavşağı
+      Offset(380, 725),  // Sol reyon koridoru orta kavşağı
       Offset(380, 948),  // Sol reyon koridoru alt kavşağı
-      Offset(780, 722),  // Orta-sol koridor
-      Offset(1000, 722), // Orta ana koridor
+      Offset(1000, 620), // Orta ana koridor üst
+      Offset(1000, 725), // Orta ana koridor orta
+      Offset(1000, 840), // Orta ana koridor alt
       Offset(1000, 955), // Arka kapı iç kavşağı
+      Offset(1115, 620), // Un reyonu sol koridoru
+      Offset(1115, 725), // Un-Domates arası sol kavşak
+      Offset(1115, 840), // Domates reyonu sol koridoru
+      Offset(1255, 495), // Un reyonu üstü
+      Offset(1255, 725), // Un ile Domates reyonu arası yatay koridor
+      Offset(1255, 925), // Domates reyonu altı
       Offset(1395, 275), // Kurye paketleme üst geçişi
-      Offset(1505, 412), // Kurye paketleme istasyonu önü
-      Offset(1475, 488), // Sağ reyon koridoru üst
-      Offset(1475, 665), // Sağ reyon koridoru orta
-      Offset(1475, 920), // Sağ reyon koridoru alt
+      Offset(1435, 488), // Sağ reyon koridoru üst
+      Offset(1435, 620), // Un-Elma arası koridor
+      Offset(1435, 725), // Sağ reyon koridoru orta
+      Offset(1435, 925), // Sağ reyon koridoru alt
+      Offset(1600, 488), // Elma reyonu üstü
+      Offset(1600, 725), // Elma reyonu altı
     ];
     for (final hub in aisleHubs) {
       tryAddWaypoint(hub);
@@ -3595,12 +3640,14 @@ class SimulationEngine with ChangeNotifier {
         final wanted = c.shoppingList[c.currentShoppingIndex];
         final shelf = shelves.firstWhere((s) => s.assignedProduct == wanted, orElse: () => shelves.first);
 
-        double targetX = shelf.rect.center.dx;
-        double targetY = shelf.rect.bottom + 28;
+        // Aynı reyona gelen müşteriler üst üste binip sıkışmasın diye hafif yatay slot farkı ver
+        final double slotSpread = ((c.id.hashCode.abs() % 5) - 2) * 10.0;
+        double targetX = shelf.rect.center.dx + slotSpread;
+        double targetY = shelf.rect.bottom + 24;
 
         _moveCustomerTowards(c, targetX, targetY, speed, dt);
 
-        if ((c.x - targetX).abs() < 18 && (c.y - targetY).abs() < 18) {
+        if ((c.x - targetX).abs() < 24 && (c.y - targetY).abs() < 24) {
           if (shelf.isUnlocked && shelf.currentStock > 0) {
             final prevTimer = c.shelfGrabTimer;
             c.shelfGrabTimer += dt;
@@ -3734,7 +3781,42 @@ class SimulationEngine with ChangeNotifier {
   }
 
   void _moveCustomerTowards(SimCustomer c, double targetX, double targetY, double speed, double dt) {
-    final wp = _getStoreSmartWaypoint(c.x, c.y, targetX, targetY);
+    c.wpTimer -= dt;
+    if (c.wpCache == null ||
+        c.wpTimer <= 0 ||
+        (c.wpGx - targetX).abs() > 1.5 ||
+        (c.wpGy - targetY).abs() > 1.5 ||
+        (Offset(c.x, c.y) - c.wpCache!).distance < 6.0) {
+      c.wpCache = _getStoreSmartWaypoint(c.x, c.y, targetX, targetY);
+      c.wpGx = targetX;
+      c.wpGy = targetY;
+      c.wpTimer = 0.16;
+    }
+
+    // Sıkışma algılayıcı: müşteri yürümeye çalışırken yerinden oynamıyorsa ara hedefi yenile veya engelden dışarı it
+    final movedSinceLast = (c.x - c.lastMoveX).abs() + (c.y - c.lastMoveY).abs();
+    c.lastMoveX = c.x;
+    c.lastMoveY = c.y;
+    if (movedSinceLast < 0.15 && (Offset(c.x, c.y) - Offset(targetX, targetY)).distance > 18) {
+      c.stuckTimer += dt;
+      if (c.stuckTimer > 0.35) {
+        c.stuckTimer = 0.0;
+        for (final obs in _getStoreObstacleRects()) {
+          if (obs.inflate(4).contains(Offset(c.x, c.y))) {
+            final pushed = _pushOutOfRect(Offset(c.x, c.y), obs.inflate(4));
+            c.x = pushed.dx;
+            c.y = pushed.dy;
+            break;
+          }
+        }
+        c.wpCache = _getStoreSmartWaypoint(c.x, c.y, targetX, targetY);
+        c.wpTimer = 0.22;
+      }
+    } else {
+      c.stuckTimer = 0.0;
+    }
+
+    final wp = c.wpCache!;
     double dx = wp.dx - c.x;
     double dy = wp.dy - c.y;
     double dist = sqrt(dx * dx + dy * dy);
@@ -3923,7 +4005,7 @@ class SimulationEngine with ChangeNotifier {
       if (!farm.isUnlocked) continue;
       if ((playerPos - farm.toolStandPos).distance < 58) {
         activeInteractionText =
-            '${farm.requiredTool.emoji} ${farm.requiredTool.name} Al & İçeri Gir [E / Tıkla]';
+            '${farm.requiredTool.emoji} Take ${farm.requiredTool.name} & Go Inside [E / Click]';
         activeInteractionAction = () {
           startAutoFarmHarvest(farm);
         };
@@ -3937,7 +4019,7 @@ class SimulationEngine with ChangeNotifier {
         if (!farm.isUnlocked) {
           final shelf = shelfForProduct(farm.primaryProduct);
           if (shelf != null) {
-            activeInteractionText = '🔒 ${farm.name}: ${shelfLockReason(shelf)} [E / Tıkla]';
+            activeInteractionText = '🔒 ${farm.name}: ${shelfLockReason(shelf)} [E / Click]';
             activeInteractionAction = () {
               tryUnlockShelfOrFarm(shelf, feedbackPos: farm.rect.center);
             };
@@ -3993,7 +4075,7 @@ class SimulationEngine with ChangeNotifier {
         final def = productCatalog[shelf.assignedProduct]!;
 
         if (!shelf.isUnlocked) {
-          activeInteractionText = '🔒 ${def.emoji} ${shelf.name}: ${shelfLockReason(shelf)} [E / Tıkla]';
+          activeInteractionText = '🔒 ${def.emoji} ${shelf.name}: ${shelfLockReason(shelf)} [E / Click]';
           activeInteractionAction = () {
             tryUnlockShelfOrFarm(shelf, feedbackPos: shelf.rect.center);
           };

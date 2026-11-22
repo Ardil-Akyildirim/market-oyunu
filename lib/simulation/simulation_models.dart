@@ -163,11 +163,11 @@ extension FarmToolTypeExt on FarmToolType {
   String get name {
     switch (this) {
       case FarmToolType.milkBucket:
-        return 'Süt Kovası';
+        return 'Milk Bucket';
       case FarmToolType.scythe:
-        return 'Çapa';
+        return 'Hoe';
       case FarmToolType.eggBucket:
-        return 'Tavuk Kovası';
+        return 'Egg Bucket';
     }
   }
 
@@ -196,11 +196,11 @@ extension FarmToolTypeExt on FarmToolType {
   String get actionVerb {
     switch (this) {
       case FarmToolType.milkBucket:
-        return 'Süt Kovası ile Süt Sağılıyor';
+        return 'Milking with Milk Bucket';
       case FarmToolType.scythe:
-        return 'Çapa ile Un Hasat Ediliyor';
+        return 'Harvesting with Hoe';
       case FarmToolType.eggBucket:
-        return 'Tavuk Kovası ile Yumurta Toplanıyor';
+        return 'Collecting Eggs with Egg Bucket';
     }
   }
 }
@@ -409,11 +409,11 @@ class CarriedBox {
     if (!isFromFarm) return 'Product Box';
     switch (productType) {
       case SimProductType.milk:
-        return 'Süt Kovası (Taze Süt)';
+        return 'Milk Bucket (Fresh Milk)';
       case SimProductType.egg:
-        return 'Tavuk Kovası (Yumurta)';
+        return 'Egg Bucket (Eggs)';
       case SimProductType.flour:
-        return 'Hasat Edilen Un';
+        return 'Harvested Flour';
       case SimProductType.cheese:
         return 'Fresh Tulum Cheese';
       default:
@@ -482,6 +482,13 @@ class SimCustomer {
   double patience;          // seconds left while waiting at the register
   double maxPatience;
   double shelfGrabTimer; // Reyon kapısı açılırken müşterinin ürünü raftan alma animasyon süresi
+  Offset? wpCache;
+  double wpTimer = 0.0;
+  double wpGx = 0.0;
+  double wpGy = 0.0;
+  double lastMoveX = 0.0;
+  double lastMoveY = 0.0;
+  double stuckTimer = 0.0;
 
   SimCustomer({
     required this.id,

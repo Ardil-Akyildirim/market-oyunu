@@ -350,7 +350,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
 
             const SizedBox(height: 14),
             const Text(
-              'Yeni Tarlalar & Reyonlar (Seviye Artınca Açılır)',
+              'New Fields & Shelves (Unlocks as Store Level Increases)',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
             ),
             const SizedBox(height: 8),
@@ -386,8 +386,8 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                           ),
                           Text(
                             shelf.isUnlocked
-                                ? 'Tarla ve Reyon Açık! Çapa ile hasat edebilirsin.'
-                                : 'Gerekli: Seviye ${shelf.zoneLevel} • Satış: \$${def.retailPrice.toStringAsFixed(0)}',
+                                ? 'Field and Shelf Open! You can harvest with the Hoe.'
+                                : 'Required: Level ${shelf.zoneLevel} • Sale: \$${def.retailPrice.toStringAsFixed(0)}',
                             style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
                           ),
                         ],
@@ -397,14 +397,14 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         color: Colors.green.shade100,
-                        child: Text('Açık {check}',
+                        child: Text('Open {check}',
                             style: TextStyle(color: Colors.green.shade900, fontSize: 11, fontWeight: FontWeight.bold)),
                       )
                     else if (!levelMet)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         color: Colors.grey.shade300,
-                        child: Text('{lock} Seviye ${shelf.zoneLevel}',
+                        child: Text('{lock} Level ${shelf.zoneLevel}',
                             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                       )
                     else
@@ -420,7 +420,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                           backgroundColor: Colors.green.shade600,
                           foregroundColor: Colors.white,
                         ),
-                        child: Text('Aç (\$${shelf.unlockCost.toInt()})',
+                        child: Text('Unlock (\$${shelf.unlockCost.toInt()})',
                             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                       ),
                   ],

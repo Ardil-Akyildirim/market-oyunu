@@ -85,27 +85,27 @@ void main() {
       expect(engine.carriedBox!.isCourierPackage, isFalse);
     });
 
-    test('Inek ciftligi (Sut Kovasi), Un tarlasi (Capa) ve Tavuk ciftligi (Tavuk Kovasi) calisir', () {
+    test('Inek ciftligi (Milk Bucket), Un tarlasi (Hoe) ve Tavuk ciftligi (Egg Bucket) calisir', () {
       final engine = SimulationEngine();
-      expect(engine.farmProducers.length, 3);
+      expect(engine.farmProducers.length, 6);
 
       final barn = engine.farmProducers.firstWhere((f) => f.zoneType == FarmZoneType.barn);
-      final field = engine.farmProducers.firstWhere((f) => f.zoneType == FarmZoneType.field);
+      final field = engine.farmProducers.firstWhere((f) => f.id == 'farm_field');
       final coop = engine.farmProducers.firstWhere((f) => f.zoneType == FarmZoneType.coop);
 
-      expect(barn.name, 'İnek Çiftliği');
+      expect(barn.name, 'Cow Farm');
       expect(barn.requiredTool, FarmToolType.milkBucket);
-      expect(barn.requiredTool.name, 'Süt Kovası');
+      expect(barn.requiredTool.name, 'Milk Bucket');
 
-      expect(field.name, 'Un Tarlası');
+      expect(field.name, 'Flour Field');
       expect(field.requiredTool, FarmToolType.scythe);
-      expect(field.requiredTool.name, 'Çapa');
+      expect(field.requiredTool.name, 'Hoe');
 
-      expect(coop.name, 'Tavuk Çiftliği');
+      expect(coop.name, 'Chicken Farm');
       expect(coop.requiredTool, FarmToolType.eggBucket);
-      expect(coop.requiredTool.name, 'Tavuk Kovası');
+      expect(coop.requiredTool.name, 'Egg Bucket');
 
-      // Un tarlasina girince Capa eline alinir ve un hasat edilir
+      // Un tarlasina girince Hoe eline alinir ve un hasat edilir
       final cropSpot = field.spots.first;
       engine.playerX = cropSpot.x;
       engine.playerY = cropSpot.y;
@@ -118,6 +118,36 @@ void main() {
       expect(engine.carriedBox, isNotNull);
       expect(engine.carriedBox!.productType, SimProductType.flour);
       expect(engine.carriedBox!.isFromFarm, isTrue);
+    });
+
+    test('Musteriler tum acik ve sonradan acilan reyonlar arasinda sikismadan dolasir', () {
+      final engine = SimulationEngine();
+      engine.cash = 10000;
+      engine.storeLevel = 3;
+      for (final s in engine.shelves) {
+        engine.unlockShelf(s);
+        s.currentStock = 16;
+      }
+
+      // Tum reyonlari gezmesi gereken bir musteri olustur
+      final customer = SimCustomer(
+        id: 'cust_test_all_shelves',
+        name: 'Test Customer',
+        avatar: '🛒',
+        x: engine.worldWidth / 2,
+        y: 25,
+        shoppingList: engine.shelves.map((s) => s.assignedProduct).toList(),
+      );
+      engine.customers.add(customer);
+
+      // 90 saniye boyunca simülasyonu ilerlet; müşteri tüm 6 reyonu gezip kasaya ulaşmalı
+      for (int step = 0; step < 1800; step++) {
+        engine.update(0.05);
+        if (customer.state == CustomerState.waitingAtCheckout) break;
+      }
+
+      expect(customer.state, CustomerState.waitingAtCheckout);
+      expect(customer.basket.length, engine.shelves.length);
     });
 
     testWidgets('Fazla urunle paketlemeye gidince "Bu fazla!" uyarisi verir ve ona gore paket yapar',

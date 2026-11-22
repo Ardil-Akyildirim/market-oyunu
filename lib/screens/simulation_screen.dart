@@ -168,6 +168,40 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     if (mounted) setState(() {});
   }
 
+  void _resetCurrentRunToFresh() {
+    setState(() {
+      _engine.day = 1;
+      _engine.cash = 400.0;
+      _engine.totalRevenue = 0.0;
+      _engine.storeLevel = 1;
+      _engine.hasAutoCashier = false;
+      _engine.hasRestocker = false;
+      _engine.isRestockerHired = false;
+      _engine.nightsSurvived = 0;
+      _engine.phase = DayPhase.day;
+      _engine.phaseTimer = 0.0;
+      _engine.closingTime = false;
+      _engine.carriedBox = null;
+      _engine.playerTool = null;
+      _engine.playerX = 1000;
+      _engine.playerY = 480;
+      _engine.customers.clear();
+      _engine.thieves.clear();
+      _engine.deliveryBoxes.clear();
+      for (final s in _engine.shelves) {
+        s.isUnlocked = s.zoneLevel == 1 && s.unlockCost <= 0;
+        s.currentStock = s.isUnlocked ? 12 : 0;
+      }
+      for (final f in _engine.farmProducers) {
+        final s = _engine.shelfForProduct(f.primaryProduct);
+        if (s != null) f.isUnlocked = s.isUnlocked;
+      }
+    });
+    SaveService.clear();
+    _hudRevision.value++;
+    showTopToast(context, '{star} Latest version loaded & fresh game started!');
+  }
+
   void _tap(VoidCallback fn) {
     if (SettingsService.instance.haptics) HapticFeedback.lightImpact();
     fn();
@@ -467,6 +501,14 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
               );
             },
             child: const Text('Replay tutorial'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _engine.tutorialFreeze = false;
+              _resetCurrentRunToFresh();
+            },
+            child: const Text('New Game (Reset)'),
           ),
           TextButton(
             onPressed: () {
@@ -1086,11 +1128,11 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     );
     if (insideFarm && box.isFromFarm) {
       if (box.productType == SimProductType.milk) {
-        return 'Süt Kovası ${box.currentCount}/${box.maxCount}';
+        return 'Milk Bucket ${box.currentCount}/${box.maxCount}';
       } else if (box.productType == SimProductType.egg) {
-        return 'Tavuk Kovası ${box.currentCount}/${box.maxCount}';
+        return 'Egg Bucket ${box.currentCount}/${box.maxCount}';
       } else if (box.productType == SimProductType.flour) {
-        return 'Un ${box.currentCount}/${box.maxCount}';
+        return 'Flour ${box.currentCount}/${box.maxCount}';
       }
     }
     final head = box.isCourierPackage ? 'Package' : (compact ? '' : 'Carrying');
@@ -1187,7 +1229,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                               ? '${_engine.playerTool!.name} • ${_carryLabel(compact)}'
                               : _carryLabel(compact))
                           : (_engine.playerTool != null
-                              ? 'Elde: ${_engine.playerTool!.name} (Hasat Et)'
+                              ? 'Equipped: ${_engine.playerTool!.name} (Harvest)'
                               : (compact ? 'Hands empty' : 'Hands Empty (Farm / Box)')),
                       style: TextStyle(
                         fontSize: 12,

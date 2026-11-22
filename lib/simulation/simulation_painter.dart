@@ -2379,7 +2379,7 @@ class SimulationPainter extends CustomPainter {
 
     _drawText(
       canvas,
-      '${def.emoji} ${def.name}',
+      '${def.emoji} ${shelf.name}',
       center.dx,
       center.dy - 9,
       fontSize: 11.0,
@@ -3314,7 +3314,7 @@ class SimulationPainter extends CustomPainter {
       castShadow: false,
       borderColor: const Color(0xFF38BDF8),
     );
-    _drawText(canvas, '❄️ -2.4°C • MILK & DAIRY', topFace.center.dx, headerBox.center.dy - 8, fontSize: 9.2, color: Colors.white, isBold: true);
+    _drawText(canvas, '❄️ -2.4°C • ${shelf.name.toUpperCase()}', topFace.center.dx, headerBox.center.dy - 8, fontSize: 9.2, color: Colors.white, isBold: true);
 
     _drawShelfStockBar(canvas, rect, shelf.currentStock, shelf.maxCapacity);
   }
@@ -3608,7 +3608,7 @@ class SimulationPainter extends CustomPainter {
 
     _drawText(
       canvas,
-      '${def.emoji} ${def.name.toUpperCase()} • \$${def.retailPrice.toStringAsFixed(0)}',
+      '${def.emoji} ${shelf.name.toUpperCase()} • \$${def.retailPrice.toStringAsFixed(0)}',
       topFace.center.dx,
       awningTopFace.center.dy,
       fontSize: 10.2,
