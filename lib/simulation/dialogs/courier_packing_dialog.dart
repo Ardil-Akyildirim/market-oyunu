@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:material_ui/material_ui.dart' hide Text;
 import '../../widgets/pixel_ui.dart';
 import '../simulation_engine.dart';
@@ -83,10 +84,11 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Container(
-        width: 500,
+        width: min(500.0, MediaQuery.of(context).size.width - 24),
         decoration: pixelDeco(kParchment, bw: 4, shadow: 6),
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(MediaQuery.of(context).size.height < 500 ? 12 : 20),
         child: SingleChildScrollView(
           child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -155,7 +157,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                'Courier Wants: ${needed} pcs',
+                                'Courier Wants: $needed pcs',
                                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -221,12 +223,12 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                   Expanded(
                     child: Text(
                       hasExcess
-                          ? 'Too many! The courier wants ${needed} x ${def.ico}, you brought ${_trayCount} (${excess} extra!). Remove the extras and pack accordingly!'
+                          ? 'Too many! The courier wants $needed x ${def.ico}, you brought $_trayCount ($excess extra!). Remove the extras and pack accordingly!'
                           : (isExact
-                              ? 'Exactly the courier order (${needed}/${needed})! Now tape the package and take it to the bike.'
+                              ? 'Exactly the courier order ($needed/$needed)! Now tape the package and take it to the bike.'
                               : (_trayCount == 0
-                                  ? 'Each press takes 1 ${def.ico} ${def.name} from the cabinet; bring it to this table (${needed} needed).'
-                                  : 'There are ${_trayCount} here now. Grab ${missing} more ${def.ico} from the cabinet!')),
+                                  ? 'Each press takes 1 ${def.ico} ${def.name} from the cabinet; bring it to this table ($needed needed).'
+                                  : 'There are $_trayCount here now. Grab $missing more ${def.ico} from the cabinet!')),
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
@@ -257,7 +259,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
               child: _trayCount == 0
                   ? Center(
                       child: Text(
-                        '{box} Courier Box Empty (0/${needed} ${def.ico})',
+                        '{box} Courier Box Empty (0/$needed ${def.ico})',
                         style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 12.5),
                       ),
                     )
@@ -311,7 +313,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                     child: OutlinedButton.icon(
                       onPressed: _removeOneExcess,
                       icon: PixelIcon('minus', size: 24, dark: true),
-                      label: const Text('Remove 1 Extra (-1)', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const FittedBox(fit: BoxFit.scaleDown, child: Text('Remove 1', style: TextStyle(fontWeight: FontWeight.bold))),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red.shade700,
                         side: BorderSide(color: Colors.red.shade400, width: 1.5),
@@ -324,8 +326,9 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                     child: ElevatedButton.icon(
                       onPressed: () => _trimAllExcess(needed),
                       icon: PixelIcon('x', size: 24, dark: true),
-                      label: Text('Set to ${needed} (${excess} Returned)',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Set to $needed', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange.shade600,
                         foregroundColor: Colors.white,
@@ -348,9 +351,9 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                   Navigator.pop(context);
                 },
                 icon: PixelIcon('box', size: 24),
-                label: Text(
-                  '{box} Prepare & Tape the Courier Package (${needed}/${needed})',
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('Tape the package', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green.shade600,
@@ -369,9 +372,9 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                   Navigator.pop(context);
                 },
                 icon: PixelIcon('bag', size: 24),
-                label: Text(
-                  'Leave on Table (${_trayCount}/${needed}) & Take from Cabinet',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                label: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('Leave on table ($_trayCount/$needed)', style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.amber.shade700,

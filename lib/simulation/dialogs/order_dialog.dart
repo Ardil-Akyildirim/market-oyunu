@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:material_ui/material_ui.dart' hide Text;
 import '../../widgets/pixel_ui.dart';
 import '../simulation_engine.dart';
@@ -26,7 +27,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
   double get _totalCost {
     double sum = 0;
     _cart.forEach((type, qty) {
-      sum += productCatalog[type]!.boxCost * qty;
+      sum += widget.engine.boxPrice(productCatalog[type]!) * qty;
     });
     return sum;
   }
@@ -38,11 +39,13 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      child: SingleChildScrollView(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Center(
         child: Container(
-        width: 580,
+        width: min(580.0, MediaQuery.of(context).size.width - 24),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height - 16),
         decoration: pixelDeco(kParchment, bw: 4, shadow: 6),
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(MediaQuery.of(context).size.height < 500 ? 12 : 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,8 +86,8 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
 
             const Divider(height: 20),
 
-            // Bilgi Notu
-            Container(
+            // Bilgi Notu (hidden on short screens so the list + confirm button stay visible)
+            if (MediaQuery.of(context).size.height >= 500) Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
@@ -159,7 +162,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                                 ),
                                 Text(
                                   isUnlocked
-                                      ? 'Box: ${def.boxSize} pcs • Box Price: \$${def.boxCost.toStringAsFixed(0)} • Sale: \$${def.retailPrice.toStringAsFixed(0)}'
+                                      ? 'Box: ${def.boxSize} pcs • Box Price: \$${widget.engine.boxPrice(def).toStringAsFixed(0)} • Sale: \$${def.retailPrice.toStringAsFixed(0)}'
                                       : '${widget.engine.shelfLockReason(shelf)} (Sale: \$${def.retailPrice.toStringAsFixed(0)})',
                                   style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                                 ),
@@ -181,7 +184,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                                         }
                                       : null,
                                 ),
-                                Text('${qty} Box', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                Text('$qty Box', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                 IconButton(
                                   icon: PixelIcon('plus', size: 20, dark: true),
                                   onPressed: () {
@@ -239,12 +242,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                       ? () {
                           widget.engine.orderProducts(_cart);
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('{truck} The truck got your order and is on its way! Pulling up to the door...'),
-                              backgroundColor: Colors.blue,
-                            ),
-                          );
+                          showTopToast(context, '{truck} Order placed! The truck is on its way.', color: const Color(0xFF7CC4FF));
                         }
                       : null,
                   icon: PixelIcon('truck', size: 18),

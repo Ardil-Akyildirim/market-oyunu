@@ -36,6 +36,28 @@ class SimProductDef {
   /// Pixel icon token for UI strings, e.g. '{milk}' (see widgets/pixel_ui.dart).
   String get ico => '{${type.name}}';
 
+  /// One short word for cramped UI (belt tiles, drag labels).
+  String get short {
+    switch (type) {
+      case SimProductType.milk:
+        return 'Milk';
+      case SimProductType.flour:
+        return 'Flour';
+      case SimProductType.egg:
+        return 'Eggs';
+      case SimProductType.tomato:
+        return 'Tomato';
+      case SimProductType.pepper:
+        return 'Pepper';
+      case SimProductType.cheese:
+        return 'Cheese';
+      case SimProductType.apple:
+        return 'Apple';
+      case SimProductType.bread:
+        return 'Bread';
+    }
+  }
+
   double get boxCost => orderCostPerItem * boxSize;
   double get profitPerItem => retailPrice - orderCostPerItem;
 }
@@ -447,7 +469,7 @@ class SimCustomer {
   double baggingAnimTimer; // 0.0 -> 1.0 poşete girme animasyonu ilerlemesi
   double waitTimer;
   double patience;          // seconds left while waiting at the register
-  final double maxPatience;
+  double maxPatience;
   double shelfGrabTimer; // Reyon kapısı açılırken müşterinin ürünü raftan alma animasyon süresi
 
   SimCustomer({
@@ -615,6 +637,10 @@ class Thief {
   double walkAngle;
   double walkAnim;
   bool fromBack = false; // sneaked in through the back door
+  Offset? wpCache; // cached route point (see _moveThiefTowards)
+  double wpTimer = 0;
+  double wpGx = 0;
+  double wpGy = 0;
 
   Thief({
     required this.id,

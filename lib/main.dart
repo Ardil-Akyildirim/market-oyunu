@@ -1,10 +1,22 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'providers/game_provider.dart';
 import 'screens/main_menu_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Landscape only: the orientation is fixed in AndroidManifest.xml (sensorLandscape), which
+  // lets the phone flip 180 degrees by itself. Calling setPreferredOrientations here would
+  // override that and can pin one direction, so it is intentionally not used.
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  // If the user pulls the system bars down, hide them again shortly after.
+  SystemChrome.setSystemUIChangeCallback((visible) async {
+    if (visible) {
+      await Future.delayed(const Duration(seconds: 2));
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
+  });
   runApp(const MarketGameApp());
 }
 
@@ -60,6 +72,9 @@ ButtonStyle _pixelButton({bool bordered = true}) {
       borderRadius: BorderRadius.zero,
       side: bordered ? const BorderSide(color: Color(0xFF14100E), width: 3) : BorderSide.none,
     )),
+    overlayColor: WidgetStateProperty.resolveWith(
+      (st) => st.contains(WidgetState.pressed) ? const Color(0x55FFFFFF) : null,
+    ),
     textStyle: const WidgetStatePropertyAll(
       TextStyle(fontFamily: 'Pixelify', fontWeight: FontWeight.bold, fontSize: 15),
     ),

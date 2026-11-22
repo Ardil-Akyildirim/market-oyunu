@@ -1,8 +1,12 @@
 import 'dart:math';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart' hide Text;
 import '../widgets/pixel_ui.dart';
 import '../widgets/tutorial_overlay.dart';
 import '../audio/audio_service.dart';
+import '../settings/settings_service.dart';
+import '../widgets/settings_dialog.dart';
+import '../save/save_service.dart';
 import 'simulation_screen.dart';
 
 class MainMenuScreen extends StatefulWidget {
@@ -19,6 +23,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
   void initState() {
     super.initState();
     _anim = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
+    SettingsService.instance.load();
+    _refreshSave();
+    AudioService.instance.playMusic('menu');
   }
 
   @override
@@ -27,15 +34,68 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
     super.dispose();
   }
 
-  void _play({bool replayTutorial = false}) async {
+  Map<String, dynamic>? _save;
+
+  Future<void> _refreshSave() async {
+    final s = await SaveService.load();
+    if (mounted) setState(() => _save = s);
+  }
+
+  void _play({bool replayTutorial = false, Map<String, dynamic>? saveData}) async {
     AudioService.instance.sfx('click');
     if (replayTutorial) {
       await TutorialPrefs.resetAll();
     }
     if (!mounted) return;
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => SimulationScreen(forceTutorial: replayTutorial),
+        builder: (_) => SimulationScreen(forceTutorial: replayTutorial, saveData: saveData),
+      ),
+    );
+    _refreshSave();
+    AudioService.instance.playMusic('menu');
+  }
+
+  void _confirmExit() {
+    showDialog(
+      context: context,
+      builder: (ctx) => PixelDialog(
+        title: const Text('Quit the game?'),
+        content: const Text('Your progress is saved automatically at the start of every day.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              SystemNavigator.pop();
+            },
+            child: const Text('Quit'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _newGame() {
+    if (_save == null) {
+      _play();
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (ctx) => PixelDialog(
+        title: const Text('Start a new game?'),
+        content: Text('Your saved game (Day ${_save!['day']}) will be replaced as soon as the new game reaches its first dawn.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _play();
+            },
+            child: const Text('New game'),
+          ),
+        ],
       ),
     );
   }
@@ -49,15 +109,21 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
         content: const SingleChildScrollView(
           child: Text(
             '{sun} DAY\n'
-            '• Keep the shelves stocked ({computer} Computer -> order -> carry the box to a shelf).\n'
-            '• Customers pay at the register: tap the counter to open Cashier View.\n'
-            '• Upgrade your store with {case} Manager.\n\n'
+            '• Customers walk in, pick items and queue at a register. Stand at the register (or use Cashier View) and scan their items, then take the payment.\n'
+            '• {computer} Computer: order wholesale boxes. The truck drops them at the back door.\n'
+            '• Boxes on the floor: press ACT next to one to pick it up, walk to a matching shelf and keep pressing ACT to stack the items. DROP puts what you hold on the floor.\n'
+            '• Shelves: with empty hands, ACT takes one item from a shelf you are standing at.\n'
+            '• {bike} Courier: when a courier order appears, bring the items to the packing desk, tape the package and hand it to the courier before time runs out.\n'
+            '• {case} Manager: upgrade the store, hire a cashier and a stocker. Staff are paid every dawn.\n'
+            '• The ACT button turns green when something is within reach.\n\n'
             '{moon} NIGHT\n'
-            '• Thieves sneak in and steal from your shelves.\n'
-            '• Walk up to them and press F (or tap {bat} SWING) to hit them with your stick.\n'
+            '• Thieves sneak in from the front or the back and steal from your shelves.\n'
+            '• Walk up to them and use SWING (or F) to hit them. The stick only works at night.\n'
             '• Driven-off thieves drop their loot and pay you a bounty.\n\n'
             'CONTROLS\n'
-            '• WASD / arrows or tap to move • E / Space to interact • F to swing the stick.',
+            '• Phone: D-pad (left) to move, ACT (right) to interact, DROP to put things down, SWING at night.\n'
+            '• Keyboard: WASD / arrows, E / Space to interact, F to swing the stick.\n'
+            '• Settings: D-pad style, button size, left-handed mode, volume.',
             style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.45),
           ),
         ),
@@ -82,14 +148,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
     final face = primary ? const Color(0xFFD9A441) : const Color(0xFF4A3C30);
     final edge = primary ? const Color(0xFF8A5A1E) : const Color(0xFF2A221C);
     final textColor = primary ? const Color(0xFF1C1209) : const Color(0xFFEDE6D6);
-    return GestureDetector(
-      onTap: () {
-        AudioService.instance.sfx('click');
-        onTap();
-      },
+    return PixelPress(
+      onTap: onTap,
       child: Container(
-        width: 270,
-        height: 54,
+        width: 250,
+        height: 48,
         decoration: BoxDecoration(
           color: face,
           border: Border.all(color: const Color(0xFF14100E), width: 4),
@@ -122,33 +185,34 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
             ),
           ),
           SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                child: Column(
+            child: LayoutBuilder(
+              builder: (context, box) {
+                final wide = box.maxWidth > box.maxHeight * 1.25;
+                final titleBlock = Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Stack(
                       children: [
                         Transform.translate(
                           offset: const Offset(4, 4),
-                          child: const Text(
+                          child: Text(
                             'VILLAGE\nMARKET',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Color(0xFF14100E),
-                              fontSize: 46,
+                              color: const Color(0xFF14100E),
+                              fontSize: wide ? 44 : 46,
                               height: 1.05,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 4,
                             ),
                           ),
                         ),
-                        const Text(
+                        Text(
                           'VILLAGE\nMARKET',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Color(0xFFF1D48A),
-                            fontSize: 46,
+                            color: const Color(0xFFF1D48A),
+                            fontSize: wide ? 44 : 46,
                             height: 1.05,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 4,
@@ -158,40 +222,44 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'Run the shop by day. Defend it by night.',
-                      style: TextStyle(color: Color(0xFFB9B09C), fontSize: 13),
+                      'Run the shop by day.\nDefend it by night.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFFB9B09C), fontSize: 14),
                     ),
-                    const SizedBox(height: 34),
-                    _menuButton('PLAY', () => _play(), primary: true),
-                    const SizedBox(height: 12),
-                    _menuButton('HOW TO PLAY', _showHowToPlay),
-                    const SizedBox(height: 18),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          tooltip: 'Music',
-                          onPressed: () async {
-                            await AudioService.instance.setMusicOn(!AudioService.instance.musicOn);
-                            if (mounted) setState(() {});
-                          },
-                          icon: PixelIcon('note', size: 24, slash: !AudioService.instance.musicOn),
-                        ),
-                        IconButton(
-                          tooltip: 'Sound effects',
-                          onPressed: () async {
-                            await AudioService.instance.setSfxOn(!AudioService.instance.sfxOn);
-                            if (mounted) setState(() {});
-                          },
-                          icon: PixelIcon('speaker', size: 24, slash: !AudioService.instance.sfxOn),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    const Text('v0.1 prototype', style: TextStyle(color: Colors.white24, fontSize: 11)),
                   ],
-                ),
-              ),
+                );
+                final buttons = Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_save != null) ...[
+                      _menuButton('CONTINUE (DAY ${_save!['day']})', () => _play(saveData: _save), primary: true),
+                      const SizedBox(height: 10),
+                      _menuButton('NEW GAME', _newGame),
+                    ] else
+                      _menuButton('PLAY', () => _play(), primary: true),
+                    const SizedBox(height: 10),
+                    _menuButton('HOW TO PLAY', _showHowToPlay),
+                    const SizedBox(height: 10),
+                    _menuButton('SETTINGS', () => showDialog(context: context, builder: (_) => const SettingsDialog())),
+                    const SizedBox(height: 10),
+                    _menuButton('EXIT', _confirmExit),
+                  ],
+                );
+                return Center(
+                  child: SingleChildScrollView(
+                    child: wide
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [titleBlock, const SizedBox(width: 64), buttons],
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [titleBlock, const SizedBox(height: 26), buttons],
+                          ),
+                  ),
+                );
+              },
             ),
           ),
         ],

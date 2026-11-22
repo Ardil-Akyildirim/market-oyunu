@@ -53,7 +53,8 @@ class PixelPainter extends CustomPainter {
   // ---------------------------------------------------------------------------
   // low level helpers
   // ---------------------------------------------------------------------------
-  double _snap(double v) => (v / kPx).round() * kPx;
+  // Characters move in 1-unit steps (a 3-unit grid made them judder at 60 fps).
+  double _snap(double v) => v.roundToDouble();
 
   void _r(Canvas c, double wx, double wy, num gx, num gy, num gw, num gh, Color col) {
     _p.color = col;
@@ -98,17 +99,17 @@ class PixelPainter extends CustomPainter {
 
   /// Pixel-ish label with a dark outline. Emoji are stripped on purpose.
   void _text(Canvas c, String text, double x, double y,
-      {double size = 10, Color color = Colors.white, bool bold = true, bool plate = false}) {
+      {double size = 10, Color color = Colors.white, bool bold = true, bool? plate}) {
     final clean = _clean(text);
     if (clean.isEmpty) return;
     // Tiny text turns digits like 2/3/8 into blobs, so keep a readable minimum
     // and put every label that holds numbers on a dark plate.
     if (size < 13) size = 13;
-    if (RegExp(r'[0-9]').hasMatch(clean)) plate = true;
+    final bool usePlate = plate ?? RegExp(r'[0-9]').hasMatch(clean);
     final tp = _tp(clean, size, color, bold);
     final dx = x - tp.width / 2;
     final dy = y - tp.height / 2;
-    if (plate) {
+    if (usePlate) {
       _p.color = const Color(0xCC0E0B0A);
       c.drawRect(Rect.fromLTWH(dx - 3, dy - 1, tp.width + 6, tp.height + 2), _p);
     } else {
@@ -134,8 +135,9 @@ class PixelPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final scale = engine.getEffectiveScale(size);
     final cam = engine.getCameraTopLeft(size);
-    final camX = (cam.dx / kPx).round() * kPx;
-    final camY = (cam.dy / kPx).round() * kPx;
+    // Snap the camera to whole device pixels: crisp pixels, but no stepping.
+    final camX = (cam.dx * scale).roundToDouble() / scale;
+    final camY = (cam.dy * scale).roundToDouble() / scale;
 
     canvas.save();
     canvas.scale(scale);
@@ -157,7 +159,6 @@ class PixelPainter extends CustomPainter {
     _paintLighting(canvas);
     _paintLockedExpansion(canvas);
     _paintMouseTarget(canvas);
-    _paintDeliveryMarker(canvas);
     _paintParticles(canvas);
 
     canvas.restore();
@@ -346,8 +347,11 @@ class PixelPainter extends CustomPainter {
     if (engine.hasAutoCashier && engine.staffOnDuty) {
       for (int i = 0; i < engine.unlockedCheckoutCount; i++) {
         final r = engine.checkoutCounters[i];
-        add(r.top - 6, () => _drawPerson(c, r.center.dx - 14, r.top - 14, facing: 0, phase: 0,
-            shirt: const Color(0xFF2F6E9E), pants: const Color(0xFF1E2430), hair: const Color(0xFF6B3F1E)));
+        add(r.top - 6, () {
+          _drawPerson(c, r.center.dx - 14, r.top - 14, facing: 0, phase: 0,
+              shirt: const Color(0xFF2F6E9E), pants: const Color(0xFF1E2430), hair: const Color(0xFF6B3F1E));
+          _text(c, 'CASHIER', r.center.dx - 14, r.top - 14 - 31 * kPx, size: 12, color: const Color(0xFF9AD7FF), plate: true);
+        });
       }
     }
     if (engine.hasRestocker && engine.isRestockerHired && !engine.restockerAtHome) {
@@ -618,6 +622,7 @@ class PixelPainter extends CustomPainter {
     _r(c, x, y, 3, -10, 4, 5, Pal.skin);
     _r(c, x, y, 3, -11, 5, 3, const Color(0xFF2E5E8E));
     _r(c, x, y, 3, -6, 5, 6, const Color(0xFFDDA82E));
+    _text(c, 'COURIER', x + 2 * kPx, y - 15 * kPx, size: 12, color: const Color(0xFFFFB3A8), plate: true);
     if (engine.courierState == CourierState.waitingForOrder && engine.activeCourierOrder != null) {
       final o = engine.activeCourierOrder!;
       _p.color = const Color(0xEEFFF8E1);
@@ -916,6 +921,7 @@ class PixelPainter extends CustomPainter {
         pants: const Color(0xFF1C2230),
         hair: const Color(0xFFD08A2E),
         hat: const Color(0xFFE0A020));
+    _text(c, 'STOCKER', _snap(w.x), _snap(w.y) - 31 * kPx - 4, size: 12, color: const Color(0xFFFFD27A), plate: true);
     if (w.carriedBox != null) {
       final bx = _snap(w.x) - 5 * kPx;
       final by = _snap(w.y) - 27 * kPx;
@@ -1001,23 +1007,21 @@ class PixelPainter extends CustomPainter {
     }
     // wall lamps (always visible) + stepped glow
     final glowStrength = 0.10 + 0.55 * d;
+    final vis = c.getLocalClipBounds();
     for (final lx in [400.0, 800.0, 1200.0, 1600.0]) {
+      if (lx + 240 < vis.left || lx - 240 > vis.right) continue; // lamp glow is off-screen
       _r(c, _snap(lx), 236, 0, 0, 3, 3, const Color(0xFFFFE9A0));
-      for (final step in const [[230.0, 0.30], [160.0, 0.45], [95.0, 0.7]]) {
+      for (final step in const [[210.0, 0.4], [110.0, 0.8]]) {
         final rad = step[0];
         _p.color = Color.fromRGBO(255, 214, 140, 0.07 * glowStrength * step[1] * 3.2);
-        _p.blendMode = BlendMode.plus;
         c.drawOval(Rect.fromCenter(center: Offset(lx, 330), width: rad * 2, height: rad * 1.5), _p);
-        _p.blendMode = BlendMode.srcOver;
       }
     }
     if (d > 0.02) {
       // lantern around the player
-      for (final step in const [[150.0, 0.18], [100.0, 0.28], [58.0, 0.4]]) {
+      for (final step in const [[130.0, 0.25], [64.0, 0.45]]) {
         _p.color = Color.fromRGBO(255, 224, 170, step[1] * d * 0.45);
-        _p.blendMode = BlendMode.plus;
         c.drawOval(Rect.fromCenter(center: Offset(_snap(engine.playerX), _snap(engine.playerY)), width: step[0] * 2, height: step[0] * 1.6), _p);
-        _p.blendMode = BlendMode.srcOver;
       }
     }
   }
@@ -1032,32 +1036,6 @@ class PixelPainter extends CustomPainter {
     for (final d in [Offset(-o, 0), Offset(o, 0), Offset(0, -o), Offset(0, o)]) {
       c.drawRect(Rect.fromLTWH(tx + d.dx - kPx / 2, ty + d.dy - kPx / 2, kPx, kPx), _p);
     }
-  }
-
-  /// Pulsing yellow frame + bouncing arrow over boxes waiting at the back door.
-  void _paintDeliveryMarker(Canvas c) {
-    if (engine.deliveryBoxes.isEmpty) return;
-    double minX = 1e9, maxX = -1e9, minY = 1e9;
-    for (final b in engine.deliveryBoxes) {
-      minX = min(minX, b.x);
-      maxX = max(maxX, b.x);
-      minY = min(minY, b.y);
-    }
-    final pulse = (sin(engine.worldTime * 6) + 1) / 2;
-    _p.style = PaintingStyle.stroke;
-    _p.strokeWidth = kPx;
-    _p.color = Color.fromARGB((120 + 110 * pulse).toInt(), 255, 214, 64);
-    c.drawRect(Rect.fromLTRB(_snap(minX - 34), _snap(minY - 30), _snap(maxX + 34), _snap(engine.deliveryBoxes.map((b) => b.y).reduce(max) + 24)), _p);
-    _p.style = PaintingStyle.fill;
-    final cx = _snap((minX + maxX) / 2);
-    final by = _snap(minY - 62 - 6 * pulse);
-    _p.color = Pal.outline;
-    c.drawRect(Rect.fromLTWH(cx - 3 * kPx, by - kPx, 6 * kPx, 5 * kPx), _p);
-    c.drawRect(Rect.fromLTWH(cx - 5 * kPx, by + 3 * kPx, 10 * kPx, 3 * kPx), _p);
-    _p.color = const Color(0xFFFFD640);
-    c.drawRect(Rect.fromLTWH(cx - 2 * kPx, by, 4 * kPx, 4 * kPx), _p);
-    c.drawRect(Rect.fromLTWH(cx - 4 * kPx, by + 4 * kPx, 8 * kPx, 2 * kPx), _p);
-    _text(c, 'DELIVERY', cx, by - 14, size: 12, color: const Color(0xFFFFD640), plate: true);
   }
 
   void _paintParticles(Canvas c) {

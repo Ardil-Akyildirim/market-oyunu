@@ -4,6 +4,8 @@
 //                import '../widgets/pixel_ui.dart';
 // The `Text` exported here is a drop-in replacement: any {name} token in the
 // string (e.g. '{moon} Night 2' or '{milk}') is drawn as a pixel icon instead of an emoji.
+import 'dart:async';
+import '../audio/audio_service.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:material_ui/material_ui.dart' as m;
 
@@ -237,14 +239,16 @@ class PixelDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      insetPadding: const EdgeInsets.all(16),
+      insetPadding: EdgeInsets.all(MediaQuery.of(context).size.height < 500 ? 8 : 16),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
           child: Container(
             decoration: pixelDeco(kPanelDark, bw: 4, shadow: 6),
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+            padding: MediaQuery.of(context).size.height < 500
+                ? const EdgeInsets.fromLTRB(14, 8, 14, 10)
+                : const EdgeInsets.fromLTRB(18, 14, 18, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -263,7 +267,7 @@ class PixelDialog extends StatelessWidget {
                   Flexible(
                     child: DefaultTextStyle(
                       style: const TextStyle(fontFamily: kPixelFont, color: Colors.white70, fontSize: 15),
-                      child: content!,
+                      child: SingleChildScrollView(child: content!),
                     ),
                   ),
                 if (actions != null && actions!.isNotEmpty) ...[
@@ -272,6 +276,52 @@ class PixelDialog extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Wraps any pixel "button": on press it sinks 3px and flashes lighter, so a tap is visible.
+class PixelPress extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final bool click; // play the click sfx
+  const PixelPress({super.key, required this.child, required this.onTap, this.click = true});
+
+  @override
+  State<PixelPress> createState() => _PixelPressState();
+}
+
+class _PixelPressState extends State<PixelPress> {
+  bool _down = false;
+
+  void _set(bool v) {
+    if (_down != v && mounted) setState(() => _down = v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerDown: (_) => _set(true),
+      onPointerUp: (_) => Future.delayed(const Duration(milliseconds: 90), () => _set(false)),
+      onPointerCancel: (_) => _set(false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap == null
+            ? null
+            : () {
+                if (widget.click) AudioService.instance.sfx('click');
+                widget.onTap!();
+              },
+        child: Transform.translate(
+          offset: Offset(0, _down ? 3 : 0),
+          child: Stack(
+            children: [
+              widget.child,
+              if (_down) const Positioned.fill(child: IgnorePointer(child: ColoredBox(color: Color(0x44FFFFFF)))),
+            ],
           ),
         ),
       ),
@@ -288,8 +338,7 @@ class PixelToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return PixelPress(
       onTap: () => onChanged(!value),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -307,6 +356,118 @@ class PixelToggle extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Small top-of-screen notification (replaces SnackBars, which pop up at the bottom).
+// ---------------------------------------------------------------------------
+OverlayEntry? _toastEntry;
+Timer? _toastTimer;
+
+void showTopToast(BuildContext context, String text, {Color color = const Color(0xFF7CE0A0), int ms = 1900}) {
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  if (overlay == null) return;
+  _toastTimer?.cancel();
+  _toastEntry?.remove();
+  final entry = OverlayEntry(
+    builder: (ctx) => Positioned(
+      top: MediaQuery.of(ctx).padding.top + 50,
+      left: 0,
+      right: 0,
+      child: IgnorePointer(
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 460),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: pixelDeco(const Color(0xEE17120F), border: color, bw: 3, shadow: 3),
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w900),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  _toastEntry = entry;
+  overlay.insert(entry);
+  _toastTimer = Timer(Duration(milliseconds: ms), () {
+    entry.remove();
+    if (_toastEntry == entry) _toastEntry = null;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Pixel slider (10 blocks) and option chips for the settings screen.
+// ---------------------------------------------------------------------------
+class PixelSlider extends StatelessWidget {
+  final double value; // 0..1
+  final ValueChanged<double> onChanged;
+  const PixelSlider({super.key, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, c) {
+      final w = c.maxWidth.isFinite ? c.maxWidth : 200.0;
+      void at(double dx) => onChanged(((dx / w) * 10).ceil().clamp(0, 10) / 10.0);
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (d) => at(d.localPosition.dx),
+        onHorizontalDragUpdate: (d) => at(d.localPosition.dx),
+        child: SizedBox(
+          height: 30,
+          child: Row(
+            children: [
+              for (int i = 0; i < 10; i++)
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: i < (value * 10).round() ? kGold : const Color(0xFF4A3C30),
+                      border: Border.all(color: kInk, width: 2),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class PixelChoice extends StatelessWidget {
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onChanged;
+  const PixelChoice({super.key, required this.labels, required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: [
+        for (int i = 0; i < labels.length; i++)
+          PixelPress(
+            onTap: () => onChanged(i),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: pixelDeco(i == selected ? const Color(0xFFD9A441) : const Color(0xFF4A3C30), bw: 3, shadow: 2),
+              child: Text(
+                labels[i],
+                style: TextStyle(
+                  color: i == selected ? const Color(0xFF1C1209) : Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

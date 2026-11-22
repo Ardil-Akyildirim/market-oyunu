@@ -34,13 +34,7 @@ class CheckoutRegisterDialog extends StatelessWidget {
           onClose: () => Navigator.pop(context),
           onPaymentCollected: (earned) {
             Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('{bag} Package delivered and +\$${earned.toStringAsFixed(0)} collected! '),
-                backgroundColor: Colors.green.shade700,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            showTopToast(context, '{bag} +\$${earned.toStringAsFixed(0)} collected!');
           },
         ),
       ),
@@ -153,6 +147,8 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
     final cust = widget.customer;
     final packedCount = cust == null ? 0 : cust.packedCount.clamp(0, cust.basket.length);
     final isAllPacked = cust != null && cust.isFullyPacked;
+    // Phones in landscape only give us ~300 px of height, so shrink every panel.
+    final compact = MediaQuery.of(context).size.height < 520;
 
     return Container(
       color: const Color(0xFF17120F),
@@ -160,39 +156,14 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
         children: [
             // 1. ÜST KAMERA & KASİYER MODU ÇUBUĞU
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 18, vertical: compact ? 4 : 10),
               decoration: const BoxDecoration(
                 color: Color(0xFF17120F),
                 border: Border(bottom: BorderSide(color: Color(0xFF2A221C), width: 1.5)),
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF8A5A33).withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.zero,
-                      border: Border.all(color: const Color(0xFFE8B84A)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('{register}', style: TextStyle(fontSize: 14)),
-                        SizedBox(width: 6),
-                        Text(
-                          '1ST-PERSON CASHIER CAMERA',
-                          style: TextStyle(
-                            color: Color(0xFFE8B84A),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Text(cust != null ? '{face}' : '{bell}', style: const TextStyle(fontSize: 22)),
+                                    Text(cust != null ? '{face}' : '{bell}', style: const TextStyle(fontSize: 22)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -201,7 +172,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                         Row(
                           children: [
                             Text(
-                              cust?.name ?? 'Register ${widget.counterIndex + 1} • Waiting for Customer',
+                              cust?.name ?? 'Register ${widget.counterIndex + 1}',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14.5),
                             ),
                             if (cust != null) ...[
@@ -223,16 +194,16 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                         ),
                         Text(
                           cust == null
-                              ? '{clock} Customers will appear here when they finish shopping and reach the register...'
-                              : (isAllPacked
-                                  ? '{check} All items scanned! Hand the bag to the customer and take payment.'
-                                  : 'CLICK an item on the belt or DRAG it to the LASER SCANNER (${packedCount}/${cust.basket.length})'),
+                              ? 'Waiting for a customer'
+                              : (isAllPacked ? 'Take payment' : 'Scan items  $packedCount/${cust.basket.length}'),
                           style: TextStyle(
                             color: cust == null
                                 ? Colors.amberAccent
                                 : (isAllPacked ? const Color(0xFF4ADE80) : const Color(0xFFB8A890)),
-                            fontSize: 11.5,
+                            fontSize: compact ? 12 : 11.5,
                           ),
+                          maxLines: compact ? 1 : null,
+                          overflow: compact ? TextOverflow.ellipsis : null,
                         ),
                       ],
                     ),
@@ -240,7 +211,8 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                   TextButton.icon(
                     onPressed: widget.onClose,
                     icon: PixelIcon('back', size: 18),
-                    label: const Text('Back to Store [ESC / Tab]', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: Text('Back',
+                        style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -287,7 +259,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                           Positioned(
                             top: 14,
                             right: 14,
-                            child: _buildPosReceiptCard(cust, packedCount, isAllPacked, inLaserPhase),
+                            child: _buildPosReceiptCard(cust, packedCount, isAllPacked, inLaserPhase, compact),
                           ),
 
                           // C) Sol Altta Banttaki Okutulacak Ürünler (Tıkla veya Lazerin Üstüne Sürükle!)
@@ -300,21 +272,8 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.72),
-                                      borderRadius: BorderRadius.zero,
-                                      border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.6)),
-                                    ),
-                                    child: const Text(
-                                      '{dot} Items on the Belt (Click to Scan or Drag to the Laser Glass)',
-                                      style: TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
                                   SizedBox(
-                                    height: 92,
+                                    height: compact ? 74 : 94,
                                     child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                                       physics: const NeverScrollableScrollPhysics(),
@@ -357,8 +316,8 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                           },
                                           child: AnimatedContainer(
                                             duration: const Duration(milliseconds: 160),
-                                            width: 84,
-                                            padding: const EdgeInsets.all(8),
+                                            width: compact ? 66 : 84,
+                                            padding: EdgeInsets.all(compact ? 4 : 8),
                                             decoration: BoxDecoration(
                                               color: isNext ? const Color(0xFFFEF3C7) : const Color(0xFFE9DFC6),
                                               borderRadius: BorderRadius.zero,
@@ -378,19 +337,22 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                             ),
                                             child: Opacity(
                                               opacity: isDraggingThis ? 0.35 : 1.0,
-                                              child: Column(
+                                              child: FittedBox(fit: BoxFit.scaleDown, child: Column(
+                                                mainAxisSize: MainAxisSize.min,
                                                 mainAxisAlignment: MainAxisAlignment.center,
                                                 children: [
-                                                  Text(def.ico, style: const TextStyle(fontSize: 30)),
+                                                  Text(def.ico, style: TextStyle(fontSize: compact ? 22 : 30)),
                                                   const SizedBox(height: 3),
-                                                  Text(
-                                                    def.name,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF17120F),
-                                                      fontSize: 9.5,
-                                                      fontWeight: FontWeight.w800,
+                                                  FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    child: Text(
+                                                      def.short,
+                                                      maxLines: 1,
+                                                      style: const TextStyle(
+                                                        color: Color(0xFF17120F),
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w900,
+                                                      ),
                                                     ),
                                                   ),
                                                   Text(
@@ -402,7 +364,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                                     ),
                                                   ),
                                                 ],
-                                              ),
+                                              )),
                                             ),
                                           ),
                                         );
@@ -422,12 +384,12 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                               final pType = cust.basket[_draggingIndex!];
                               final def = productCatalog[pType]!;
                               return Positioned(
-                                left: local.dx - 34,
-                                top: local.dy - 34,
+                                left: local.dx - 38,
+                                top: local.dy - 46,
                                 child: IgnorePointer(
                                   child: Container(
-                                    width: 68,
-                                    height: 68,
+                                    width: 76,
+                                    height: 76,
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.zero,
@@ -436,7 +398,18 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                         BoxShadow(color: Colors.black.withValues(alpha: 0.45), offset: const Offset(3, 4), blurRadius: 0),
                                       ],
                                     ),
-                                    child: Center(child: Text(def.ico, style: const TextStyle(fontSize: 34))),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(def.ico, style: const TextStyle(fontSize: 28)),
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(def.short,
+                                              style: const TextStyle(
+                                                  color: Color(0xFF17120F), fontSize: 13, fontWeight: FontWeight.w900)),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );
@@ -445,7 +418,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                           // E) Tüm Ürünler Okutulduysa Alt Orta: Poşeti Teslim Et & Ödeme Al Butonu
                           if (cust != null && isAllPacked && !isScanning)
                             Positioned(
-                              bottom: 20,
+                              bottom: compact ? 8 : 20,
                               left: 24,
                               right: 24,
                               child: Center(
@@ -453,13 +426,13 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                   onPressed: _handPackageAndCollect,
                                   icon: const Text('{card}', style: TextStyle(fontSize: 22)),
                                   label: Text(
-                                    'HAND OVER BAG & TAKE PAYMENT (+\$${_totalAmount.toStringAsFixed(0)})',
-                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                                    'TAKE PAYMENT +\$${_totalAmount.toStringAsFixed(0)}',
+                                    style: TextStyle(fontSize: compact ? 14 : 15, fontWeight: FontWeight.w900),
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF16A34A),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
+                                    padding: EdgeInsets.symmetric(horizontal: compact ? 18 : 28, vertical: compact ? 10 : 18),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
                                     elevation: 10,
                                   ),
@@ -470,9 +443,9 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                           // F) Kasada henüz müşteri yoksa bekleme bilgisi
                           if (cust == null)
                             Positioned(
-                              top: sceneSize.height * 0.24,
+                              top: sceneSize.height * (compact ? 0.16 : 0.24),
                               left: 24,
-                              right: 260,
+                              right: compact ? 190 : 260,
                               child: Center(
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
@@ -488,14 +461,8 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        '{clock} Waiting for a Customer at the Register...',
+                                        'Waiting for a customer',
                                         style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900),
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        'The store keeps running in the background. It will pop up here automatically when a customer arrives!',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(color: Color(0xFFB8A890), fontSize: 11.5),
                                       ),
                                     ],
                                   ),
@@ -515,10 +482,10 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
       );
   }
 
-  Widget _buildPosReceiptCard(SimCustomer? cust, int packedCount, bool isAllPacked, bool inLaserPhase) {
+  Widget _buildPosReceiptCard(SimCustomer? cust, int packedCount, bool isAllPacked, bool inLaserPhase, bool compact) {
     return Container(
-      width: 225,
-      padding: const EdgeInsets.all(12),
+      width: compact ? 168 : 225,
+      padding: EdgeInsets.all(compact ? 7 : 12),
       decoration: BoxDecoration(
         color: const Color(0xFF17120F).withValues(alpha: 0.92),
         borderRadius: BorderRadius.zero,
@@ -537,8 +504,8 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '{register} REGISTER POS RECEIPT',
+              Text(
+                'RECEIPT',
                 style: TextStyle(color: Color(0xFFE8B84A), fontSize: 11, fontWeight: FontWeight.w900),
               ),
               Text(
@@ -549,23 +516,11 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
           ),
           const Divider(color: Color(0xFF4A3C30), height: 12),
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 135),
+            constraints: BoxConstraints(maxHeight: compact ? 46 : 135),
             child: cust == null
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text(
-                      'Waiting for customer...',
-                      style: TextStyle(color: Colors.white38, fontSize: 11),
-                    ),
-                  )
+                ? const SizedBox(height: 12)
                 : packedCount == 0
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          'No items scanned yet...',
-                          style: TextStyle(color: Colors.white38, fontSize: 11),
-                        ),
-                      )
+                    ? const SizedBox(height: 12)
                     : ListView.builder(
                         shrinkWrap: true,
                         itemCount: packedCount,

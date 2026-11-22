@@ -214,7 +214,7 @@ class TutorialOverlay extends StatelessWidget {
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.fromLTRB(22, 20, 22, 14),
               decoration: pixelDeco(kPanelDark, border: kGold, bw: 4, shadow: 6),
-              child: Column(
+              child: SingleChildScrollView(child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -259,7 +259,7 @@ class TutorialOverlay extends StatelessWidget {
                     ],
                   ),
                 ],
-              ),
+              )),
             ),
           ),
         ),

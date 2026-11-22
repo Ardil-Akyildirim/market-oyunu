@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:material_ui/material_ui.dart' hide Text;
 import '../../widgets/pixel_ui.dart';
 import '../simulation_engine.dart';
@@ -23,11 +24,12 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: SingleChildScrollView(
         child: Container(
-        width: 490,
+        width: min(490.0, MediaQuery.of(context).size.width - 24),
         decoration: pixelDeco(kParchment, bw: 4, shadow: 6),
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(MediaQuery.of(context).size.height < 500 ? 12 : 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,6 +60,13 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
               ],
             ),
             const Divider(height: 20),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                '{coin} Staff wages are paid every dawn: \$${engine.dailyWages.toStringAsFixed(0)} per day (cashier \$${SimulationEngine.wageCashier.toStringAsFixed(0)}, stocker \$${SimulationEngine.wageRestocker.toStringAsFixed(0)}, courier \$${SimulationEngine.wageCourier.toStringAsFixed(0)}).',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7A3E12)),
+              ),
+            ),
 
             // 1. Dükkan Seviye Atlama Kartı
             Container(
@@ -81,9 +90,9 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         ),
                         Text(
                           engine.storeLevel == 1
-                              ? '{unlock} Level 2 expands the store, opens the 2nd Checkout Counter and the Auto Cashier (Ayşe)!'
+                              ? '{unlock} Level 2 expands the store, opens the 2nd Checkout Counter and the Auto Cashier!'
                               : (engine.storeLevel == 2
-                                  ? '{unlock} Level 3 expands the store again and opens the 3rd Checkout Counter and Stocker Ali!'
+                                  ? '{unlock} Level 3 expands the store again and opens the 3rd Checkout Counter and the Stocker!'
                                   : 'Increases customer capacity and income rate (3/3 Counters Open).'),
                           style: TextStyle(fontSize: 11, color: Colors.orange.shade900, fontWeight: FontWeight.w600),
                         ),
@@ -151,10 +160,12 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
+                          runSpacing: 2,
                           children: [
-                            const Text('Auto Cashier (Ayşe)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            const SizedBox(width: 6),
+                            const Text('Auto Cashier', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
@@ -202,7 +213,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                                 engine.spawnParticle(
                                   engine.checkoutCounter.center.dx,
                                   engine.checkoutCounter.top - 20,
-                                  '{face} Cashier Ayşe Started Working!',
+                                  '{face} Cashier started working!',
                                   Colors.greenAccent,
                                   size: 16,
                                 );
@@ -213,7 +224,10 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         backgroundColor: Colors.purple.shade600,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('Hire (\$250)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        const Text('Hire (\$250)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        Text('\$${SimulationEngine.wageCashier.toStringAsFixed(0)}/day', style: const TextStyle(fontSize: 12)),
+                      ]),
                     )
                   else
                     Container(
@@ -246,10 +260,12 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
+                          runSpacing: 2,
                           children: [
-                            const Text('Shelf Attendant (Stocker Ali)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            const SizedBox(width: 6),
+                            const Text('Stocker', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
@@ -298,7 +314,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                                 engine.spawnParticle(
                                   engine.restocker.x,
                                   engine.restocker.y - 30,
-                                  '{hardhat} Stocker Ali Started Working!',
+                                  '{hardhat} Stocker started working!',
                                   Colors.cyanAccent,
                                   size: 16,
                                 );
@@ -309,7 +325,10 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         backgroundColor: Colors.cyan.shade700,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('Hire (\$350)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        const Text('Hire (\$350)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        Text('\$${SimulationEngine.wageRestocker.toStringAsFixed(0)}/day', style: const TextStyle(fontSize: 12)),
+                      ]),
                     )
                   else
                     SizedBox(

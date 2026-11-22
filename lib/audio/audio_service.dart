@@ -1,26 +1,35 @@
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Music (day / night) and sound effects. Every call is wrapped in try/catch:
+/// Music (menu / day / night) and sound effects. Every call is wrapped in try/catch:
 /// audio problems must never crash the game (e.g. browsers blocking autoplay).
-class AudioService {
+///
+/// Music uses two players so tracks cross-fade instead of cutting. Sound effects use
+/// low-latency players and never take audio focus, so they cannot interrupt the music.
+class AudioService with WidgetsBindingObserver {
   AudioService._();
   static final AudioService instance = AudioService._();
 
   bool musicOn = true;
   bool sfxOn = true;
+  double musicVol = 0.8; // 0..1 (settings slider)
+  double sfxVol = 0.8; // 0..1 (settings slider)
 
-  final AudioPlayer _music = AudioPlayer();
+  final List<AudioPlayer> _mp = [AudioPlayer(), AudioPlayer()];
+  int _cur = 0;
   final List<AudioPlayer> _pool = List.generate(8, (_) => AudioPlayer());
   int _next = 0;
   String? _track;
   bool _musicPlaying = false;
-  int _musicToken = 0;
+  bool _pausedByApp = false;
+  Timer? _fadeTimer;
   final Map<String, DateTime> _lastPlayed = {};
   bool _loaded = false;
 
-  static const double _musicVolume = 0.32;
+  static const double _musicBase = 0.45;
+  double get _target => (_musicBase * musicVol).clamp(0.0, 1.0).toDouble();
 
   static const Map<String, double> _sfxVolume = {
     'click': 0.55,
@@ -53,7 +62,51 @@ class AudioService {
       final prefs = await SharedPreferences.getInstance();
       musicOn = prefs.getBool('audio_music_on') ?? true;
       sfxOn = prefs.getBool('audio_sfx_on') ?? true;
+      musicVol = prefs.getDouble('audio_music_vol') ?? 0.8;
+      sfxVol = prefs.getDouble('audio_sfx_vol') ?? 0.8;
     } catch (_) {}
+    try {
+      // Never request audio focus: sound effects must not interrupt the music.
+      final ctx = AudioContext(
+        android: AudioContextAndroid(
+          audioFocus: AndroidAudioFocus.none,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.game,
+          stayAwake: false,
+        ),
+        iOS: AudioContextIOS(category: AVAudioSessionCategory.ambient),
+      );
+      await AudioPlayer.global.setAudioContext(ctx);
+      for (final p in [..._mp, ..._pool]) {
+        try {
+          await p.setAudioContext(ctx);
+        } catch (_) {}
+      }
+    } catch (_) {}
+    try {
+      WidgetsBinding.instance.addObserver(this);
+    } catch (_) {}
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.hidden) {
+      if (_musicPlaying && !_pausedByApp) {
+        _pausedByApp = true;
+        _fadeTimer?.cancel();
+        for (final p in _mp) {
+          p.pause().catchError((_) {});
+        }
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      if (_pausedByApp) {
+        _pausedByApp = false;
+        if (musicOn && _musicPlaying) {
+          _mp[_cur].setVolume(_target).catchError((_) {});
+          _mp[_cur].resume().catchError((_) {});
+        }
+      }
+    }
   }
 
   Future<void> _save() async {
@@ -61,70 +114,69 @@ class AudioService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('audio_music_on', musicOn);
       await prefs.setBool('audio_sfx_on', sfxOn);
+      await prefs.setDouble('audio_music_vol', musicVol);
+      await prefs.setDouble('audio_sfx_vol', sfxVol);
     } catch (_) {}
   }
 
-  /// 'day' or 'night'. Starts the loop (cross-fading from the previous track).
+  /// 'menu', 'day' or 'night'. Cross-fades from the previous track.
   Future<void> playMusic(String track) async {
     await load();
     if (_track == track && _musicPlaying) return;
     _track = track;
     if (!musicOn) return;
-    final token = ++_musicToken;
     try {
-      if (_musicPlaying) {
-        await _fade(0.0, 350, token);
-      }
-      if (token != _musicToken) return;
-      await _music.stop();
-      await _music.setReleaseMode(ReleaseMode.loop);
-      await _music.setVolume(0.0);
-      await _music.play(AssetSource('audio/music_$track.wav'));
+      _fadeTimer?.cancel();
+      final outgoing = _mp[_cur];
+      final incomingIdx = 1 - _cur;
+      final incoming = _mp[incomingIdx];
+      // the idle player may still be fading out from an earlier switch
+      await incoming.stop();
+      await incoming.setReleaseMode(ReleaseMode.loop);
+      await incoming.setVolume(0.0);
+      await incoming.play(AssetSource('audio/music_$track.wav'));
+      final hadMusic = _musicPlaying;
+      _cur = incomingIdx;
       _musicPlaying = true;
-      await _fade(_musicVolume, 700, token);
+
+      const steps = 14;
+      const stepMs = 100; // ~1.4 s cross-fade
+      int i = 0;
+      _fadeTimer = Timer.periodic(const Duration(milliseconds: stepMs), (t) {
+        i++;
+        final k = (i / steps).clamp(0.0, 1.0).toDouble();
+        try {
+          incoming.setVolume(_target * k);
+          if (hadMusic) outgoing.setVolume(_target * (1 - k));
+        } catch (_) {}
+        if (i >= steps) {
+          t.cancel();
+          outgoing.stop().catchError((_) {});
+        }
+      });
     } catch (_) {
       _musicPlaying = false;
     }
   }
 
-  Future<void> _fade(double to, int ms, int token) async {
-    const steps = 10;
-    double from = to == 0.0 ? _musicVolume : 0.0;
-    for (int i = 1; i <= steps; i++) {
-      if (token != _musicToken) return;
-      try {
-        await _music.setVolume(from + (to - from) * (i / steps));
-      } catch (_) {}
-      await Future.delayed(Duration(milliseconds: ms ~/ steps));
-    }
-  }
-
   Future<void> stopMusic() async {
-    _musicToken++;
+    _fadeTimer?.cancel();
     _musicPlaying = false;
-    try {
-      await _music.stop();
-    } catch (_) {}
-  }
-
-  Future<void> pauseMusic() async {
-    try {
-      await _music.pause();
-    } catch (_) {}
-  }
-
-  Future<void> resumeMusic() async {
-    if (!musicOn) return;
-    try {
-      await _music.resume();
-    } catch (_) {}
+    _track = null;
+    for (final p in _mp) {
+      try {
+        await p.stop();
+      } catch (_) {}
+    }
   }
 
   Future<void> setMusicOn(bool on) async {
     musicOn = on;
     await _save();
     if (!on) {
+      final t = _track;
       await stopMusic();
+      _track = t;
     } else if (_track != null) {
       final t = _track!;
       _track = null;
@@ -137,8 +189,23 @@ class AudioService {
     await _save();
   }
 
+  Future<void> setMusicVolume(double v) async {
+    musicVol = v.clamp(0.0, 1.0).toDouble();
+    if (_musicPlaying && (_fadeTimer == null || !_fadeTimer!.isActive)) {
+      try {
+        await _mp[_cur].setVolume(_target);
+      } catch (_) {}
+    }
+    await _save();
+  }
+
+  Future<void> setSfxVolume(double v) async {
+    sfxVol = v.clamp(0.0, 1.0).toDouble();
+    await _save();
+  }
+
   void sfx(String name) {
-    if (!sfxOn) return;
+    if (!sfxOn || sfxVol <= 0) return;
     final cd = _cooldown[name];
     if (cd != null) {
       final now = DateTime.now();
@@ -149,9 +216,13 @@ class AudioService {
     try {
       final p = _pool[_next];
       _next = (_next + 1) % _pool.length;
-      unawaited(p
-          .play(AssetSource('audio/sfx_$name.wav'), volume: _sfxVolume[name] ?? 0.6)
-          .catchError((_) {}));
+      final v = ((_sfxVolume[name] ?? 0.6) * sfxVol * 1.2).clamp(0.0, 1.0).toDouble();
+      unawaited(() async {
+        try {
+          await p.stop();
+          await p.play(AssetSource('audio/sfx_$name.wav'), volume: v);
+        } catch (_) {}
+      }());
     } catch (_) {}
   }
 }
