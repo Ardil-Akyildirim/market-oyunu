@@ -57,15 +57,15 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
 
     if (order == null) {
       return Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('📦 Şu an aktif kurye siparişi yok.', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('📦 There is no active courier order right now.', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Kapat')),
+              ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
             ],
           ),
         ),
@@ -80,7 +80,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
     final bool hasExcess = excess > 0;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
       backgroundColor: Colors.white,
       child: Container(
         width: 500,
@@ -97,7 +97,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: Colors.deepPurple.shade50,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.zero,
                     border: Border.all(color: Colors.deepPurple.shade200),
                   ),
                   child: const Text('📦', style: TextStyle(fontSize: 26)),
@@ -108,11 +108,11 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Kurye Paketleme İstasyonu',
-                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF1E293B)),
+                        'Courier Packing Station',
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF2A221C)),
                       ),
                       Text(
-                        '🛵 ${order.customerName} • Ödül: +₺${order.rewardAmount.toStringAsFixed(0)} • ${order.remainingTime.toInt()}sn',
+                        '🛵 ${order.customerName} • Reward: +\$${order.rewardAmount.toStringAsFixed(0)} • ${order.remainingTime.toInt()}s',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.deepPurple.shade700),
                       ),
                     ],
@@ -132,7 +132,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Row(
@@ -153,7 +153,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                'Kuryenin İstediği: $needed adet',
+                                'Courier Wants: ${needed} pcs',
                                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -170,7 +170,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                       color: hasExcess
                           ? Colors.red.shade100
                           : (isExact ? Colors.green.shade100 : Colors.amber.shade100),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.zero,
                       border: Border.all(
                         color: hasExcess
                             ? Colors.red.shade400
@@ -201,7 +201,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                 color: hasExcess
                     ? Colors.red.shade50
                     : (isExact ? Colors.green.shade50 : Colors.amber.shade50),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(
                   color: hasExcess
                       ? Colors.red.shade400
@@ -219,12 +219,12 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                   Expanded(
                     child: Text(
                       hasExcess
-                          ? 'Bu fazla! Kurye $needed adet ${def.emoji} istiyor, sen $_trayCount adet getirdin ($excess adet fazla!). Fazlasını çıkarıp ona göre paketi yap!'
+                          ? 'Too many! The courier wants ${needed} x ${def.emoji}, you brought ${_trayCount} (${excess} extra!). Remove the extras and pack accordingly!'
                           : (isExact
-                              ? 'Tam kurye siparişine göre ($needed/$needed)! Şimdi paketi bantlayıp motora götürebilirsin.'
+                              ? 'Exactly the courier order (${needed}/${needed})! Now tape the package and take it to the bike.'
                               : (_trayCount == 0
-                                  ? 'Dolaptan her basışta 1 adet ${def.emoji} ${def.name} alıp bu masaya getir ($needed adet gerekli).'
-                                  : 'Şu an $_trayCount adet var. Dolaptan $missing adet daha ${def.emoji} alıp getir!')),
+                                  ? 'Each press takes 1 ${def.emoji} ${def.name} from the cabinet; bring it to this table (${needed} needed).'
+                                  : 'There are ${_trayCount} here now. Grab ${missing} more ${def.emoji} from the cabinet!')),
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
@@ -245,8 +245,8 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
               padding: const EdgeInsets.all(12),
               constraints: const BoxConstraints(minHeight: 84),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1B4B),
-                borderRadius: BorderRadius.circular(14),
+                color: const Color(0xFF1E2431),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(
                   color: hasExcess ? Colors.redAccent : const Color(0xFFFACC15),
                   width: 2,
@@ -255,7 +255,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
               child: _trayCount == 0
                   ? Center(
                       child: Text(
-                        '📦 Kurye Kolisi Boş (0/$needed ${def.emoji})',
+                        '📦 Courier Box Empty (0/${needed} ${def.emoji})',
                         style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 12.5),
                       ),
                     )
@@ -267,12 +267,12 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                         final isExtra = index >= needed;
                         return InkWell(
                           onTap: isExtra ? _removeOneExcess : null,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.zero,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: isExtra ? Colors.red.shade700 : const Color(0xFF4C1D95),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.zero,
                               border: Border.all(
                                 color: isExtra ? Colors.redAccent.shade100 : const Color(0xFFFACC15),
                                 width: 1.5,
@@ -284,7 +284,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                                 Text(def.emoji, style: const TextStyle(fontSize: 18)),
                                 const SizedBox(width: 4),
                                 Text(
-                                  isExtra ? 'FAZLA ✕' : '#${index + 1}',
+                                  isExtra ? 'EXTRA ✕' : '#${index + 1}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -309,7 +309,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                     child: OutlinedButton.icon(
                       onPressed: _removeOneExcess,
                       icon: const Icon(Icons.remove_circle_outline),
-                      label: const Text('1 Fazla Çıkar (-1)', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const Text('Remove 1 Extra (-1)', style: TextStyle(fontWeight: FontWeight.bold)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red.shade700,
                         side: BorderSide(color: Colors.red.shade400, width: 1.5),
@@ -322,7 +322,7 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                     child: ElevatedButton.icon(
                       onPressed: () => _trimAllExcess(needed),
                       icon: const Icon(Icons.content_cut_rounded),
-                      label: Text('$needed Adete Ayarla ($excess İade)',
+                      label: Text('Set to ${needed} (${excess} Returned)',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange.shade600,
@@ -347,14 +347,14 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                 },
                 icon: const Icon(Icons.inventory_2_rounded),
                 label: Text(
-                  '📦 Kurye Paketini Hazırla & Bantla ($needed/$needed)',
+                  '📦 Prepare & Tape the Courier Package (${needed}/${needed})',
                   style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green.shade600,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
                 ),
               )
             else if (!hasExcess && _trayCount > 0)
@@ -368,26 +368,26 @@ class _CourierPackingDialogState extends State<CourierPackingDialog> {
                 },
                 icon: const Icon(Icons.save_alt_rounded),
                 label: Text(
-                  'Masaya Bırak ($_trayCount/$needed) & Dolaptan Al',
+                  'Leave on Table (${_trayCount}/${needed}) & Take from Cabinet',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.amber.shade700,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
                 ),
               )
             else if (!hasExcess)
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF334155),
+                  backgroundColor: const Color(0xFF4A3C30),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
                 ),
-                child: const Text('Tamam, Dolaptan Ürün Al', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('OK, Take Item from Cabinet', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
           ],
           ),

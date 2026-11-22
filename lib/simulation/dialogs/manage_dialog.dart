@@ -20,8 +20,8 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
     final isRestockerUnlocked = engine.storeLevel >= 3;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
+      backgroundColor: const Color(0xFFE9DFC6),
       child: Container(
         width: 490,
         padding: const EdgeInsets.all(20),
@@ -38,11 +38,11 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Market Yönetimi & Personel (Seviye ${engine.storeLevel})',
+                        'Store Management & Staff (Level ${engine.storeLevel})',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       const Text(
-                        'Seviye atlayarak Kasiyer ve Stokçu kilidini açın!',
+                        'Level up to unlock the Cashier and the Stocker!',
                         style: TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                     ],
@@ -61,7 +61,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(color: Colors.orange.shade300, width: 1.5),
               ),
               child: Row(
@@ -73,15 +73,15 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Market Seviyesini Yükselt (Seviye ${engine.storeLevel} ➔ ${engine.storeLevel + 1})',
+                          'Upgrade Store Level (Level ${engine.storeLevel} ➔ ${engine.storeLevel + 1})',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                         Text(
                           engine.storeLevel == 1
-                              ? '🔓 Seviye 2\'de 2. Kasa Tezgahı ve Otomatik Kasiyer (Ayşe) açılır!'
+                              ? '🔓 Level 2 expands the store, opens the 2nd Checkout Counter and the Auto Cashier (Ayşe)!'
                               : (engine.storeLevel == 2
-                                  ? '🔓 Seviye 3\'te 3. Kasa Tezgahı ve Stokçu Ali kilidi açılır!'
-                                  : 'Müşteri kapasitesini ve gelir hızını artırır (3/3 Kasa Açık).'),
+                                  ? '🔓 Level 3 expands the store again and opens the 3rd Checkout Counter and Stocker Ali!'
+                                  : 'Increases customer capacity and income rate (3/3 Counters Open).'),
                           style: TextStyle(fontSize: 11, color: Colors.orange.shade900, fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -93,10 +93,14 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                             setState(() {
                               engine.cash -= upgradeCost;
                               engine.storeLevel++;
+                              final opened = engine.refreshShelfUnlocks();
+                              for (final name in opened) {
+                                engine.spawnParticle(engine.playerX, engine.playerY - 64, '🆕 $name is now on sale!', Colors.lightGreenAccent, size: 16);
+                              }
                               engine.spawnParticle(
                                 engine.playerX,
                                 engine.playerY - 40,
-                                '🎉 Market Seviye ${engine.storeLevel} Oldu!',
+                                '🎉 Store Reached Level ${engine.storeLevel}!',
                                 Colors.amberAccent,
                                 size: 18,
                               );
@@ -105,7 +109,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                                 engine.spawnParticle(
                                   newCounter.center.dx,
                                   newCounter.top - 16,
-                                  '🔓 🛎️ Kasa ${engine.storeLevel} Hizmete Açıldı!',
+                                  '🔓 🛎️ Register ${engine.storeLevel} Is Now Open!',
                                   Colors.greenAccent,
                                   size: 18,
                                 );
@@ -118,7 +122,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                       foregroundColor: Colors.white,
                     ),
                     child: Text(
-                      'Seviye Atla (₺${upgradeCost.toStringAsFixed(0)})',
+                      'Level Up (\$${upgradeCost.toStringAsFixed(0)})',
                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -133,7 +137,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: isCashierUnlocked ? Colors.purple.shade50 : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(color: isCashierUnlocked ? Colors.purple.shade200 : Colors.grey.shade300),
               ),
               child: Row(
@@ -146,16 +150,16 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                       children: [
                         Row(
                           children: [
-                            const Text('Otomatik Kasiyer (Ayşe)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            const Text('Auto Cashier (Ayşe)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: isCashierUnlocked ? Colors.purple.shade100 : Colors.amber.shade100,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.zero,
                               ),
                               child: Text(
-                                'Seviye 2',
+                                'Level 2',
                                 style: TextStyle(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.bold,
@@ -167,10 +171,10 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         ),
                         Text(
                           !isCashierUnlocked
-                              ? '🔒 Kasiyer işe almak için önce marketi Seviye 2\'ye yükseltin.'
+                              ? '🔒 Upgrade the store to Level 2 first to hire a cashier.'
                               : (engine.hasAutoCashier
-                                  ? 'Kasiyer kasada çalışıyor, müşterileri otomatik geçiriyor!'
-                                  : 'Sen çiftlikteyken müşterilerin ödemesini kasada otomatik alır.'),
+                                  ? 'The cashier works the register and rings up customers automatically!'
+                                  : 'They collect customer payments automatically while you restock and guard the shop.'),
                           style: TextStyle(fontSize: 11, color: isCashierUnlocked ? Colors.purple.shade900 : Colors.grey.shade700),
                         ),
                       ],
@@ -181,9 +185,9 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.zero,
                       ),
-                      child: const Text('🔒 Seviye 2 Gerekli', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: const Text('🔒 Level 2 Required', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     )
                   else if (!engine.hasAutoCashier)
                     ElevatedButton(
@@ -195,7 +199,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                                 engine.spawnParticle(
                                   engine.checkoutCounter.center.dx,
                                   engine.checkoutCounter.top - 20,
-                                  '👩‍💼 Kasiyer Ayşe İşe Başladı!',
+                                  '👩‍💼 Cashier Ayşe Started Working!',
                                   Colors.greenAccent,
                                   size: 16,
                                 );
@@ -206,16 +210,16 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         backgroundColor: Colors.purple.shade600,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('İşe Al (₺250)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: const Text('Hire (\$250)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     )
                   else
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.green.shade100,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.zero,
                       ),
-                      child: Text('Çalışıyor ✅', style: TextStyle(color: Colors.green.shade900, fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: Text('Working ✅', style: TextStyle(color: Colors.green.shade900, fontSize: 11, fontWeight: FontWeight.bold)),
                     ),
                 ],
               ),
@@ -228,7 +232,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: isRestockerUnlocked ? Colors.cyan.shade50 : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(color: isRestockerUnlocked ? Colors.cyan.shade200 : Colors.grey.shade300),
               ),
               child: Row(
@@ -241,16 +245,16 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                       children: [
                         Row(
                           children: [
-                            const Text('Çiftlik & Reyon Görevlisi (Stokçu Ali)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            const Text('Shelf Attendant (Stocker Ali)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: isRestockerUnlocked ? Colors.cyan.shade100 : Colors.amber.shade100,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.zero,
                               ),
                               child: Text(
-                                'Seviye 3',
+                                'Level 3',
                                 style: TextStyle(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.bold,
@@ -262,10 +266,10 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         ),
                         Text(
                           !isRestockerUnlocked
-                              ? '🔒 Stokçu Ali\'yi işe almak için marketi Seviye 3\'e yükseltin.'
+                              ? '🔒 Upgrade the store to Level 3 first to hire Stocker Ali.'
                               : (engine.isRestockerHired
-                                  ? 'Tırpanla buğday biçiyor, süt sağıyor, peynir yapıyor ve rafları dolduruyor!'
-                                  : 'Çiftlikte tırpan/kova ile hasat yapıp rafları otomatik doldurur.'),
+                                  ? 'Picks up delivered boxes and fills the shelves for you!'
+                                  : 'Picks up delivered boxes and fills the shelves automatically.'),
                           style: TextStyle(fontSize: 11, color: isRestockerUnlocked ? Colors.cyan.shade900 : Colors.grey.shade700),
                         ),
                       ],
@@ -276,9 +280,9 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.zero,
                       ),
-                      child: const Text('🔒 Seviye 3 Gerekli', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: const Text('🔒 Level 3 Required', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     )
                   else if (!engine.isRestockerHired)
                     ElevatedButton(
@@ -291,7 +295,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                                 engine.spawnParticle(
                                   engine.restocker.x,
                                   engine.restocker.y - 30,
-                                  '👷 Stokçu Ali İşe Başladı!',
+                                  '👷 Stocker Ali Started Working!',
                                   Colors.cyanAccent,
                                   size: 16,
                                 );
@@ -302,7 +306,7 @@ class _ManageStoreDialogState extends State<ManageStoreDialog> {
                         backgroundColor: Colors.cyan.shade700,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('İşe Al (₺350)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: const Text('Hire (\$350)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     )
                   else
                     Switch(

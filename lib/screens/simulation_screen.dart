@@ -4,14 +4,17 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import '../simulation/simulation_engine.dart';
 import '../simulation/simulation_models.dart';
-import '../simulation/simulation_painter.dart';
+import '../simulation/pixel_painter.dart';
 import '../simulation/dialogs/order_dialog.dart';
 import '../simulation/dialogs/checkout_dialog.dart';
 import '../simulation/dialogs/manage_dialog.dart';
 import '../simulation/dialogs/courier_packing_dialog.dart';
+import '../widgets/tutorial_overlay.dart';
+import '../audio/audio_service.dart';
 
 class SimulationScreen extends StatefulWidget {
-  const SimulationScreen({super.key});
+  final bool forceTutorial;
+  const SimulationScreen({super.key, this.forceTutorial = false});
 
   @override
   State<SimulationScreen> createState() => _SimulationScreenState();
@@ -40,6 +43,15 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
 
   final FocusNode _focusNode = FocusNode();
 
+  // Tutorials (day basics + first night)
+  List<TutorialStep>? _tutorialSteps;
+  int _tutorialIndex = 0;
+  String? _tutorialPrefKey;
+  bool _nightTutorialDone = false;
+  bool _dayTutorialDone = false;
+  bool _isDawnDialogOpen = false;
+  bool _musicIsNight = false;
+
   @override
   void initState() {
     super.initState();
@@ -53,6 +65,10 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
         _focusNode.requestFocus();
       }
     });
+
+    _engine.onSfx = AudioService.instance.sfx;
+    AudioService.instance.playMusic('day');
+    _loadTutorialState();
 
     _ticker = createTicker((elapsed) {
       if (_lastElapsed == Duration.zero) {
@@ -74,7 +90,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
       _engine.update(dt);
 
       // Kasa arkasındaki alana yürüyünce otomatik olarak 1. Şahıs Kasiyer Bakışına geç
-      if (!_isCashierViewOpen && !_isPackingDialogOpen) {
+      if (!_isCashierViewOpen && !_isPackingDialogOpen && !_engine.isNight) {
         final cashierZoneIdx = _engine.getCheckoutTriggerZoneIndex();
         if (cashierZoneIdx != null) {
           if (!_cashierAutoExitLock) {
@@ -112,6 +128,18 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
         _hudRevision.value++;
       }
 
+      _updateTutorials();
+
+      if (_engine.isNight != _musicIsNight) {
+        _musicIsNight = _engine.isNight;
+        AudioService.instance.playMusic(_musicIsNight ? 'night' : 'day');
+      }
+
+      if (_engine.dawnReportPending && !_isDawnDialogOpen && mounted) {
+        _engine.dawnReportPending = false;
+        _showDawnReport();
+      }
+
       if (_engine.shouldOpenCourierPackingDialog && !_isPackingDialogOpen && mounted) {
         _engine.shouldOpenCourierPackingDialog = false;
         _openCourierPackingDialog();
@@ -125,6 +153,8 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     _ticker.dispose();
+    _engine.onSfx = null;
+    AudioService.instance.stopMusic();
     _focusNode.dispose();
     _hudRevision.dispose();
     _engine.dispose();
@@ -234,6 +264,9 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
       if (_isLeftKey(event)) _keyLeft = true;
       if (_isRightKey(event)) _keyRight = true;
       if (_isActionKey(event)) _executeActiveAction();
+      if (event.logicalKey == LogicalKeyboardKey.keyF || event.logicalKey == LogicalKeyboardKey.keyJ) {
+        _engine.swingStick();
+      }
     } else if (event is KeyUpEvent) {
       if (_isUpKey(event)) _keyUp = false;
       if (_isDownKey(event)) _keyDown = false;
@@ -245,6 +278,199 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
 
   void _handleKeyEvent(KeyEvent event) {
     _handleGlobalKeyEvent(event);
+  }
+
+  // ===============================================================
+  // TUTORIALS
+  // ===============================================================
+  Future<void> _loadTutorialState() async {
+    _dayTutorialDone = await TutorialPrefs.isDone(TutorialPrefs.dayKey);
+    _nightTutorialDone = await TutorialPrefs.isDone(TutorialPrefs.nightKey);
+    if (!mounted) return;
+    if (widget.forceTutorial || !_dayTutorialDone) {
+      _startTutorial(
+        buildDayTutorial(_engine.playerX, _engine.playerY),
+        TutorialPrefs.dayKey,
+      );
+    }
+  }
+
+  void _startTutorial(List<TutorialStep> steps, String prefKey) {
+    setState(() {
+      _tutorialSteps = steps;
+      _tutorialIndex = 0;
+      _tutorialPrefKey = prefKey;
+    });
+    _engine.tutorialFreeze = !steps.first.isTask;
+  }
+
+  void _finishTutorial() {
+    final key = _tutorialPrefKey;
+    if (key != null) {
+      TutorialPrefs.setDone(key, true);
+      if (key == TutorialPrefs.dayKey) _dayTutorialDone = true;
+      if (key == TutorialPrefs.nightKey) _nightTutorialDone = true;
+    }
+    _engine.tutorialFreeze = false;
+    if (mounted) {
+      setState(() {
+        _tutorialSteps = null;
+        _tutorialPrefKey = null;
+      });
+      _focusNode.requestFocus();
+    }
+  }
+
+  void _nextTutorialStep() {
+    final steps = _tutorialSteps;
+    if (steps == null) return;
+    if (_tutorialIndex >= steps.length - 1) {
+      _finishTutorial();
+      return;
+    }
+    setState(() => _tutorialIndex++);
+    _engine.tutorialFreeze = !steps[_tutorialIndex].isTask;
+  }
+
+  void _updateTutorials() {
+    final steps = _tutorialSteps;
+    if (steps != null) {
+      final step = steps[_tutorialIndex];
+      if (step.isTask && step.isDone!(_engine)) {
+        _nextTutorialStep();
+      }
+      return;
+    }
+    // First night ever: show the night tutorial
+    if (_engine.isNight && !_nightTutorialDone && _dayTutorialDone && _engine.phaseTimer > 0.8) {
+      _startTutorial(buildNightTutorial(), TutorialPrefs.nightKey);
+    }
+  }
+
+  // ===============================================================
+  // DAWN REPORT & PAUSE MENU
+  // ===============================================================
+  void _showDawnReport() {
+    _isDawnDialogOpen = true;
+    _engine.tutorialFreeze = true;
+    final e = _engine;
+    final survivedDay = e.reportDay;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF2A221C),
+        title: Text(
+          '☀️ Dawn of Day ${survivedDay + 1}',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You survived night $survivedDay!',
+              style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            Text('🦹 Thieves driven off: ${e.nightThievesRepelled}',
+                style: const TextStyle(color: Colors.white70)),
+            Text('💰 Bounty earned: \$${e.nightBounty.toStringAsFixed(0)}',
+                style: const TextStyle(color: Colors.greenAccent)),
+            Text('📦 Items stolen: ${e.nightStolenItems} (worth \$${e.nightStolenValue.toStringAsFixed(0)})',
+                style: const TextStyle(color: Colors.redAccent)),
+            Text('↩️ Items recovered: ${e.nightRecoveredItems}',
+                style: const TextStyle(color: Colors.lightBlueAccent)),
+            if (e.dawnUnlocks.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text('🆕 New on sale today: ${e.dawnUnlocks.join(', ')}',
+                  style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold)),
+            ],
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Open the shop'),
+          ),
+        ],
+      ),
+    ).then((_) {
+      _isDawnDialogOpen = false;
+      _engine.tutorialFreeze = _tutorialSteps != null && !_tutorialSteps![_tutorialIndex].isTask;
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  void _showPauseMenu() {
+    _engine.tutorialFreeze = true;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF2A221C),
+        title: const Text('Paused', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: StatefulBuilder(
+          builder: (context, setLocal) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Controls: WASD / arrows or tap to move, E / Space to interact, F to swing the stick at night.',
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 10),
+              SwitchListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Music', style: TextStyle(color: Colors.white)),
+                value: AudioService.instance.musicOn,
+                onChanged: (v) async {
+                  await AudioService.instance.setMusicOn(v);
+                  setLocal(() {});
+                },
+              ),
+              SwitchListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Sound effects', style: TextStyle(color: Colors.white)),
+                value: AudioService.instance.sfxOn,
+                onChanged: (v) async {
+                  await AudioService.instance.setSfxOn(v);
+                  setLocal(() {});
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _startTutorial(
+                buildDayTutorial(_engine.playerX, _engine.playerY),
+                TutorialPrefs.dayKey,
+              );
+            },
+            child: const Text('Replay tutorial'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _engine.tutorialFreeze = false;
+              Navigator.of(context).pop();
+            },
+            child: const Text('Main menu'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Resume'),
+          ),
+        ],
+      ),
+    ).then((_) {
+      if (_tutorialSteps == null) _engine.tutorialFreeze = false;
+      if (mounted) _focusNode.requestFocus();
+    });
   }
 
   void _openCourierPackingDialog() {
@@ -302,7 +528,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('🛍️ Paket teslim edildi ve +₺${earned.toStringAsFixed(0)} tahsil edildi! 😊'),
+          content: Text('🛍️ Package delivered and +\$${earned.toStringAsFixed(0)} collected! 😊'),
           backgroundColor: Colors.green.shade700,
           duration: const Duration(seconds: 2),
         ),
@@ -323,12 +549,12 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
 
   void _executeActiveAction() {
     if (_engine.activeInteractionText != null) {
-      if (_engine.activeInteractionText!.contains('Bilgisayar')) {
+      if (_engine.activeInteractionText!.contains('Computer')) {
         showDialog(
           context: context,
           builder: (ctx) => OrderComputerDialog(engine: _engine),
         );
-      } else if (_engine.activeInteractionText!.contains('Kasayı Aç')) {
+      } else if (_engine.activeInteractionText!.contains('Open Register')) {
         final waiting = _engine.customers.where((c) => c.state == CustomerState.waitingAtCheckout).toList();
         if (waiting.isNotEmpty) {
           final cust = waiting.first;
@@ -361,9 +587,11 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
       autofocus: true,
       onKeyEvent: _handleKeyEvent,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: const Color(0xFF17120F),
         body: SafeArea(
-          child: Column(
+          child: Stack(
+            children: [
+          Column(
             children: [
               // Üst Simülatör HUD Paneli (Sadece HUD gerektiğinde güncellenir)
               ListenableBuilder(
@@ -413,6 +641,14 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                               _focusNode.requestFocus();
                               final worldPos = _screenToWorld(details.localPosition, size);
                               if (worldPos != null) {
+                                // Night: tapping a thief runs at him / swings the stick
+                                if (_engine.isNight) {
+                                  final thief = _engine.thiefNear(worldPos.dx, worldPos.dy, radius: 46);
+                                  if (thief != null) {
+                                    _engine.attackThiefAt(thief);
+                                    return;
+                                  }
+                                }
                                 // Tıklanan yer bilgisayar masası ise doğrudan aç
                                 if (_engine.computerDesk.inflate(15).contains(worldPos)) {
                                   showDialog(
@@ -439,7 +675,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                       _engine.spawnParticle(
                                         r.center.dx,
                                         r.top - 16,
-                                        '🚫 Kasada kurye paketi yapılmaz! 📦 Paketleme İstasyonuna git!',
+                                        '🚫 No courier packages at the register! 📦 Go to the Packing Station!',
                                         Colors.orangeAccent,
                                         size: 14,
                                       );
@@ -499,7 +735,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                   child: RepaintBoundary(
                                     child: ClipRect(
                                       child: CustomPaint(
-                                        painter: SimulationPainter(engine: _engine),
+                                        painter: PixelPainter(engine: _engine),
                                       ),
                                     ),
                                   ),
@@ -513,7 +749,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                                     decoration: BoxDecoration(
                                       color: Colors.black.withValues(alpha: 0.75),
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.zero,
                                       border: Border.all(color: Colors.white24),
                                       boxShadow: [
                                         BoxShadow(
@@ -524,7 +760,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                     ),
                                     child: const Row(
                                       children: [
-                                        Text('🖱️ Tıkla-Yürü • ⌨️ WASD / Ok Tuşları (Kamera Seni Takip Eder) • [E] Etkileşim',
+                                        Text('Click to walk  •  WASD / arrows  •  E interact  •  F swing stick (night)',
                                             style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                                       ],
                                     ),
@@ -541,7 +777,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                                       decoration: BoxDecoration(
                                         color: Colors.black.withValues(alpha: 0.75),
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.zero,
                                         border: Border.all(color: Colors.white24),
                                       ),
                                       child: Row(
@@ -551,7 +787,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                             visualDensity: VisualDensity.compact,
                                             icon: const Icon(Icons.remove, color: Colors.white, size: 16),
                                             onPressed: () => _engine.adjustZoom(-0.10),
-                                            tooltip: 'Kamerayı Uzaklaştır (%50\'ye kadar)',
+                                            tooltip: 'Zoom Out (down to 50%)',
                                           ),
                                           Text(
                                             '🔍 ${(100 * _engine.cameraZoom).round()}%',
@@ -561,11 +797,132 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                             visualDensity: VisualDensity.compact,
                                             icon: const Icon(Icons.add, color: Colors.white, size: 16),
                                             onPressed: () => _engine.adjustZoom(0.10),
-                                            tooltip: 'Kamerayı Yakınlaştır',
+                                            tooltip: 'Zoom In',
                                           ),
                                         ],
                                       ),
                                     ),
+                                  ),
+                                ),
+
+                                // Toasts: customer at register / delivery at back door
+                                Positioned(
+                                  top: 70,
+                                  left: 0,
+                                  right: 0,
+                                  child: IgnorePointer(
+                                    child: ListenableBuilder(
+                                      listenable: _hudRevision,
+                                      builder: (context, _) {
+                                        final persistentDelivery = _engine.deliveryBoxes.isNotEmpty;
+                                        final showToast = _engine.toastTimer > 0 && _engine.toastText != null;
+                                        if (!showToast && !persistentDelivery) return const SizedBox.shrink();
+                                        final isDelivery = showToast ? _engine.toastKind == 1 : true;
+                                        final text = showToast
+                                            ? _engine.toastText!
+                                            : 'Boxes waiting at the BACK DOOR (south)';
+                                        final col = isDelivery ? const Color(0xFFFFD640) : const Color(0xFF7CE0A0);
+                                        return Center(
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xEE17120F),
+                                              border: Border.all(color: col, width: 3),
+                                            ),
+                                            child: Text(
+                                              '${isDelivery ? '\u{1F4E6}' : '\u{1F6D2}'} $text',
+                                              style: TextStyle(color: col, fontSize: 13, fontWeight: FontWeight.w900),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+
+                                // Closing-time banner
+                                Positioned(
+                                  bottom: 14,
+                                  left: 14,
+                                  child: ListenableBuilder(
+                                    listenable: _hudRevision,
+                                    builder: (context, _) {
+                                      if (!_engine.closingTime) return const SizedBox.shrink();
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xEE17120F),
+                                          border: Border.all(color: const Color(0xFFFFB347), width: 3),
+                                        ),
+                                        child: const Text(
+                                          'Closing time! Waiting for the last customers to leave...\nThe night begins once the shop is empty.',
+                                          style: TextStyle(color: Color(0xFFFFB347), fontSize: 11.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+
+                                // Night status banner (bottom-left)
+                                Positioned(
+                                  bottom: 14,
+                                  left: 14,
+                                  child: ListenableBuilder(
+                                    listenable: _hudRevision,
+                                    builder: (context, _) {
+                                      if (!_engine.isNight) return const SizedBox.shrink();
+                                      final left = _engine.phaseTimeLeft.ceil();
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xDD0B1230),
+                                          borderRadius: BorderRadius.zero,
+                                          border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.6)),
+                                        ),
+                                        child: Text(
+                                          '🌙 Night ${_engine.day} • Dawn in ${left}s\n'
+                                          '🦹 On the prowl: ${_engine.thieves.length} • Driven off: ${_engine.nightThievesRepelled} • Stolen: ${_engine.nightStolenItems}',
+                                          style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+
+                                // Night: big swing button (bottom-right)
+                                Positioned(
+                                  bottom: 14,
+                                  right: 14,
+                                  child: ListenableBuilder(
+                                    listenable: _hudRevision,
+                                    builder: (context, _) {
+                                      if (!_engine.isNight) return const SizedBox.shrink();
+                                      return GestureDetector(
+                                        behavior: HitTestBehavior.opaque,
+                                        onTapDown: (_) => _engine.swingStick(),
+                                        child: Container(
+                                          width: 84,
+                                          height: 84,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: const Color(0xFFB45309),
+                                            border: Border.all(color: Colors.amberAccent, width: 3),
+                                            boxShadow: [
+                                              BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 8),
+                                            ],
+                                          ),
+                                          child: const Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text('🏏', style: TextStyle(fontSize: 30)),
+                                              Text('SWING (F)',
+                                                  style: TextStyle(
+                                                      color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ),
 
@@ -587,8 +944,8 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                             duration: const Duration(milliseconds: 200),
                                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xDD1E293B),
-                                              borderRadius: BorderRadius.circular(14),
+                                              color: const Color(0xDD2A221C),
+                                              borderRadius: BorderRadius.zero,
                                               boxShadow: [
                                                 BoxShadow(
                                                   color: Colors.black.withValues(alpha: 0.25),
@@ -622,6 +979,16 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                 ),
                 ],
               ),
+              if (_tutorialSteps != null)
+                TutorialOverlay(
+                  step: _tutorialSteps![_tutorialIndex],
+                  index: _tutorialIndex,
+                  total: _tutorialSteps!.length,
+                  onNext: _nextTutorialStep,
+                  onSkip: _finishTutorial,
+                ),
+            ],
+          ),
             ),
           ),
     );
@@ -633,18 +1000,21 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     required VoidCallback onTap,
     Color surfaceColor = const Color(0xFFF8FAFC),
     Color bevelColor = const Color(0xFFCBD5E1),
-    Color textColor = const Color(0xFF1E293B),
+    Color textColor = const Color(0xFF2A221C),
   }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        onTap: () {
+          AudioService.instance.sfx('click');
+          onTap();
+        },
+        borderRadius: BorderRadius.zero,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
           decoration: BoxDecoration(
             color: surfaceColor,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.zero,
             border: Border.all(color: bevelColor, width: 1.2),
             boxShadow: [
               BoxShadow(
@@ -684,8 +1054,8 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
-        color: Color(0xFF1E293B),
-        border: Border(bottom: BorderSide(color: Color(0xFF334155), width: 1.5)),
+        color: Color(0xFF2A221C),
+        border: Border(bottom: BorderSide(color: Color(0xFF4A3C30), width: 1.5)),
       ),
       child: Row(
         children: [
@@ -693,16 +1063,16 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(
-              color: const Color(0xFF0F172A),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFF334155), width: 1.5),
+              color: const Color(0xFF17120F),
+              borderRadius: BorderRadius.zero,
+              border: Border.all(color: const Color(0xFF4A3C30), width: 1.5),
             ),
             child: Row(
               children: [
                 const Text('💵', style: TextStyle(fontSize: 17)),
                 const SizedBox(width: 8),
                 Text(
-                  '₺${_engine.cash.toStringAsFixed(1)}',
+                  '\$${_engine.cash.toStringAsFixed(1)}',
                   style: const TextStyle(
                     color: Color(0xFF4ADE80),
                     fontWeight: FontWeight.w900,
@@ -714,13 +1084,38 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
           ),
           const SizedBox(width: 12),
 
+          // Day / night clock
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: _engine.isNight ? const Color(0xFF1E2431) : const Color(0xFF17120F),
+              borderRadius: BorderRadius.zero,
+              border: Border.all(
+                color: _engine.isNight ? Colors.lightBlueAccent : const Color(0xFF4A3C30),
+                width: 1.5,
+              ),
+            ),
+            child: Text(
+              '${_engine.isNight ? '🌙' : '☀️'} Day ${_engine.day} • '
+              '${_engine.closingTime ? 'CLOSING 0:00' : '${_engine.phaseTimeLeft.ceil() ~/ 60}:${(_engine.phaseTimeLeft.ceil() % 60).toString().padLeft(2, '0')}'}',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Menu',
+            onPressed: _showPauseMenu,
+            icon: const Icon(Icons.menu, color: Colors.white70),
+          ),
+          const SizedBox(width: 4),
+
           // Elindeki Kova / Tırpan / Koli Göstergesi
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF334155),
-                borderRadius: BorderRadius.circular(10),
+                color: const Color(0xFF4A3C30),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(
                   color: (_engine.carriedBox != null || _engine.playerTool != null)
                       ? Colors.amberAccent.withValues(alpha: 0.7)
@@ -740,10 +1135,10 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                   Expanded(
                     child: Text(
                       _engine.carriedBox != null
-                          ? 'Taşınan: ${_engine.carriedBox!.containerName} (${_engine.carriedBox!.currentCount}/${_engine.carriedBox!.maxCount})'
+                          ? 'Carrying: ${_engine.carriedBox!.containerName} (${_engine.carriedBox!.currentCount}/${_engine.carriedBox!.maxCount})'
                           : (_engine.playerTool != null
-                              ? 'Ekipman: ${_engine.playerTool!.name} (İçeri Girip Toplayabilirsin)'
-                              : 'Ellerin Boş (Kova / Tırpan / Koli Alabilirsin)'),
+                              ? 'Equipment: ${_engine.playerTool!.name} (Walk Inside to Harvest)'
+                              : 'Hands Empty (Pick Up a Delivery Box)'),
                       style: TextStyle(
                         fontSize: 12,
                         color: (_engine.carriedBox == null && _engine.playerTool == null)
@@ -764,21 +1159,21 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                         _engine.spawnParticle(
                           _engine.playerX,
                           _engine.playerY - 28,
-                          '↩️ Rafa Geri Konuldu',
+                          '↩️ Returned to Shelf',
                           Colors.lightBlueAccent,
                           size: 14,
                         );
                       },
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.zero,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
-                          borderRadius: BorderRadius.circular(8),
+                          color: const Color(0xFF17120F),
+                          borderRadius: BorderRadius.zero,
                           border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.7)),
                         ),
                         child: const Text(
-                          '↩️ Rafa İade',
+                          '↩️ Returned to Shelf',
                           style: TextStyle(color: Colors.lightBlueAccent, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -804,10 +1199,10 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                 return _buildNaturalButton(
                   icon: hasSealedPkg ? '🛵' : '📦',
                   label: hasSealedPkg
-                      ? 'Paketi Motora Teslim Et (${ord.remainingTime.toInt()}s)'
+                      ? 'Hand Package to Courier (${ord.remainingTime.toInt()}s)'
                       : (isPackingNow
-                          ? 'Paketle (%${(_engine.courierPackingProgress * 100).toInt()}) (${ord.remainingTime.toInt()}s)'
-                          : '${ord.deliveredQty}/${ord.requiredQty} ${def.emoji} Paketle & Gönder (${ord.remainingTime.toInt()}s)'),
+                          ? 'Pack (${(_engine.courierPackingProgress * 100).toInt()}%) (${ord.remainingTime.toInt()}s)'
+                          : '${ord.deliveredQty}/${ord.requiredQty} ${def.emoji} Pack & Send (${ord.remainingTime.toInt()}s)'),
                   surfaceColor: hasSealedPkg ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
                   bevelColor: hasSealedPkg ? const Color(0xFF16A34A) : const Color(0xFFD97706),
                   textColor: hasSealedPkg ? const Color(0xFF14532D) : const Color(0xFF78350F),
@@ -821,7 +1216,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
           // 1. Şahıs Kasiyer Bakış Açısı Tuşu
           _buildNaturalButton(
             icon: '🎥',
-            label: _isCashierViewOpen ? 'Markete Dön' : 'Kasiyer Bakış',
+            label: _isCashierViewOpen ? 'Back to Store' : 'Cashier View',
             surfaceColor: _isCashierViewOpen ? const Color(0xFFDCFCE7) : const Color(0xFFE0F2FE),
             bevelColor: _isCashierViewOpen ? const Color(0xFF16A34A) : const Color(0xFF0284C7),
             textColor: _isCashierViewOpen ? const Color(0xFF14532D) : const Color(0xFF0C4A6E),
@@ -838,7 +1233,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
           // Bilgisayar (Toptan Sipariş) Doğal Tuşu
           _buildNaturalButton(
             icon: '💻',
-            label: 'Bilgisayar',
+            label: 'Computer',
             onTap: () {
               showDialog(
                 context: context,
@@ -851,7 +1246,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
           // Yönetici & Market Yönetimi Doğal Tuşu
           _buildNaturalButton(
             icon: '👔',
-            label: 'Yönetici (Sv.${_engine.storeLevel})',
+            label: 'Manager (Lv.${_engine.storeLevel})',
             surfaceColor: const Color(0xFFEDE9FE),
             bevelColor: const Color(0xFFC4B5FD),
             textColor: const Color(0xFF3B0764),

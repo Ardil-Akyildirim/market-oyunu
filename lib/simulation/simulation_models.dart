@@ -40,7 +40,7 @@ class SimProductDef {
 final Map<SimProductType, SimProductDef> productCatalog = {
   SimProductType.milk: const SimProductDef(
     type: SimProductType.milk,
-    name: 'Taze Köy Sütü',
+    name: 'Fresh Village Milk',
     emoji: '🥛',
     primaryColor: Color(0xFF0284C7),
     secondaryColor: Color(0xFFE0F2FE),
@@ -50,7 +50,7 @@ final Map<SimProductType, SimProductDef> productCatalog = {
   ),
   SimProductType.flour: const SimProductDef(
     type: SimProductType.flour,
-    name: 'Doğal Buğday Unu',
+    name: 'Natural Wheat Flour',
     emoji: '🌾',
     primaryColor: Color(0xFFD97706),
     secondaryColor: Color(0xFFFEF3C7),
@@ -60,7 +60,7 @@ final Map<SimProductType, SimProductDef> productCatalog = {
   ),
   SimProductType.egg: const SimProductDef(
     type: SimProductType.egg,
-    name: 'Köy Yumurtası',
+    name: 'Village Eggs',
     emoji: '🥚',
     primaryColor: Color(0xFFF59E0B),
     secondaryColor: Color(0xFFFEF3C7),
@@ -70,7 +70,7 @@ final Map<SimProductType, SimProductDef> productCatalog = {
   ),
   SimProductType.tomato: const SimProductDef(
     type: SimProductType.tomato,
-    name: 'Tarla Domatesi',
+    name: 'Field Tomatoes',
     emoji: '🍅',
     primaryColor: Color(0xFFEF4444),
     secondaryColor: Color(0xFFFEE2E2),
@@ -80,8 +80,8 @@ final Map<SimProductType, SimProductDef> productCatalog = {
   ),
   SimProductType.pepper: const SimProductDef(
     type: SimProductType.pepper,
-    name: 'Taze Köy Biberi',
-    emoji: '🫑',
+    name: 'Fresh Village Peppers',
+    emoji: '🌶️',
     primaryColor: Color(0xFF16A34A),
     secondaryColor: Color(0xFFDCFCE7),
     orderCostPerItem: 11.0,
@@ -90,7 +90,7 @@ final Map<SimProductType, SimProductDef> productCatalog = {
   ),
   SimProductType.cheese: const SimProductDef(
     type: SimProductType.cheese,
-    name: 'Tulum Peyniri',
+    name: 'Tulum Cheese',
     emoji: '🧀',
     primaryColor: Color(0xFFEAB308),
     secondaryColor: Color(0xFFFEF9C3),
@@ -100,7 +100,7 @@ final Map<SimProductType, SimProductDef> productCatalog = {
   ),
   SimProductType.apple: const SimProductDef(
     type: SimProductType.apple,
-    name: 'Amasya Elması',
+    name: 'Amasya Apples',
     emoji: '🍎',
     primaryColor: Color(0xFFDC2626),
     secondaryColor: Color(0xFFBBF7D0),
@@ -110,7 +110,7 @@ final Map<SimProductType, SimProductDef> productCatalog = {
   ),
   SimProductType.bread: const SimProductDef(
     type: SimProductType.bread,
-    name: 'Taş Fırın Ekmeği',
+    name: 'Stone Oven Bread',
     emoji: '🥖',
     primaryColor: Color(0xFFB45309),
     secondaryColor: Color(0xFFFED7AA),
@@ -129,42 +129,42 @@ enum FarmZoneType {
 
 // Çiftlik Ekipmanları (Ahır için Süt Kovası, Tarla için Tırpan, Kümes için Yumurta Kovası)
 enum FarmToolType {
-  milkBucket, // 🪣 Süt Kovası
+  milkBucket, // 🧺 Süt Kovası
   scythe,     // 🌾 Hasat Tırpanı
-  eggBucket,  // 🪣 Yumurta Kovası
+  eggBucket,  // 🧺 Yumurta Kovası
 }
 
 extension FarmToolTypeExt on FarmToolType {
   String get name {
     switch (this) {
       case FarmToolType.milkBucket:
-        return 'Süt Kovası';
+        return 'Milk Bucket';
       case FarmToolType.scythe:
-        return 'Hasat Tırpanı';
+        return 'Harvest Scythe';
       case FarmToolType.eggBucket:
-        return 'Yumurta Kovası';
+        return 'Egg Bucket';
     }
   }
 
   String get emoji {
     switch (this) {
       case FarmToolType.milkBucket:
-        return '🪣';
+        return '🧺';
       case FarmToolType.scythe:
         return '🌾';
       case FarmToolType.eggBucket:
-        return '🪣';
+        return '🧺';
     }
   }
 
   String get actionVerb {
     switch (this) {
       case FarmToolType.milkBucket:
-        return 'İnekten Süt Sağılıyor';
+        return 'Milking the Cow';
       case FarmToolType.scythe:
-        return 'Tırpanla Biçiliyor';
+        return 'Cutting with the Scythe';
       case FarmToolType.eggBucket:
-        return 'Kovaya Yumurta Toplanıyor';
+        return 'Collecting Eggs in the Bucket';
     }
   }
 }
@@ -301,6 +301,8 @@ class StoreShelf {
   final int maxCapacity;
   bool isUnlocked;
   final double unlockCost;
+  final int unlockDay;  // product becomes available at dawn of this day
+  final int zoneLevel;  // store level (expansion) required before it can open
   bool isHovered;
   double doorOpenProgress; // 0.0 (kapalı) -> 1.0 (reyon kapısı / dolap kapağı açık)
   double lastPlacedBounceTimer; // 1.0 -> 0.0 (yeni dizilen ürünün zıplama efekti)
@@ -315,6 +317,8 @@ class StoreShelf {
     this.maxCapacity = 16,
     this.isUnlocked = true,
     this.unlockCost = 0.0,
+    this.unlockDay = 1,
+    this.zoneLevel = 1,
     this.isHovered = false,
     this.doorOpenProgress = 0.0,
     this.lastPlacedBounceTimer = 0.0,
@@ -361,23 +365,23 @@ class CarriedBox {
 
   String get containerName {
     if (isCourierPackage) {
-      return 'Kurye Sipariş Paketi (${productCatalog[productType]!.name})';
+      return 'Courier Order Package (${productCatalog[productType]!.name})';
     }
     if (isPickedFromShelf) {
-      return 'Elde ${productCatalog[productType]!.name}';
+      return 'Holding ${productCatalog[productType]!.name}';
     }
-    if (!isFromFarm) return 'Ürün Kolisi';
+    if (!isFromFarm) return 'Product Box';
     switch (productType) {
       case SimProductType.milk:
-        return 'Sağılmış Taze Süt';
+        return 'Fresh Milk';
       case SimProductType.egg:
-        return 'Toplanmış Köy Yumurtası';
+        return 'Collected Village Eggs';
       case SimProductType.flour:
-        return 'Biçilmiş Buğday Demeti';
+        return 'Cut Wheat Bundle';
       case SimProductType.cheese:
-        return 'Taze Tulum Peyniri';
+        return 'Fresh Tulum Cheese';
       default:
-        return 'Taze Tarla Mahsulü';
+        return 'Fresh Field Produce';
     }
   }
 
@@ -439,6 +443,8 @@ class SimCustomer {
   SimProductType? baggingProduct; // Şu an poşetin içine doğru uçan ürün (animasyon için)
   double baggingAnimTimer; // 0.0 -> 1.0 poşete girme animasyonu ilerlemesi
   double waitTimer;
+  double patience;          // seconds left while waiting at the register
+  final double maxPatience;
   double shelfGrabTimer; // Reyon kapısı açılırken müşterinin ürünü raftan alma animasyon süresi
 
   SimCustomer({
@@ -459,6 +465,8 @@ class SimCustomer {
         basket = [],
         currentShoppingIndex = 0,
         waitTimer = 0.0,
+        maxPatience = 40.0 + (id.hashCode % 15).abs().toDouble(),
+        patience = 40.0 + (id.hashCode % 15).abs().toDouble(),
         walkAngle = 0.0;
 
   int get unpackedCount => (basket.length - packedCount).clamp(0, basket.length);
@@ -499,19 +507,19 @@ class SimCustomer {
   String get archetypeBadge {
     switch (archetype) {
       case CustomerArchetype.grandma:
-        return '👵 Tonton';
+        return '👵 Granny';
       case CustomerArchetype.athlete:
-        return '🏃 Sporcu';
+        return '🏃 Athlete';
       case CustomerArchetype.chef:
-        return '👨‍🍳 Aşçı Şef';
+        return '👨‍🍳 Head Chef';
       case CustomerArchetype.student:
-        return '🎒 Öğrenci';
+        return '🎒 Student';
       case CustomerArchetype.family:
-        return '👩‍👧 Aile';
+        return '👩‍👧 Family';
       case CustomerArchetype.vip:
         return '👑 VIP';
       case CustomerArchetype.regular:
-        return '🛒 Müşteri';
+        return '🛒 Customer';
     }
   }
 }
@@ -568,7 +576,58 @@ class RestockerWorker {
     this.carriedBox,
     this.equippedTool,
     this.actionAnimTimer = 0.0,
-    this.statusText = '📦 Rafları Kontrol Ediyor',
+    this.statusText = '📦 Checking the Shelves',
     this.walkTimer = 0.0,
   });
+}
+
+// ===============================================================
+// 🌙 DAY / NIGHT CYCLE & THIEVES
+// ===============================================================
+enum DayPhase { day, night }
+
+enum ThiefState {
+  sneaking, // walking in towards a shelf
+  stealing, // grabbing items from the shelf
+  fleeing,  // running for the door
+  stunned,  // just got whacked with the stick
+}
+
+class Thief {
+  final String id;
+  double x;
+  double y;
+  ThiefState state;
+  int hp;
+  final int maxHp;
+  final double speed;
+  String? targetShelfId;
+  SimProductType? loot;
+  int carried;
+  double stealTimer;
+  double stunTimer;
+  double hitFlash;   // 1.0 -> 0.0 (white flash after a hit)
+  double knockX;
+  double knockY;
+  double walkAngle;
+  double walkAnim;
+
+  Thief({
+    required this.id,
+    required this.x,
+    required this.y,
+    required this.hp,
+    required this.speed,
+    this.state = ThiefState.sneaking,
+    this.targetShelfId,
+    this.loot,
+    this.carried = 0,
+    this.stealTimer = 0.0,
+    this.stunTimer = 0.0,
+    this.hitFlash = 0.0,
+    this.knockX = 0.0,
+    this.knockY = 0.0,
+    this.walkAngle = 0.0,
+    this.walkAnim = 0.0,
+  }) : maxHp = hp;
 }

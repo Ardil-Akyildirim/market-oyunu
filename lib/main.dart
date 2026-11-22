@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'providers/game_provider.dart';
-import 'screens/simulation_screen.dart';
+import 'screens/main_menu_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,15 +18,22 @@ class MarketGameApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GameProvider()),
       ],
       child: MaterialApp(
-        title: 'Supermarket Simulator',
+        title: 'Village Market',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
           colorSchemeSeed: Colors.orange,
-          scaffoldBackgroundColor: const Color(0xFF0F172A),
-          fontFamily: 'Segoe UI',
+          scaffoldBackgroundColor: const Color(0xFF17120F),
+          fontFamily: 'monospace',
+          dialogTheme: const DialogThemeData(
+            backgroundColor: Color(0xFF2A221C),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero,
+              side: BorderSide(color: Color(0xFF14100E), width: 4),
+            ),
+          ),
         ),
-        home: const SimulationScreen(),
+        home: const MainMenuScreen(),
       ),
     );
   }

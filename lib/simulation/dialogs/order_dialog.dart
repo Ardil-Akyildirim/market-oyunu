@@ -35,8 +35,8 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
     final canAfford = widget.engine.cash >= _totalCost && _totalCost > 0;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
+      backgroundColor: const Color(0xFFE9DFC6),
       child: Container(
         width: 580,
         padding: const EdgeInsets.all(20),
@@ -51,7 +51,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.blue.shade100,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.zero,
                   ),
                   child: const Text('💻', style: TextStyle(fontSize: 24)),
                 ),
@@ -61,11 +61,11 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Çiftlik & Market Yönetim Bilgisayarı',
+                        'Store Management Computer',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       Text(
-                        'Yeni ürün kilitlerini açın veya kapıya toptan koli siparişi verin!',
+                        'Order wholesale boxes: they are delivered to the front door.',
                         style: TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                     ],
@@ -86,16 +86,16 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
                 color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.zero,
                 border: Border.all(color: Colors.green.shade200),
               ),
               child: const Row(
                 children: [
-                  Text('🚜', style: TextStyle(fontSize: 18)),
+                  Text('📦', style: TextStyle(fontSize: 18)),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'İpucu: Marketin arkasındaki Ahır, Tarla ve Tavuk Çiftliğinden ücretsiz taze üretim kolilerini de toplayabilirsiniz!',
+                      'Tip: new products open as the days pass. Pick up delivered boxes at the door and tap a shelf to restock it.',
                       style: TextStyle(fontSize: 11, color: Color(0xFF166534), fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -117,7 +117,7 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: isUnlocked ? Colors.grey.shade50 : Colors.amber.shade50.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.zero,
                         border: Border.all(
                           color: isUnlocked ? Colors.grey.shade200 : Colors.amber.shade300,
                         ),
@@ -141,10 +141,10 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: isUnlocked ? Colors.green.shade100 : Colors.orange.shade100,
-                                        borderRadius: BorderRadius.circular(6),
+                                        borderRadius: BorderRadius.zero,
                                       ),
                                       child: Text(
-                                        isUnlocked ? 'AÇIK' : 'KİLİTLİ REYON',
+                                        isUnlocked ? 'OPEN' : 'LOCKED SHELF',
                                         style: TextStyle(
                                           fontSize: 9,
                                           fontWeight: FontWeight.bold,
@@ -156,8 +156,8 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                                 ),
                                 Text(
                                   isUnlocked
-                                      ? 'Koli: ${def.boxSize} adet • Koli Fiyatı: ₺${def.boxCost.toStringAsFixed(0)} • Satış: ₺${def.retailPrice.toStringAsFixed(0)}'
-                                      : 'Bu ürünü satmaya başlamak için reyon kilidini açın (Satış: ₺${def.retailPrice.toStringAsFixed(0)})',
+                                      ? 'Box: ${def.boxSize} pcs • Box Price: \$${def.boxCost.toStringAsFixed(0)} • Sale: \$${def.retailPrice.toStringAsFixed(0)}'
+                                      : '${widget.engine.shelfLockReason(shelf)} (Sale: \$${def.retailPrice.toStringAsFixed(0)})',
                                   style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                                 ),
                               ],
@@ -171,16 +171,18 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                                   icon: const Icon(Icons.remove_circle_outline, size: 20),
                                   onPressed: qty > 0
                                       ? () {
+                                          widget.engine.playSfx('click');
                                           setState(() {
                                             _cart[def.type] = qty - 1;
                                           });
                                         }
                                       : null,
                                 ),
-                                Text('$qty Koli', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                Text('${qty} Box', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                 IconButton(
                                   icon: const Icon(Icons.add_circle_outline, size: 20, color: Colors.blue),
                                   onPressed: () {
+                                    widget.engine.playSfx('click');
                                     setState(() {
                                       _cart[def.type] = qty + 1;
                                     });
@@ -189,22 +191,15 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                               ],
                             )
                           else
-                            ElevatedButton.icon(
-                              onPressed: widget.engine.cash >= shelf.unlockCost
-                                  ? () {
-                                      setState(() {
-                                        widget.engine.unlockShelf(shelf);
-                                      });
-                                    }
-                                  : null,
-                              icon: const Icon(Icons.lock_open, size: 15),
-                              label: Text('Aç (₺${shelf.unlockCost.toStringAsFixed(0)})',
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.amber.shade700,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade100,
+                                borderRadius: BorderRadius.zero,
+                              ),
+                              child: Text(
+                                '🔒 ${widget.engine.shelfLockReason(shelf)}',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange.shade900),
                               ),
                             ),
                         ],
@@ -224,10 +219,10 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Mevcut Kasa: ₺${widget.engine.cash.toStringAsFixed(1)}',
+                    Text('Current Cash: \$${widget.engine.cash.toStringAsFixed(1)}',
                         style: const TextStyle(fontSize: 12, color: Colors.grey)),
                     Text(
-                      'Toplam Sipariş: ₺${_totalCost.toStringAsFixed(0)}',
+                      'Total Order: \$${_totalCost.toStringAsFixed(0)}',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
@@ -243,20 +238,20 @@ class _OrderComputerDialogState extends State<OrderComputerDialog> {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('🚚 Kamyon siparişi aldı ve yola çıktı! Kapıya yanaşıyor...'),
+                              content: Text('🚚 The truck got your order and is on its way! Pulling up to the door...'),
                               backgroundColor: Colors.blue,
                             ),
                           );
                         }
                       : null,
                   icon: const Icon(Icons.local_shipping, size: 18),
-                  label: const Text('KAMYONU ÇAĞIR 🚛', style: TextStyle(fontWeight: FontWeight.bold)),
+                  label: const Text('CALL THE TRUCK 🚛', style: TextStyle(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade600,
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: Colors.grey.shade300,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
                   ),
                 ),
               ],

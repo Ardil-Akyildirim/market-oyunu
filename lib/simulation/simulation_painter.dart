@@ -22,6 +22,7 @@ class SimulationPainter extends CustomPainter {
     canvas.save();
     canvas.scale(scale);
     canvas.translate(-camTopLeft.dx, -camTopLeft.dy);
+    canvas.clipRect(Rect.fromLTWH(0, 0, engine.worldWidth, engine.worldHeight));
 
     // 1. Devasa Dünya Zemini (Statik katman tek seferde GPU Picture olarak cache'lenir!)
     if (_cachedWorldPicture == null) {
@@ -45,6 +46,7 @@ class SimulationPainter extends CustomPainter {
 
     // 5. 3D Mağaza Mobilyaları, Soğutucu Dolaplar, Manav ve Gondol Reyonlar
     _drawFurnitureAndShelves(canvas);
+    _drawLockedExpansion(canvas);
 
     // 6. Derinlik Sıralı (Y-Sorted) 3D Müşteriler & Oyuncu
     _drawCharactersSorted(canvas);
@@ -54,6 +56,7 @@ class SimulationPainter extends CustomPainter {
 
     // 7. Tavan Spot Işıkları, Cam Yansımaları ve Atmosferik Işık Hüzmeleri
     _drawAtmosphericLighting(canvas);
+    _drawNightOverlay(canvas);
 
     // 8. Mouse Hedef Göstergesi
     _drawMouseTarget(canvas);
@@ -481,7 +484,7 @@ class SimulationPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5,
     );
-    _drawText(canvas, '🌟 HOŞ GELDİNİZ 🌟', doorCenter, 263, fontSize: 13, color: const Color(0xFFFEF3C7), isBold: true);
+    _drawText(canvas, '🌟 WELCOME 🌟', doorCenter, 263, fontSize: 13, color: const Color(0xFFFEF3C7), isBold: true);
 
     // F. Arka Çiftlik Kapısı Paspası
     final backMatRect = Rect.fromLTWH(doorCenter - 115, 938, 230, 46);
@@ -500,7 +503,7 @@ class SimulationPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.2,
     );
-    _drawText(canvas, '🚜 ÇİFTLİK & ÜRETİM KAPISI 🚜', doorCenter, 961, fontSize: 11.5, color: const Color(0xFFFEF3C7), isBold: true);
+    _drawText(canvas, '🚪 BACK DOOR 🚪', doorCenter, 961, fontSize: 11.5, color: const Color(0xFFFEF3C7), isBold: true);
 
     // G. 3D YÜKSEK DUVARLAR, ÇATI PARAPETİ VE CAM VİTRİNLER
     _draw3DWallSegment(canvas, 68, 215, 26, 785); // Sol 3D Duvar
@@ -538,7 +541,7 @@ class SimulationPainter extends CustomPainter {
       radius: 10,
       borderColor: const Color(0xFF38BDF8),
     );
-    _drawText(canvas, '🏪 BEREKET SÜPERMARKET & ÇİFTLİK 3D', doorCenter, 191, fontSize: 12.5, color: Colors.white, isBold: true);
+    _drawText(canvas, '🏪 VILLAGE MARKET', doorCenter, 191, fontSize: 12.5, color: Colors.white, isBold: true);
 
     // Kaldırım Üzeri 3D Market Alışveriş Arabaları Park Durağı ve Ahşap Bank
     _draw3DShoppingCartCorral(canvas, 480, 184);
@@ -865,7 +868,7 @@ class SimulationPainter extends CustomPainter {
     );
     _drawText(
       canvas,
-      'Marketten Reyonu Açıldığında Bu Tarla Açılır',
+      'This Field Unlocks When the Shelf Is Opened at the Store',
       center.dx,
       center.dy + 9,
       fontSize: 9.2,
@@ -955,7 +958,7 @@ class SimulationPainter extends CustomPainter {
     // Üst Başlık Tabelası
     final headerRect = Rect.fromLTWH(topFace.left + 8, topFace.top - 10, topFace.width - 16, 22);
     canvas.drawRRect(RRect.fromRectAndRadius(headerRect, const Radius.circular(6)), Paint()..color = const Color(0xFFCA8A04));
-    _drawText(canvas, '🧀 PEYNİR YAPMA MAKİNESİ', headerRect.center.dx, headerRect.center.dy, fontSize: 9.2, color: Colors.white, isBold: true);
+    _drawText(canvas, '🧀 CHEESE MAKING MACHINE', headerRect.center.dx, headerRect.center.dy, fontSize: 9.2, color: Colors.white, isBold: true);
 
     // Alt Durum Çubuğu
     final statusRect = Rect.fromLTWH(rect.left + 8, rect.bottom - 20, rect.width - 16, 17);
@@ -969,11 +972,11 @@ class SimulationPainter extends CustomPainter {
         ),
         Paint()..color = const Color(0xFF22C55E),
       );
-      _drawText(canvas, '⚙️ PEYNİR YAPILIYOR %${(prog * 100).toInt()}', statusRect.center.dx, statusRect.center.dy, fontSize: 8.5, color: Colors.white, isBold: true);
+      _drawText(canvas, '⚙️ MAKING CHEESE ${(prog * 100).toInt()}%', statusRect.center.dx, statusRect.center.dy, fontSize: 8.5, color: Colors.white, isBold: true);
     } else if (engine.cheeseMachineReadyBoxes > 0) {
       _drawText(
         canvas,
-        '🧀 HAZIR: ${engine.cheeseMachineReadyBoxes}/${engine.cheeseMachineMaxBoxes} PEYNİR (AL)',
+        '🧀 READY: ${engine.cheeseMachineReadyBoxes}/${engine.cheeseMachineMaxBoxes} CHEESE (TAKE)',
         statusRect.center.dx,
         statusRect.center.dy,
         fontSize: 8.5,
@@ -983,7 +986,7 @@ class SimulationPainter extends CustomPainter {
     } else {
       _drawText(
         canvas,
-        '🥛 AHIRDAN SÜT GETİR & DÖK',
+        '🥛 BRING MILK FROM THE BARN & POUR',
         statusRect.center.dx,
         statusRect.center.dy,
         fontSize: 8.5,
@@ -1051,7 +1054,7 @@ class SimulationPainter extends CustomPainter {
     );
     _drawText(
       canvas,
-      isEquipped ? '✅ ${farm.requiredTool.name.toUpperCase()}' : '${farm.requiredTool.emoji} ${farm.requiredTool.name.toUpperCase()} AL',
+      isEquipped ? '✅ ${farm.requiredTool.name.toUpperCase()}' : 'TAKE ${farm.requiredTool.emoji} ${farm.requiredTool.name.toUpperCase()}',
       pos.dx,
       pos.dy - 36,
       fontSize: 8.8,
@@ -1248,14 +1251,14 @@ class SimulationPainter extends CustomPainter {
       _drawSpotStatusBadge(
         canvas,
         spot: spot,
-        readyLabel: '🥛 SAĞ',
-        activeLabel: '🥛 Sağılıyor',
+        readyLabel: '🥛 MILK',
+        activeLabel: '🥛 Milking',
         accentColor: const Color(0xFF0284C7),
         offsetY: -32,
       );
     }
 
-    _drawFarmHeaderAndStatus(canvas, farm, '🐄 İNEK MERASI (🪣 KOVA AL & İÇERİ GİRİP SÜT SAĞ)', const Color(0xFF0284C7));
+    _drawFarmHeaderAndStatus(canvas, farm, '🐄 COW PASTURE (🧺 TAKE A BUCKET & GO INSIDE TO MILK)', const Color(0xFF0284C7));
   }
 
   void _draw3DHayBale(Canvas canvas, double x, double y) {
@@ -1487,7 +1490,7 @@ class SimulationPainter extends CustomPainter {
             canvas.drawCircle(Offset(wx + 4 + individualSway * 0.3, fy - 2), 5.0, Paint()..color = const Color(0xFFDC2626));
             canvas.drawCircle(Offset(wx + individualSway * 0.3, fy - 9), 4.4, Paint()..color = const Color(0xFFF87171));
           } else if (spot.productType == SimProductType.pepper) {
-            // 🫑 3D Köy Biberi Fidesi ve Sallanan Sivri Yeşil Biberler
+            // 🌶️ 3D Köy Biberi Fidesi ve Sallanan Sivri Yeşil Biberler
             canvas.drawCircle(Offset(wx + 2, fy + 2), 10.5, Paint()..color = Colors.black38);
             canvas.drawCircle(Offset(wx + individualSway * 0.3, fy - 4), 10.5, Paint()..color = const Color(0xFF166534));
             canvas.drawOval(Rect.fromCenter(center: Offset(wx - 4 + individualSway * 0.3, fy - 5), width: 6.5, height: 12.5), Paint()..color = const Color(0xFF22C55E));
@@ -1529,19 +1532,19 @@ class SimulationPainter extends CustomPainter {
         }
       }
 
-      String readyText = '🌾 TIRPANLA BİÇ';
+      String readyText = '🌾 CUT WITH SCYTHE';
       Color badgeColor = const Color(0xFFD97706);
       if (spot.productType == SimProductType.tomato) {
-        readyText = '🍅 DOMATES TOPLA';
+        readyText = '🍅 PICK TOMATOES';
         badgeColor = const Color(0xFFDC2626);
       } else if (spot.productType == SimProductType.pepper) {
-        readyText = '🫑 BİBER TOPLA';
+        readyText = '🌶️ PICK PEPPERS';
         badgeColor = const Color(0xFF16A34A);
       } else if (spot.productType == SimProductType.apple) {
-        readyText = '🍎 ELMA TOPLA';
+        readyText = '🍎 PICK APPLES';
         badgeColor = const Color(0xFFEA580C);
       } else if (spot.productType == SimProductType.bread) {
-        readyText = '🥖 BAŞAK BİÇ';
+        readyText = '🥖 CUT WHEAT';
         badgeColor = const Color(0xFFB45309);
       }
 
@@ -1549,7 +1552,7 @@ class SimulationPainter extends CustomPainter {
         canvas,
         spot: spot,
         readyLabel: readyText,
-        activeLabel: '🌾 Hasat Ediliyor',
+        activeLabel: '🌾 Harvesting',
         accentColor: badgeColor,
         offsetY: -34,
       );
@@ -1741,14 +1744,14 @@ class SimulationPainter extends CustomPainter {
       _drawSpotStatusBadge(
         canvas,
         spot: spot,
-        readyLabel: '🥚 KOVAYA TOPLA',
-        activeLabel: '🥚 Toplanıyor',
+        readyLabel: '🥚 COLLECT IN BUCKET',
+        activeLabel: '🥚 Collecting',
         accentColor: const Color(0xFFF59E0B),
         offsetY: -30,
       );
     }
 
-    _drawFarmHeaderAndStatus(canvas, farm, '🐔 KÜMES (🪣 KOVA AL & İÇERİ GİRİP YUMURTA TOPLA)', const Color(0xFFF59E0B));
+    _drawFarmHeaderAndStatus(canvas, farm, '🐔 COOP (🧺 TAKE A BUCKET & GO INSIDE TO COLLECT EGGS)', const Color(0xFFF59E0B));
   }
 
   void _draw3DEggNest(Canvas canvas, double x, double y, {required int eggCount}) {
@@ -1931,14 +1934,14 @@ class SimulationPainter extends CustomPainter {
     final def = productCatalog[farm.primaryProduct]!;
     if (readyCount > 0) {
       if (farm.zoneType == FarmZoneType.barn) {
-        statusText = '🪣 GİRİŞTEN SÜT KOVASI AL & İÇERİ GİRİP İNEKLERİ SAĞ ($readyCount/$totalCount Hazır)';
+        statusText = '🧺 TAKE A MILK BUCKET AT THE ENTRANCE & GO INSIDE TO MILK THE COWS (${readyCount}/${totalCount} Ready)';
       } else if (farm.zoneType == FarmZoneType.field) {
-        statusText = '🌾 TIRPAN AL & İÇERİ GİRİP ${def.emoji} ${def.name.toUpperCase()} HASAT ET ($readyCount/$totalCount Hazır)';
+        statusText = '🌾 TAKE A SCYTHE & GO INSIDE TO HARVEST ${def.emoji} ${def.name.toUpperCase()} (${readyCount}/${totalCount} Ready)';
       } else {
-        statusText = '🪣 GİRİŞTEN YUMURTA KOVASI AL & KÜMESTE YUMURTA TOPLA ($readyCount/$totalCount Hazır)';
+        statusText = '🧺 TAKE AN EGG BUCKET AT THE ENTRANCE & COLLECT EGGS IN THE COOP (${readyCount}/${totalCount} Ready)';
       }
     } else {
-      statusText = '⏳ YENİ ${def.emoji} ${def.name.toUpperCase()} YETİŞİYOR...';
+      statusText = '⏳ NEW ${def.emoji} ${def.name.toUpperCase()} GROWING...';
     }
     final statusColor = readyCount > 0 ? const Color(0xFF4ADE80) : Colors.amberAccent;
     _drawText(canvas, statusText, rect.center.dx, bottomBar.center.dy, fontSize: 9.2, color: statusColor, isBold: true);
@@ -2010,7 +2013,7 @@ class SimulationPainter extends CustomPainter {
         ).createShader(Rect.fromLTWH(x + 202, y - 4, 24, 34)),
     );
 
-    _drawText(canvas, '🚚 BEREKET LOJİSTİK 3D', x + 84, y + 12, fontSize: 11, color: Colors.white, isBold: true);
+    _drawText(canvas, '🚚 DELIVERY TRUCK', x + 84, y + 12, fontSize: 11, color: Colors.white, isBold: true);
   }
 
   // =========================================================================
@@ -2045,7 +2048,7 @@ class SimulationPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5,
     );
-    _drawText(canvas, '🛵 HIZLI KURYE PARK YERİ', station.center.dx, station.bottom - 14, fontSize: 10, color: const Color(0xFFFDE047), isBold: true);
+    _drawText(canvas, '🛵 EXPRESS COURIER PARKING', station.center.dx, station.bottom - 14, fontSize: 10, color: const Color(0xFFFDE047), isBold: true);
 
     // Eğer Kurye Motoru Sahnedeyse 3D Motosiklet + Kasklı Sürücü Çiz
     if (engine.courierState != CourierState.away) {
@@ -2158,7 +2161,7 @@ class SimulationPainter extends CustomPainter {
             engine.carriedBox!.productType == ord.productType;
         _drawText(
           canvas,
-          '🛵 ACİL SİPARİŞ: ${ord.deliveredQty}/${ord.requiredQty} ${def.emoji} ${def.name}',
+          '🛵 URGENT ORDER: ${ord.deliveredQty}/${ord.requiredQty} ${def.emoji} ${def.name}',
           cardRect.center.dx,
           cardRect.top + 15,
           fontSize: 10.8,
@@ -2168,8 +2171,8 @@ class SimulationPainter extends CustomPainter {
         _drawText(
           canvas,
           hasReadyPack
-              ? '✅ 📦 Kurye Paketini Teslim Et (+₺${ord.rewardAmount.toStringAsFixed(0)}) [TIKLA]'
-              : '📦 Önce Paketle & Getir • +₺${ord.rewardAmount.toStringAsFixed(0)} (${ord.remainingTime.toInt()}sn) [TIKLA]',
+              ? '✅ 📦 Deliver Courier Package (+\$${ord.rewardAmount.toStringAsFixed(0)}) [CLICK]'
+              : '📦 Pack & Bring First • +\$${ord.rewardAmount.toStringAsFixed(0)} (${ord.remainingTime.toInt()}s) [CLICK]',
           cardRect.center.dx,
           cardRect.bottom - 13,
           fontSize: 9.4,
@@ -2245,8 +2248,51 @@ class SimulationPainter extends CustomPainter {
 
     // Kilitli reyonlar açılana kadar raf çizilmez; sadece zeminde "Burayı Aç" yazısı görünür!
     for (final shelf in engine.shelves) {
-      if (!shelf.isUnlocked) {
+      if (!shelf.isUnlocked && engine.storeLevel >= shelf.zoneLevel) {
         _drawLockedShelf(canvas, shelf);
+      }
+    }
+  }
+
+  /// Roped-off, darkened parts of the store that are not bought yet.
+  void _drawLockedExpansion(Canvas canvas) {
+    const double top = 232;
+    final double bottom = engine.worldHeight;
+    final zones = <Rect>[
+      if (engine.storeMinX > 95) Rect.fromLTRB(0, top, engine.storeMinX, bottom),
+      if (engine.storeMaxX < engine.worldWidth - 95)
+        Rect.fromLTRB(engine.storeMaxX, top, engine.worldWidth, bottom),
+    ];
+    if (zones.isEmpty) return;
+
+    final nextCost = engine.nextLevelUpgradeCost.toStringAsFixed(0);
+    for (final z in zones) {
+      canvas.drawRect(z, Paint()..color = const Color(0xFF0B1020).withValues(alpha: 0.80));
+      // Diagonal stripes
+      final stripe = Paint()
+        ..color = const Color(0xFFFBBF24).withValues(alpha: 0.07)
+        ..strokeWidth = 14;
+      canvas.save();
+      canvas.clipRect(z);
+      for (double k = -z.height; k < z.width + z.height; k += 46) {
+        canvas.drawLine(Offset(z.left + k, z.top), Offset(z.left + k + z.height, z.bottom), stripe);
+      }
+      canvas.restore();
+      // Rope edge
+      final edgeX = z.left < 10 ? z.right : z.left;
+      canvas.drawLine(
+        Offset(edgeX, z.top),
+        Offset(edgeX, z.bottom),
+        Paint()
+          ..color = const Color(0xFFFBBF24)
+          ..strokeWidth = 4,
+      );
+      final cx = z.center.dx;
+      final cy = (z.top + z.bottom) / 2;
+      _drawText(canvas, '🔒 Locked Area', cx, cy - 16, fontSize: 15, color: Colors.white, isBold: true);
+      if (engine.storeLevel < 3) {
+        _drawText(canvas, 'Expand the store via 👔 Manager', cx, cy + 6, fontSize: 11, color: const Color(0xFFFDE68A), isBold: true);
+        _drawText(canvas, '(\$$nextCost)', cx, cy + 22, fontSize: 11, color: const Color(0xFF4ADE80), isBold: true);
       }
     }
   }
@@ -2274,7 +2320,7 @@ class SimulationPainter extends CustomPainter {
 
     _drawText(
       canvas,
-      '🔒 🛎️ Kasa $index Alanı',
+      '🔒 🛎️ Register ${index} Area',
       center.dx,
       center.dy - 7,
       fontSize: 10.2,
@@ -2283,7 +2329,7 @@ class SimulationPainter extends CustomPainter {
     );
     _drawText(
       canvas,
-      '⭐ Mağaza Seviye $index\'de Açılır',
+      '⭐ Unlocks at Store Level ${index}',
       center.dx,
       center.dy + 8,
       fontSize: 9.0,
@@ -2309,7 +2355,6 @@ class SimulationPainter extends CustomPainter {
   void _drawLockedShelf(Canvas canvas, StoreShelf shelf) {
     final rect = shelf.rect;
     final def = productCatalog[shelf.assignedProduct]!;
-    final canAfford = engine.cash >= shelf.unlockCost;
     final bob = sin(engine.worldTime * 3.5 + rect.left * 0.01) * 2.5;
     final center = Offset(rect.center.dx, rect.center.dy + bob);
 
@@ -2327,9 +2372,7 @@ class SimulationPainter extends CustomPainter {
     canvas.drawRRect(
       RRect.fromRectAndRadius(labelBg, const Radius.circular(14)),
       Paint()
-        ..color = canAfford
-            ? const Color(0xFF4ADE80).withValues(alpha: shelf.isHovered ? 1.0 : 0.85)
-            : const Color(0xFFFBBF24).withValues(alpha: shelf.isHovered ? 1.0 : 0.75)
+        ..color = const Color(0xFFFBBF24).withValues(alpha: shelf.isHovered ? 1.0 : 0.75)
         ..style = PaintingStyle.stroke
         ..strokeWidth = shelf.isHovered ? 2.5 : 1.6,
     );
@@ -2345,11 +2388,11 @@ class SimulationPainter extends CustomPainter {
     );
     _drawText(
       canvas,
-      '🔓 Burayı Aç: ₺${shelf.unlockCost.toStringAsFixed(0)} [E / Tıkla]',
+      '🔒 ${engine.shelfLockReason(shelf)}',
       center.dx,
       center.dy + 9,
       fontSize: 10.2,
-      color: canAfford ? const Color(0xFF4ADE80) : const Color(0xFFFDE047),
+      color: const Color(0xFFFDE047),
       isBold: true,
     );
   }
@@ -2732,7 +2775,7 @@ class SimulationPainter extends CustomPainter {
     );
     _drawText(
       canvas,
-      '${def.emoji} ${shelf.name.toUpperCase()} • ₺${def.retailPrice.toStringAsFixed(0)}',
+      '${def.emoji} ${shelf.name.toUpperCase()} • \$${def.retailPrice.toStringAsFixed(0)}',
       topFace.center.dx,
       canopyRect.center.dy - 9,
       fontSize: 10.2,
@@ -2934,7 +2977,7 @@ class SimulationPainter extends CustomPainter {
 
     if (!isBackRow) {
       canvas.drawRect(Rect.fromCenter(center: Offset(x, y + 1), width: w, height: 8), Paint()..color = const Color(0xFFB45309));
-      _drawText(canvas, 'UN', x, y + 1, fontSize: 6.5, color: Colors.white, isBold: true);
+      _drawText(canvas, 'FLOUR', x, y + 1, fontSize: 6.5, color: Colors.white, isBold: true);
     }
   }
 
@@ -3271,7 +3314,7 @@ class SimulationPainter extends CustomPainter {
       castShadow: false,
       borderColor: const Color(0xFF38BDF8),
     );
-    _drawText(canvas, '❄️ -2.4°C • SÜT & MANDIRA', topFace.center.dx, headerBox.center.dy - 8, fontSize: 9.2, color: Colors.white, isBold: true);
+    _drawText(canvas, '❄️ -2.4°C • MILK & DAIRY', topFace.center.dx, headerBox.center.dy - 8, fontSize: 9.2, color: Colors.white, isBold: true);
 
     _drawShelfStockBar(canvas, rect, shelf.currentStock, shelf.maxCapacity);
   }
@@ -3565,7 +3608,7 @@ class SimulationPainter extends CustomPainter {
 
     _drawText(
       canvas,
-      '${def.emoji} ${def.name.toUpperCase()} • ₺${def.retailPrice.toStringAsFixed(0)}',
+      '${def.emoji} ${def.name.toUpperCase()} • \$${def.retailPrice.toStringAsFixed(0)}',
       topFace.center.dx,
       awningTopFace.center.dy,
       fontSize: 10.2,
@@ -3705,7 +3748,7 @@ class SimulationPainter extends CustomPainter {
       );
       _drawText(
         canvas,
-        '🔓 Reyon Kapağı Açık',
+        '🔓 Shelf Cover Open',
         pill.center.dx,
         pill.center.dy,
         fontSize: 7.5,
@@ -3854,7 +3897,7 @@ class SimulationPainter extends CustomPainter {
       final sDef = productCatalog[engine.currentScanningProduct!]!;
       _drawText(
         canvas,
-        '${sDef.emoji}₺${sDef.retailPrice.toInt()}',
+        '${sDef.emoji}\$${sDef.retailPrice.toInt()}',
         posRect.center.dx,
         posRect.center.dy,
         fontSize: 7.5,
@@ -3978,7 +4021,7 @@ class SimulationPainter extends CustomPainter {
             );
             _drawText(
               canvas,
-              '🔊 BİİP! ₺${flyDef.retailPrice.toInt()}',
+              '🔊 BEEP! \$${flyDef.retailPrice.toInt()}',
               beepBadge.center.dx,
               beepBadge.center.dy,
               fontSize: 8.2,
@@ -4046,8 +4089,8 @@ class SimulationPainter extends CustomPainter {
       _drawText(
         canvas,
         cust.isFullyPacked
-            ? '✅ Paketi Ver & Ödeme Al [Tıkla]'
-            : '🔊 Barkodu Okut (${cust.packedCount}/${cust.basket.length}) [Tıkla]',
+            ? '✅ Hand Over Package & Take Payment [Click]'
+            : '🔊 Scan Barcode (${cust.packedCount}/${cust.basket.length}) [Click]',
         promptRect.center.dx,
         promptRect.center.dy,
         fontSize: 9.0,
@@ -4060,7 +4103,7 @@ class SimulationPainter extends CustomPainter {
     _drawNaturalWorldButton(
       canvas,
       center: Offset(topFace.center.dx, topFace.bottom - 15),
-      label: '🛎️ Kasa $index',
+      label: '🛎️ Register ${index}',
       width: 86,
       height: 20,
     );
@@ -4185,7 +4228,7 @@ class SimulationPainter extends CustomPainter {
         );
         _drawText(
           canvas,
-          '📦 Kurye Paketi Bantlanıyor %${(prog * 100).toInt()}',
+          '📦 Taping Courier Package ${(prog * 100).toInt()}%',
           barRect.center.dx,
           barRect.center.dy,
           fontSize: 8.8,
@@ -4203,7 +4246,7 @@ class SimulationPainter extends CustomPainter {
         );
         _drawText(
           canvas,
-          '📦 Masada: ${engine.courierStagedCount}/${ord.remainingQty} ${sDef.emoji} (${ord.remainingQty - engine.courierStagedCount} daha)',
+          '📦 On Table: ${engine.courierStagedCount}/${ord.remainingQty} ${sDef.emoji} (${ord.remainingQty - engine.courierStagedCount} more)',
           barRect.center.dx,
           barRect.center.dy,
           fontSize: 8.6,
@@ -4239,8 +4282,8 @@ class SimulationPainter extends CustomPainter {
       _drawText(
         canvas,
         isExcess
-            ? '⚠️ BU FAZLA! ($totalWithHeld/${ord.remainingQty} ${def.emoji}) [Tıkla]'
-            : '📦 ${ord.requiredQty}x ${def.emoji} Kurye Paketleme [Tıkla]',
+            ? '⚠️ TOO MANY! (${totalWithHeld}/${ord.remainingQty} ${def.emoji}) [Click]'
+            : '📦 ${ord.requiredQty}x ${def.emoji} Courier Packing [Click]',
         badgeRect.center.dx,
         badgeRect.center.dy,
         fontSize: 8.8,
@@ -4252,7 +4295,7 @@ class SimulationPainter extends CustomPainter {
     _drawNaturalWorldButton(
       canvas,
       center: Offset(topFace.center.dx, topFace.bottom - 12),
-      label: '📦 Kurye Paketleme',
+      label: '📦 Courier Packing',
       width: 118,
       height: 19,
     );
@@ -4326,7 +4369,7 @@ class SimulationPainter extends CustomPainter {
     _drawNaturalWorldButton(
       canvas,
       center: Offset(topFace.center.dx, topFace.bottom - 14),
-      label: '💻 Bilgisayar',
+      label: '💻 Computer',
       width: 96,
       height: 21,
     );
@@ -4416,7 +4459,7 @@ class SimulationPainter extends CustomPainter {
 
     _drawText(
       canvas,
-      'STOK: $current / $maxCap',
+      'STOCK: ${current} / ${maxCap}',
       bgRect.center.dx,
       bgRect.center.dy,
       fontSize: 8.2,
@@ -4454,7 +4497,7 @@ class SimulationPainter extends CustomPainter {
 
     // Otomatik Kasiyer Karakterleri (Açık Kasaların Arkasında)
     if (engine.hasAutoCashier) {
-      final cashierNames = ['KASİYER AYŞE', 'KASİYER MERT', 'KASİYER ZEYNEP'];
+      final cashierNames = ['CASHIER AYŞE', 'CASHIER MERT', 'CASHIER ZEYNEP'];
       for (int i = 0; i < engine.unlockedCheckoutCount; i++) {
         final cRect = engine.checkoutCounters[i];
         final cName = cashierNames[i % cashierNames.length];
@@ -4488,6 +4531,10 @@ class SimulationPainter extends CustomPainter {
       addDrawable(c.y, () => _drawSingleCustomer(canvas, c));
     }
 
+    for (final t in engine.thieves) {
+      addDrawable(t.y, () => _drawThief(canvas, t));
+    }
+
     addDrawable(engine.playerY, () => _drawPlayer(canvas));
 
     for (final fn in drawables) {
@@ -4503,7 +4550,7 @@ class SimulationPainter extends CustomPainter {
       canvas: canvas,
       x: w.x,
       y: w.y,
-      name: '👷 STOKÇU ALİ',
+      name: '👷 STOCKER ALI',
       shirtColor: const Color(0xFF0891B2),
       pantsColor: const Color(0xFF0F172A),
       hairColor: const Color(0xFFF59E0B),
@@ -4517,9 +4564,9 @@ class SimulationPainter extends CustomPainter {
         y: w.y,
         tool: w.equippedTool!,
         actionAnimTimer: w.actionAnimTimer,
-        isHarvesting: w.statusText.contains('Biçiliyor') ||
-            w.statusText.contains('Sağılıyor') ||
-            w.statusText.contains('Toplanıyor'),
+        isHarvesting: w.statusText.contains('Cutting') ||
+            w.statusText.contains('Milking') ||
+            w.statusText.contains('Collecting'),
         carriedBox: w.carriedBox,
       );
     }
@@ -4665,26 +4712,26 @@ class SimulationPainter extends CustomPainter {
 
     if (c.state == CustomerState.walkingToEntrance) {
       if (c.y >= 210 && c.y <= 285) {
-        _drawThoughtBubble(canvas, '${c.avatar} Merhaba!', c.x, c.y - 62);
+        _drawThoughtBubble(canvas, '${c.avatar} Hello!', c.x, c.y - 62);
       } else {
-        _drawThoughtBubble(canvas, '${c.avatar} Alışveriş', c.x, c.y - 62);
+        _drawThoughtBubble(canvas, '${c.avatar} Shopping', c.x, c.y - 62);
       }
     } else if (c.state == CustomerState.shopping && c.currentShoppingIndex < c.shoppingList.length) {
       final wanted = c.shoppingList[c.currentShoppingIndex];
       final def = productCatalog[wanted]!;
       _drawThoughtBubble(canvas, '${def.emoji} ${def.name}', c.x, c.y - 62);
     } else if (c.state == CustomerState.goingToCheckout) {
-      _drawThoughtBubble(canvas, '🛍️ Kasaya', c.x, c.y - 62);
+      _drawThoughtBubble(canvas, '🛍️ To Register', c.x, c.y - 62);
     } else if (c.state == CustomerState.waitingAtCheckout) {
       if (c.isFullyPacked) {
-        _drawThoughtBubble(canvas, '💵 Ödeme Hazır!', c.x, c.y - 62);
+        _drawThoughtBubble(canvas, '💵 Payment Ready!', c.x, c.y - 62);
       } else {
-        _drawThoughtBubble(canvas, '🛍️ Paketle (${c.packedCount}/${c.basket.length})', c.x, c.y - 62);
+        _drawThoughtBubble(canvas, '🛍️ Packing (${c.packedCount}/${c.basket.length})', c.x, c.y - 62);
       }
     } else if (c.state == CustomerState.leavingSad) {
-      _drawThoughtBubble(canvas, '😞 Yoktu', c.x, c.y - 62);
+      _drawThoughtBubble(canvas, '😞 Out of Stock', c.x, c.y - 62);
     } else if (c.state == CustomerState.leavingHappy) {
-      _drawThoughtBubble(canvas, '🛍️ Teşekkürler!', c.x, c.y - 62);
+      _drawThoughtBubble(canvas, '🛍️ Thanks!', c.x, c.y - 62);
     }
   }
 
@@ -4712,7 +4759,7 @@ class SimulationPainter extends CustomPainter {
       canvas: canvas,
       x: x,
       y: y,
-      name: '⭐ YÖNETİCİ',
+      name: '⭐ MANAGER',
       shirtColor: const Color(0xFFC2410C),
       pantsColor: const Color(0xFF0F172A),
       hairColor: const Color(0xFF1E293B),
@@ -4735,6 +4782,138 @@ class SimulationPainter extends CustomPainter {
     if (engine.carriedBox != null) {
       _drawCarriedContainer(canvas, x, y - 50, engine.carriedBox!);
     }
+
+    _drawPlayerStick(canvas, x, y);
+  }
+
+  /// The wooden stick: held at night, swung when the player attacks.
+  void _drawPlayerStick(Canvas canvas, double x, double y) {
+    final swinging = engine.stickSwingTimer > 0;
+    if (!engine.isNight && !swinging) return;
+
+    final dir = swinging ? engine.stickHitDirX : (cos(engine.playerAngle) >= 0 ? 1.0 : -1.0);
+    final t = 1.0 - engine.stickSwingTimer;
+    final pivot = Offset(x + dir * 13, y + 2);
+    const len = 42.0;
+
+    void stickAt(double a, double alpha) {
+      final tip = Offset(pivot.dx + dir * sin(a) * len, pivot.dy - cos(a) * len);
+      canvas.drawLine(
+        pivot,
+        tip,
+        Paint()
+          ..color = const Color(0xFF92400E).withValues(alpha: alpha)
+          ..strokeWidth = 5.5
+          ..strokeCap = StrokeCap.round,
+      );
+      canvas.drawLine(
+        Offset(pivot.dx + dir * sin(a) * len * 0.55, pivot.dy - cos(a) * len * 0.55),
+        tip,
+        Paint()
+          ..color = const Color(0xFFD97706).withValues(alpha: alpha)
+          ..strokeWidth = 4.0
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+
+    if (swinging) {
+      final a = -0.6 + t * 2.6;
+      stickAt(a - 0.5, 0.18);
+      stickAt(a - 0.25, 0.32);
+      stickAt(a, 1.0);
+    } else {
+      stickAt(0.35, 1.0);
+    }
+  }
+
+  /// A masked thief: dark clothes, sack of loot, HP bar and hit flash.
+  void _drawThief(Canvas canvas, Thief t) {
+    final isStunned = t.state == ThiefState.stunned;
+    final walk = (t.state == ThiefState.stealing || isStunned) ? 0.0 : sin(t.walkAnim);
+
+    _draw3DHumanCharacter(
+      canvas: canvas,
+      x: t.x,
+      y: t.y,
+      name: '🦹 THIEF',
+      shirtColor: const Color(0xFF1F2937),
+      pantsColor: const Color(0xFF111827),
+      hairColor: const Color(0xFF000000),
+      walkOffset: walk,
+    );
+
+    // Eye mask
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(t.x, t.y - 29), width: 22, height: 6),
+        const Radius.circular(3),
+      ),
+      Paint()..color = const Color(0xFF020617),
+    );
+
+    if (t.hitFlash > 0) {
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(t.x, t.y - 10), width: 34, height: 62),
+        Paint()..color = Colors.white.withValues(alpha: 0.6 * t.hitFlash),
+      );
+    }
+
+    // HP bar
+    final barRect = Rect.fromCenter(center: Offset(t.x, t.y - 62), width: 38, height: 6);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(barRect, const Radius.circular(3)),
+      Paint()..color = Colors.black.withValues(alpha: 0.65),
+    );
+    final frac = (t.hp / t.maxHp).clamp(0.0, 1.0).toDouble();
+    if (frac > 0) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(barRect.left, barRect.top, barRect.width * frac, barRect.height),
+          const Radius.circular(3),
+        ),
+        Paint()..color = const Color(0xFFEF4444),
+      );
+    }
+
+    if (t.carried > 0 && t.loot != null) {
+      final emoji = productCatalog[t.loot!]?.emoji ?? '';
+      _drawText(canvas, '🎒 $emoji x${t.carried}', t.x, t.y - 76, fontSize: 12, color: Colors.white, isBold: true);
+    }
+    if (isStunned) {
+      _drawText(canvas, '💫', t.x, t.y - 50, fontSize: 16);
+    }
+  }
+
+  /// Dark blue tint over the whole world at night, with warm lamp glows.
+  void _drawNightOverlay(Canvas canvas) {
+    final d = engine.nightDarkness;
+    if (d <= 0.01) return;
+
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, engine.worldWidth, engine.worldHeight),
+      Paint()..color = const Color(0xFF0B1230).withValues(alpha: 0.6 * d),
+    );
+
+    void glow(double cx, double cy, double r, Color c, double a) {
+      final rect = Rect.fromCircle(center: Offset(cx, cy), radius: r);
+      canvas.drawCircle(
+        Offset(cx, cy),
+        r,
+        Paint()
+          ..blendMode = BlendMode.plus
+          ..shader = RadialGradient(
+            colors: [c.withValues(alpha: a * d), Colors.transparent],
+          ).createShader(rect),
+      );
+    }
+
+    for (final lx in [420.0, 780.0, 1140.0, 1520.0]) {
+      for (final ly in [390.0, 650.0, 880.0]) {
+        glow(lx, ly, 170, const Color(0xFFFDE68A), 0.22);
+      }
+    }
+    // Lantern around the player
+    glow(engine.playerX, engine.playerY, 130, const Color(0xFFFFEDD5), 0.20);
   }
 
   /// Karakterin Elindeki Süt Kovası, Tırpan veya Yumurta Kovasını Çizer
@@ -4820,7 +4999,7 @@ class SimulationPainter extends CustomPainter {
       );
       _drawText(
         canvas,
-        '📦 Kurye Paketi (${box.currentCount} ${def.emoji})',
+        '📦 Courier Package (${box.currentCount} ${def.emoji})',
         bx,
         by,
         fontSize: 9.5,
@@ -4921,7 +5100,7 @@ class SimulationPainter extends CustomPainter {
         canvas.drawCircle(Offset(bx - 5, handY - 1), 7.5, Paint()..color = const Color(0xFFFACC15));
         canvas.drawCircle(Offset(bx + 5, handY - 1), 7.5, Paint()..color = const Color(0xFFEAB308));
       } else {
-        // 🍅🫑🍎🥖 Elde Taze Meyve / Sebze / Ekmek Hasat Kasası
+        // 🍅🌶️🍎🥖 Elde Taze Meyve / Sebze / Ekmek Hasat Kasası
         final crate = Rect.fromCenter(center: Offset(bx, handY + 3), width: 28, height: 13);
         canvas.drawRRect(RRect.fromRectAndRadius(crate, const Radius.circular(4)), Paint()..color = const Color(0xFF92400E));
         for (final ox in [-6.5, 0.0, 6.5]) {
@@ -5219,7 +5398,7 @@ class SimulationPainter extends CustomPainter {
       RRect.fromRectAndRadius(nameBg, const Radius.circular(7)),
       Paint()..color = Colors.black.withValues(alpha: 0.52),
     );
-    _drawText(canvas, isPlayer ? '⭐ Yönetici' : name, x, y + 30, fontSize: 8.8, color: Colors.white.withValues(alpha: 0.95), isBold: true);
+    _drawText(canvas, isPlayer ? '⭐ Manager' : name, x, y + 30, fontSize: 8.8, color: Colors.white.withValues(alpha: 0.95), isBold: true);
   }
 
   // =========================================================================

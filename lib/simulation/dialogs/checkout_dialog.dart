@@ -26,8 +26,8 @@ class CheckoutRegisterDialog extends StatelessWidget {
         width: dialogW,
         height: dialogH,
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A),
-          borderRadius: BorderRadius.circular(24),
+          color: const Color(0xFF17120F),
+          borderRadius: BorderRadius.zero,
           border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.45), width: 2),
         ),
         clipBehavior: Clip.antiAlias,
@@ -39,7 +39,7 @@ class CheckoutRegisterDialog extends StatelessWidget {
             Navigator.pop(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('🛍️ Paket teslim edildi ve +₺${earned.toStringAsFixed(0)} tahsil edildi! 😊'),
+                content: Text('🛍️ Package delivered and +\$${earned.toStringAsFixed(0)} collected! 😊'),
                 backgroundColor: Colors.green.shade700,
                 duration: const Duration(seconds: 2),
               ),
@@ -81,6 +81,9 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
   Offset? _dragOffset;
   int? _draggingIndex;
   bool _laserTriggeredDuringDrag = false;
+  final GlobalKey _sceneKey = GlobalKey();
+
+  RenderBox? get _sceneBox => _sceneKey.currentContext?.findRenderObject() as RenderBox?;
 
   @override
   void initState() {
@@ -155,7 +158,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
     final isAllPacked = cust != null && cust.isFullyPacked;
 
     return Container(
-      color: const Color(0xFF0F172A),
+      color: const Color(0xFF17120F),
       child: Column(
         children: [
             // 1. ÜST KAMERA & KASİYER MODU ÇUBUĞU
@@ -163,7 +166,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               decoration: const BoxDecoration(
                 color: Color(0xFF090D16),
-                border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 1.5)),
+                border: Border(bottom: BorderSide(color: Color(0xFF2A221C), width: 1.5)),
               ),
               child: Row(
                 children: [
@@ -171,7 +174,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0284C7).withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.zero,
                       border: Border.all(color: const Color(0xFF38BDF8)),
                     ),
                     child: const Row(
@@ -180,7 +183,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                         Text('🎥', style: TextStyle(fontSize: 14)),
                         SizedBox(width: 6),
                         Text(
-                          '1. ŞAHIS KASİYER KAMERASI',
+                          '1ST-PERSON CASHIER CAMERA',
                           style: TextStyle(
                             color: Color(0xFF38BDF8),
                             fontSize: 11,
@@ -201,7 +204,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                         Row(
                           children: [
                             Text(
-                              cust?.name ?? 'Kasa ${widget.counterIndex + 1} • Müşteri Bekleniyor',
+                              cust?.name ?? 'Register ${widget.counterIndex + 1} • Waiting for Customer',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14.5),
                             ),
                             if (cust != null) ...[
@@ -209,8 +212,8 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: cust.isVip ? Colors.amber.shade900 : const Color(0xFF1E293B),
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: cust.isVip ? Colors.amber.shade900 : const Color(0xFF2A221C),
+                                  borderRadius: BorderRadius.zero,
                                   border: Border.all(color: cust.isVip ? Colors.amber : Colors.white24),
                                 ),
                                 child: Text(
@@ -223,10 +226,10 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                         ),
                         Text(
                           cust == null
-                              ? '⏳ Müşteriler alışverişini bitirip kasaya gelince burada görünecek...'
+                              ? '⏳ Customers will appear here when they finish shopping and reach the register...'
                               : (isAllPacked
-                                  ? '✅ Tüm ürünler okutuldu! Poşeti müşteriye teslim edip ödemeyi alın.'
-                                  : '🖱️ Banttaki ürüne TIKLAYIN veya LAZER TARAYICIYA SÜRÜKLEYİP okutun ($packedCount/${cust.basket.length})'),
+                                  ? '✅ All items scanned! Hand the bag to the customer and take payment.'
+                                  : '🖱️ CLICK an item on the belt or DRAG it to the LASER SCANNER (${packedCount}/${cust.basket.length})'),
                           style: TextStyle(
                             color: cust == null
                                 ? Colors.amberAccent
@@ -240,7 +243,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                   TextButton.icon(
                     onPressed: widget.onClose,
                     icon: const Icon(Icons.arrow_back, color: Colors.white70, size: 18),
-                    label: const Text('Markete Dön [ESC / Tab]', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: const Text('Back to Store [ESC / Tab]', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -253,7 +256,11 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                   final sceneSize = Size(constraints.maxWidth, constraints.maxHeight);
                   final laserCenter = Offset(sceneSize.width * 0.50, sceneSize.height * 0.67);
 
-                  return AnimatedBuilder(
+                  return SizedBox(
+                    key: _sceneKey,
+                    width: sceneSize.width,
+                    height: sceneSize.height,
+                    child: AnimatedBuilder(
                     animation: Listenable.merge([_bagDropController, _ambientController]),
                     builder: (context, _) {
                       final scanT = _bagDropController.value;
@@ -300,11 +307,11 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: Colors.black.withValues(alpha: 0.72),
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.zero,
                                       border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.6)),
                                     ),
                                     child: const Text(
-                                      '🔴 Banttaki Ürünler (Okutmak için Tıkla veya Lazer Camına Sürükle)',
+                                      '🔴 Items on the Belt (Click to Scan or Drag to the Laser Glass)',
                                       style: TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold),
                                     ),
                                   ),
@@ -312,7 +319,8 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                   SizedBox(
                                     height: 92,
                                     child: ListView.separated(
-                                      scrollDirection: Axis.horizontal,
+                scrollDirection: Axis.horizontal,
+                                      physics: const NeverScrollableScrollPhysics(),
                                       itemCount: cust.basket.length - packedCount,
                                       separatorBuilder: (_, _) => const SizedBox(width: 10),
                                       itemBuilder: (context, offset) {
@@ -335,7 +343,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                             setState(() {
                                               _dragOffset = details.globalPosition;
                                             });
-                                            final box = context.findRenderObject() as RenderBox?;
+                                            final box = _sceneBox;
                                             if (box != null && !_laserTriggeredDuringDrag) {
                                               final local = box.globalToLocal(details.globalPosition);
                                               if ((local - laserCenter).distance < 95) {
@@ -362,7 +370,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                                 begin: Alignment.topLeft,
                                                 end: Alignment.bottomRight,
                                               ),
-                                              borderRadius: BorderRadius.circular(14),
+                                              borderRadius: BorderRadius.zero,
                                               border: Border.all(
                                                 color: isNext ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
                                                 width: isNext ? 2.6 : 1.4,
@@ -389,13 +397,13 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
                                                     style: const TextStyle(
-                                                      color: Color(0xFF0F172A),
+                                                      color: Color(0xFF17120F),
                                                       fontSize: 9.5,
                                                       fontWeight: FontWeight.w800,
                                                     ),
                                                   ),
                                                   Text(
-                                                    '₺${def.retailPrice.toStringAsFixed(0)}',
+                                                    '\$${def.retailPrice.toStringAsFixed(0)}',
                                                     style: TextStyle(
                                                       color: Colors.green.shade800,
                                                       fontSize: 11,
@@ -417,7 +425,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                           // D) Sürüklenen Ürünün Parmağı/Mouse'u Takip Etmesi
                           if (cust != null && _draggingIndex != null && _dragOffset != null && _draggingIndex! < cust.basket.length)
                             Builder(builder: (context) {
-                              final box = context.findRenderObject() as RenderBox?;
+                              final box = _sceneBox;
                               if (box == null) return const SizedBox.shrink();
                               final local = box.globalToLocal(_dragOffset!);
                               final pType = cust.basket[_draggingIndex!];
@@ -431,7 +439,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                     height: 68,
                                     decoration: BoxDecoration(
                                       color: Colors.white,
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.zero,
                                       border: Border.all(color: Colors.redAccent, width: 2.5),
                                       boxShadow: [
                                         BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 12),
@@ -454,14 +462,14 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                   onPressed: _handPackageAndCollect,
                                   icon: const Text('💳', style: TextStyle(fontSize: 22)),
                                   label: Text(
-                                    'POŞETİ TESLİM ET & ÖDEMEYİ AL (+₺${_totalAmount.toStringAsFixed(0)})',
+                                    'HAND OVER BAG & TAKE PAYMENT (+\$${_totalAmount.toStringAsFixed(0)})',
                                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF16A34A),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: Color(0xFF14100E), width: 3)),
                                     elevation: 10,
                                   ),
                                 ),
@@ -478,8 +486,8 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF0F172A).withValues(alpha: 0.88),
-                                    borderRadius: BorderRadius.circular(16),
+                                    color: const Color(0xFF17120F).withValues(alpha: 0.88),
+                                    borderRadius: BorderRadius.zero,
                                     border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.65), width: 1.5),
                                     boxShadow: [
                                       BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 14),
@@ -489,12 +497,12 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        '⏳ Kasada Müşteri Bekleniyor...',
+                                        '⏳ Waiting for a Customer at the Register...',
                                         style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900),
                                       ),
                                       SizedBox(height: 4),
                                       Text(
-                                        'Market arka planda çalışmaya devam ediyor. Müşteri kasaya geldiğinde otomatik burada belirecek!',
+                                        'The store keeps running in the background. It will pop up here automatically when a customer arrives!',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5),
                                       ),
@@ -506,6 +514,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                         ],
                       );
                     },
+                    ),
                   );
                 },
               ),
@@ -520,10 +529,10 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
       width: 225,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFF17120F).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.zero,
         border: Border.all(
-          color: inLaserPhase ? const Color(0xFF4ADE80) : const Color(0xFF334155),
+          color: inLaserPhase ? const Color(0xFF4ADE80) : const Color(0xFF4A3C30),
           width: inLaserPhase ? 2.0 : 1.4,
         ),
         boxShadow: [
@@ -538,7 +547,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                '🖥️ KASA POS FİŞİ',
+                '🖥️ REGISTER POS RECEIPT',
                 style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.w900),
               ),
               Text(
@@ -547,14 +556,14 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
               ),
             ],
           ),
-          const Divider(color: Color(0xFF334155), height: 12),
+          const Divider(color: Color(0xFF4A3C30), height: 12),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 135),
             child: cust == null
                 ? const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
                     child: Text(
-                      'Müşteri bekleniyor...',
+                      'Waiting for customer...',
                       style: TextStyle(color: Colors.white38, fontSize: 11),
                     ),
                   )
@@ -562,7 +571,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                     ? const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Text(
-                          'Henüz ürün okutulmadı...',
+                          'No items scanned yet...',
                           style: TextStyle(color: Colors.white38, fontSize: 11),
                         ),
                       )
@@ -584,7 +593,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                               ),
                             ),
                             Text(
-                              '₺${def.retailPrice.toStringAsFixed(0)}',
+                              '\$${def.retailPrice.toStringAsFixed(0)}',
                               style: const TextStyle(color: Color(0xFF4ADE80), fontSize: 11, fontWeight: FontWeight.bold),
                             ),
                           ],
@@ -593,13 +602,13 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
                     },
                   ),
           ),
-          const Divider(color: Color(0xFF334155), height: 12),
+          const Divider(color: Color(0xFF4A3C30), height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('TOPLAM:', style: TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.bold)),
+              const Text('TOTAL:', style: TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.bold)),
               Text(
-                '₺${_scannedAmount.toStringAsFixed(0)} / ₺${_totalAmount.toStringAsFixed(0)}',
+                '\$${_scannedAmount.toStringAsFixed(0)} / \$${_totalAmount.toStringAsFixed(0)}',
                 style: TextStyle(
                   color: isAllPacked ? const Color(0xFF4ADE80) : Colors.amberAccent,
                   fontSize: 14,
@@ -614,7 +623,7 @@ class _CashierFirstPersonViewState extends State<CashierFirstPersonView>
   }
 }
 
-/// 1. Şahıs Kasiyer Kamerası (Kasanın önünü, karşıdaki müşteriyi, 3D perspektif bandı, lazer tarayıcıyı ve poşeti çizer)
+/// First-person cashier view, drawn in the same chunky pixel style as the shop.
 class _CashierFirstPersonPainter extends CustomPainter {
   final SimCustomer? customer;
   final int packedCount;
@@ -636,197 +645,160 @@ class _CashierFirstPersonPainter extends CustomPainter {
     required this.ambientTime,
   });
 
+  static const double u = 4.0; // one "art pixel"
+  static const Color _ol = Color(0xFF14100E);
+  final Paint _p = Paint()..isAntiAlias = false;
+
+  double _s(double v) => (v / u).round() * u;
+
+  void _r(Canvas c, double x, double y, double w, double h, Color col) {
+    _p.color = col;
+    final x0 = _s(x), y0 = _s(y);
+    final x1 = _s(x + w), y1 = _s(y + h);
+    c.drawRect(Rect.fromLTRB(x0, y0, max(x1, x0 + u), max(y1, y0 + u)), _p);
+  }
+
+  /// Box with a dark pixel outline.
+  void _box(Canvas c, Rect r, Color fill, {Color? hi, double o = u}) {
+    _r(c, r.left - o, r.top - o, r.width + o * 2, r.height + o * 2, _ol);
+    _r(c, r.left, r.top, r.width, r.height, fill);
+    if (hi != null) _r(c, r.left, r.top, r.width, u, hi);
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    final horizonY = h * 0.44;
+    final horizonY = _s(h * 0.44);
 
-    // 1. ARKA PLAN: MARKET İÇİ PERSPEKTİFİ (Tavan, Duvarlar, Uzaktaki Raflar ve Giriş Camı)
-    final ceilingRect = Rect.fromLTWH(0, 0, w, horizonY);
-    canvas.drawRect(
-      ceilingRect,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFF1E293B), Color(0xFF334155), Color(0xFF475569)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ).createShader(ceilingRect),
-    );
-
-    // Tavan Perspektif LED Panelleri
+    // ---- BACK WALL -------------------------------------------------------
+    _r(canvas, 0, 0, w, horizonY, const Color(0xFF243635));
+    for (double y = 0; y < horizonY; y += u * 6) {
+      _r(canvas, 0, y, w, u, const Color(0xFF1F302F)); // panel seams
+    }
+    // ceiling strip
+    _r(canvas, 0, 0, w, u * 3, const Color(0xFF17120F));
+    // ceiling lights (stepped glow)
     for (final tx in [w * 0.22, w * 0.50, w * 0.78]) {
-      final led = Path()
-        ..moveTo(tx - 26, 8)
-        ..lineTo(tx + 26, 8)
-        ..lineTo(tx + 14, horizonY * 0.45)
-        ..lineTo(tx - 14, horizonY * 0.45)
-        ..close();
-      canvas.drawPath(led, Paint()..color = const Color(0xFFFEF9C3).withValues(alpha: 0.75));
+      _r(canvas, tx - 60, u * 3, 120, u, const Color(0x22FFF2B0));
+      _r(canvas, tx - 40, u * 3, 80, u * 2, const Color(0x33FFF2B0));
+      _r(canvas, tx - 28, u * 3, 56, u * 2, _ol);
+      _r(canvas, tx - 24, u * 3, 48, u, const Color(0xFFFFF2B0));
+    }
+    // wainscot band + floor strip
+    _r(canvas, 0, horizonY - u * 9, w, u * 5, const Color(0xFF6F6858));
+    _r(canvas, 0, horizonY - u * 9, w, u, const Color(0xFF9A9280));
+    for (double x = 0; x < w; x += u * 8) {
+      for (double y = horizonY - u * 4; y < horizonY + u * 2; y += u * 2) {
+        final alt = (((x / (u * 8)).floor() + (y / (u * 2)).floor()) % 2 == 0);
+        _r(canvas, x, y, u * 8, u * 2, alt ? const Color(0xFF3B3129) : const Color(0xFF30271F));
+      }
     }
 
-    // Uzaktaki 3D Market Reyonları Silüeti (Derinlik hissi)
+    // distant shelves
     for (final rx in [w * 0.14, w * 0.84]) {
-      final shelfRect = Rect.fromCenter(center: Offset(rx, horizonY - 26), width: 110, height: 82);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(shelfRect, const Radius.circular(6)),
-        Paint()..color = const Color(0xFF1E293B),
-      );
+      final sr = Rect.fromCenter(center: Offset(rx, horizonY - 30), width: 112, height: 88);
+      _box(canvas, sr, const Color(0xFF3A2A1C));
+      const cols = [Color(0xFFD9534F), Color(0xFFE8B84A), Color(0xFF5BB0D6), Color(0xFF6BBF6A)];
       for (int row = 0; row < 3; row++) {
-        final ry = shelfRect.top + 18 + row * 22;
-        canvas.drawLine(Offset(shelfRect.left + 8, ry), Offset(shelfRect.right - 8, ry), Paint()..color = const Color(0xFF64748B)..strokeWidth = 3);
-        for (double px = shelfRect.left + 16; px < shelfRect.right - 14; px += 18) {
-          canvas.drawCircle(Offset(px, ry - 6), 5, Paint()..color = [Colors.redAccent, Colors.amber, Colors.lightBlueAccent, Colors.greenAccent][(px.toInt() + row) % 4]);
+        final ry = sr.top + 20 + row * 24;
+        _r(canvas, sr.left + 4, ry, sr.width - 8, u, const Color(0xFF8A5A33));
+        for (double px = sr.left + 12; px < sr.right - 12; px += 16) {
+          _r(canvas, px, ry - 12, 10, 12, cols[(px.toInt() ~/ 4 + row) % 4]);
         }
       }
     }
 
-    // 2. KARŞIDA DURAN 3D MÜŞTERİ (Kasanın Önünde Bekleyen Müşteri)
+    // ---- CUSTOMER ---------------------------------------------------------
     if (customer != null) {
-      _drawCustomerFacingCashier(canvas, w * 0.46, horizonY + 12, customer!);
+      _drawCustomer(canvas, w * 0.46, horizonY + 12, customer!);
     }
 
-    // 3. ÖNÜMÜZDEKİ 3D PERSPEKTİF KASA TEZGAHI
-    final counterPath = Path()
-      ..moveTo(0, horizonY + 8)
-      ..lineTo(w, horizonY + 8)
-      ..lineTo(w, h)
-      ..lineTo(0, h)
-      ..close();
-    canvas.drawPath(
-      counterPath,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFF334155), Color(0xFF1E293B), Color(0xFF0F172A)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ).createShader(Rect.fromLTWH(0, horizonY, w, h - horizonY)),
-    );
-    // Tezgah Ön Parlak Krom Kenar Şeridi
-    canvas.drawLine(
-      Offset(0, horizonY + 8),
-      Offset(w, horizonY + 8),
-      Paint()
-        ..color = const Color(0xFF94A3B8)
-        ..strokeWidth = 4.0,
-    );
+    // ---- COUNTER ----------------------------------------------------------
+    final ctop = horizonY + u * 2;
+    _r(canvas, 0, ctop - u, w, h - ctop + u, _ol);
+    _r(canvas, 0, ctop, w, h - ctop, const Color(0xFF5A3A22));
+    _r(canvas, 0, ctop, w, u * 2, const Color(0xFFB07A45)); // lit top edge
+    _r(canvas, 0, ctop + u * 2, w, u, const Color(0xFF8A5A33));
+    for (double y = ctop + u * 10; y < h; y += u * 10) {
+      _r(canvas, 0, y, w, u, const Color(0xFF4A2F1B)); // plank seams
+    }
+    _r(canvas, 0, ctop + u * 3, w, u, const Color(0xFF94A3B8)); // steel rail
 
-    // 4. 3D PERSPEKTİFLİ HAREKETLİ KONVEYÖR BANT (Soldan merkeze doğru uzanır)
-    final beltPath = Path()
-      ..moveTo(w * 0.04, horizonY + 26)
-      ..lineTo(w * 0.44, horizonY + 26)
-      ..lineTo(w * 0.44, h * 0.88)
-      ..lineTo(w * 0.02, h * 0.88)
-      ..close();
-    canvas.drawPath(
-      beltPath,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFF090D16), Color(0xFF111827), Color(0xFF1F2937)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ).createShader(Rect.fromLTWH(0, horizonY + 26, w * 0.45, h * 0.5)),
-    );
-    // Hareketli Bant Çizgileri
-    final beltScroll = (ambientTime * 18) % 28;
-    for (double bx = w * 0.05 + beltScroll; bx < w * 0.42; bx += 28) {
-      canvas.drawLine(
-        Offset(bx, horizonY + 30),
-        Offset(bx - 10, h * 0.86),
-        Paint()
-          ..color = const Color(0xFF334155)
-          ..strokeWidth = 2.0,
-      );
+    // ---- CONVEYOR BELT ----------------------------------------------------
+    final bx0 = _s(w * 0.04), bx1 = _s(w * 0.44);
+    final by0 = _s(horizonY + 28), by1 = _s(h * 0.88);
+    _r(canvas, bx0 - u, by0 - u, bx1 - bx0 + u * 2, by1 - by0 + u * 2, _ol);
+    _r(canvas, bx0, by0, bx1 - bx0, by1 - by0, const Color(0xFF1B1F27));
+    _r(canvas, bx0, by0, bx1 - bx0, u, const Color(0xFF3B4250));
+    _r(canvas, bx0, by1 - u, bx1 - bx0, u, const Color(0xFF3B4250));
+    final scroll = ((ambientTime * 20) % 28 / u).floor() * u;
+    for (double x = bx0 + scroll; x < bx1; x += 28) {
+      _r(canvas, x, by0 + u * 2, u, by1 - by0 - u * 4, const Color(0xFF2E3440));
     }
 
-    // 5. ORTADA KIRMIZI LAZER BARKOD OKUYUCU CAM TABLA
-    final scannerRect = Rect.fromCenter(center: Offset(w * 0.50, h * 0.67), width: 118, height: 118);
-    final inLaserPhase = isScanning && scanProgress <= 0.58;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(scannerRect.inflate(6), const Radius.circular(14)),
-      Paint()..color = const Color(0xFF475569),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(scannerRect, const Radius.circular(10)),
-      Paint()..color = const Color(0xFF020617),
-    );
-    // Kırmızı Optik Lazer Çizgileri
-    final laserColor = inLaserPhase ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
-    final laserPaint = Paint()
-      ..color = laserColor
-      ..strokeWidth = inLaserPhase ? 4.2 : 2.2;
-    canvas.drawLine(Offset(scannerRect.left + 12, scannerRect.center.dy), Offset(scannerRect.right - 12, scannerRect.center.dy), laserPaint);
-    canvas.drawLine(Offset(scannerRect.center.dx, scannerRect.top + 12), Offset(scannerRect.center.dx, scannerRect.bottom - 12), laserPaint);
-    canvas.drawLine(Offset(scannerRect.left + 18, scannerRect.top + 18), Offset(scannerRect.right - 18, scannerRect.bottom - 18), laserPaint..strokeWidth = 1.4);
-
-    if (inLaserPhase) {
-      canvas.drawCircle(
-        scannerRect.center,
-        46,
-        Paint()..color = const Color(0xFFEF4444).withValues(alpha: 0.28),
-      );
-      _drawText(canvas, '🔊 BİİP!', scannerRect.center.dx, scannerRect.top - 18, fontSize: 15, color: const Color(0xFF4ADE80), bold: true);
+    // ---- SCANNER ----------------------------------------------------------
+    final scannerRect = Rect.fromCenter(center: Offset(w * 0.50, h * 0.67), width: 120, height: 120);
+    final inLaser = isScanning && scanProgress <= 0.58;
+    _box(canvas, scannerRect.inflate(u * 2), const Color(0xFF475569), hi: const Color(0xFF94A3B8));
+    _r(canvas, scannerRect.left, scannerRect.top, scannerRect.width, scannerRect.height, const Color(0xFF05070D));
+    final laser = inLaser ? const Color(0xFF4ADE80) : const Color(0xFFEF4444);
+    final lt = inLaser ? u * 1.5 : u;
+    _r(canvas, scannerRect.left + 12, scannerRect.center.dy - lt / 2, scannerRect.width - 24, lt, laser);
+    _r(canvas, scannerRect.center.dx - lt / 2, scannerRect.top + 12, lt, scannerRect.height - 24, laser);
+    // diagonal as stepped blocks
+    for (int i = 0; i < 6; i++) {
+      final d = scannerRect.left + 22 + i * 14.0;
+      _r(canvas, d, scannerRect.top + 22 + i * 14.0, u, u, laser);
+    }
+    if (inLaser) {
+      _r(canvas, scannerRect.left + 8, scannerRect.top + 8, scannerRect.width - 16, scannerRect.height - 16, const Color(0x22EF4444));
+      _text(canvas, 'BEEP!', scannerRect.center.dx, scannerRect.top - 22, fontSize: 16, color: const Color(0xFF4ADE80));
     } else {
-      _drawText(canvas, 'LAZER OKUYUCU', scannerRect.center.dx, scannerRect.bottom + 16, fontSize: 10, color: const Color(0xFF94A3B8), bold: true);
+      _text(canvas, 'LASER SCANNER', scannerRect.center.dx, scannerRect.bottom + 22, fontSize: 10, color: const Color(0xFF94A3B8));
     }
 
-    // 6. SAĞ TARAFTA AÇIK DURAN 3D MARKET POŞETİ
+    // ---- BAG --------------------------------------------------------------
     final bagCenter = Offset(w * 0.78, h * 0.69);
-    final bagBounce = isScanning && scanProgress > 0.58 ? sin(((scanProgress - 0.58) / 0.42) * pi) * 10.0 : 0.0;
+    final bounce = isScanning && scanProgress > 0.58 ? sin(((scanProgress - 0.58) / 0.42) * pi) * 10.0 : 0.0;
     final bagRect = Rect.fromCenter(
-      center: Offset(bagCenter.dx, bagCenter.dy - bagBounce * 0.4),
-      width: 125 + packedCount * 3.0,
-      height: 118 + bagBounce,
+      center: Offset(bagCenter.dx, bagCenter.dy - bounce * 0.4),
+      width: 124 + packedCount * 3.0,
+      height: 116 + bounce,
     );
-    // Poşet gölgesi
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(bagCenter.dx + 6, bagRect.bottom + 4), width: bagRect.width, height: 22),
-      Paint()..color = Colors.black.withValues(alpha: 0.45),
-    );
-    // Poşet gövdesi
-    final isFullyPacked = customer?.isFullyPacked ?? false;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bagRect, const Radius.circular(14)),
-      Paint()
-        ..shader = LinearGradient(
-          colors: isFullyPacked
-              ? const [Color(0xFF22C55E), Color(0xFF15803D)]
-              : const [Color(0xFFF59E0B), Color(0xFFB45309)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ).createShader(bagRect),
-    );
-    // Poşet ağzı (iç derinlik)
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(bagRect.center.dx, bagRect.top + 14), width: bagRect.width - 20, height: 22),
-      Paint()..color = const Color(0xFF0F172A),
-    );
-    // Poşetin içindeki ürünler
+    final ready = customer?.isFullyPacked ?? false;
+    _r(canvas, bagRect.left + 8, bagRect.bottom + u, bagRect.width, u * 2, const Color(0x55000000)); // shadow
+    final bagMain = ready ? const Color(0xFF3F9B5A) : const Color(0xFFC08A4A);
+    final bagLight = ready ? const Color(0xFF63C07C) : const Color(0xFFDDA865);
+    final bagDark = ready ? const Color(0xFF2B6E40) : const Color(0xFF8C5F2E);
+    _box(canvas, bagRect, bagMain);
+    _r(canvas, bagRect.left, bagRect.top, u * 3, bagRect.height, bagLight);
+    _r(canvas, bagRect.right - u * 3, bagRect.top, u * 3, bagRect.height, bagDark);
+    _r(canvas, bagRect.left, bagRect.bottom - u * 2, bagRect.width, u * 2, bagDark);
+    _r(canvas, bagRect.left + u * 4, bagRect.top + u * 2, bagRect.width - u * 8, u * 6, const Color(0xFF17120F)); // mouth
     if (customer != null) {
       for (int i = 0; i < min(packedCount, 6); i++) {
         final def = productCatalog[customer!.basket[i]]!;
-        _drawText(canvas, def.emoji, bagRect.center.dx - 32 + (i % 3) * 32, bagRect.top + 16 + (i ~/ 3) * 14, fontSize: 20);
+        _text(canvas, def.emoji, bagRect.center.dx - 32 + (i % 3) * 32, bagRect.top + 28 + (i ~/ 3) * 26, fontSize: 22);
       }
     }
-    _drawText(
+    _text(
       canvas,
       customer == null
-          ? '🛍️ MARKET POŞETİ'
-          : (isFullyPacked ? '✅ POŞET HAZIR' : '🛍️ MARKET POŞETİ ($packedCount/${customer!.basket.length})'),
+          ? 'STORE BAG'
+          : (ready ? 'BAG READY!' : 'STORE BAG ($packedCount/${customer!.basket.length})'),
       bagCenter.dx,
-      bagRect.bottom + 18,
+      bagRect.bottom + 24,
       fontSize: 11,
-      color: isFullyPacked ? const Color(0xFF4ADE80) : Colors.white,
-      bold: true,
+      color: ready ? const Color(0xFF4ADE80) : Colors.white,
     );
 
-    // 7. OKUTULAN ÜRÜNÜN KASİYER ELİYLE LAZERDEN GEÇİP POŞETE UÇMASI ANİMASYONU
+    // ---- ITEM FLYING THROUGH ---------------------------------------------
     if (isScanning && droppingItem != null) {
       final def = productCatalog[droppingItem!]!;
       final start = Offset(w * 0.25, h * 0.65);
       final mid = scannerRect.center;
       final end = Offset(bagCenter.dx, bagRect.top + 10);
-
       late final Offset cur;
       if (scanProgress <= 0.58) {
         final t = scanProgress / 0.58;
@@ -835,111 +807,111 @@ class _CashierFirstPersonPainter extends CustomPainter {
         final t = (scanProgress - 0.58) / 0.42;
         cur = Offset.lerp(mid, end, t)! - Offset(0, sin(t * pi) * 48);
       }
-
-      // Kasiyerin sağ alt köşeden uzanan 3D kolu/eli
-      canvas.drawLine(
-        Offset(w * 0.58, h + 10),
-        cur + const Offset(10, 14),
-        Paint()
-          ..color = const Color(0xFFC2410C)
-          ..strokeWidth = 18
-          ..strokeCap = StrokeCap.round,
-      );
-      canvas.drawCircle(cur + const Offset(8, 12), 13, Paint()..color = const Color(0xFFFBCFE8));
-
-      // Ürün kartı
-      final itemRect = Rect.fromCenter(center: cur, width: 64, height: 64);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(itemRect, const Radius.circular(14)),
-        Paint()..color = Colors.white,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(itemRect, const Radius.circular(14)),
-        Paint()
-          ..color = inLaserPhase ? Colors.redAccent : def.primaryColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3.0,
-      );
-      _drawText(canvas, def.emoji, cur.dx, cur.dy - 2, fontSize: 32);
+      // cashier arm (stepped blocks from the bottom-right corner)
+      final from = Offset(w * 0.58, h + 10);
+      final to = cur + const Offset(10, 16);
+      for (int i = 0; i <= 10; i++) {
+        final pt = Offset.lerp(from, to, i / 10)!;
+        _r(canvas, pt.dx - 12, pt.dy - 12, 24, 24, _ol);
+      }
+      for (int i = 0; i <= 10; i++) {
+        final pt = Offset.lerp(from, to, i / 10)!;
+        _r(canvas, pt.dx - 8, pt.dy - 8, 16, 16, const Color(0xFFC2410C));
+      }
+      _r(canvas, to.dx - 14, to.dy - 14, 28, 28, _ol);
+      _r(canvas, to.dx - 10, to.dy - 10, 20, 20, const Color(0xFFE0B08A));
+      // item card
+      final card = Rect.fromCenter(center: cur, width: 64, height: 64);
+      _box(canvas, card, Colors.white);
+      _r(canvas, card.left, card.bottom - u * 2, card.width, u * 2, inLaser ? const Color(0xFFEF4444) : def.primaryColor);
+      _text(canvas, def.emoji, cur.dx, cur.dy - 4, fontSize: 30);
     }
   }
 
-  void _drawCustomerFacingCashier(Canvas canvas, double cx, double cy, SimCustomer customer) {
-    final breathe = sin(ambientTime * 1.5) * 2.5;
+  void _drawCustomer(Canvas c, double cx, double cy, SimCustomer cu) {
+    final bob = (sin(ambientTime * 1.5) * 1.5).round() * u / 2;
     Color shirt = const Color(0xFF0D9488);
-    if (customer.isVip) shirt = const Color(0xFFCA8A04);
-    if (customer.archetype == CustomerArchetype.chef) shirt = const Color(0xFFF8FAFC);
-    if (customer.archetype == CustomerArchetype.grandma) shirt = const Color(0xFF9333EA);
-    if (customer.archetype == CustomerArchetype.athlete) shirt = const Color(0xFFEF4444);
-    if (customer.archetype == CustomerArchetype.student) shirt = const Color(0xFF2563EB);
+    if (cu.isVip) shirt = const Color(0xFFCA8A04);
+    if (cu.archetype == CustomerArchetype.chef) shirt = const Color(0xFFE8ECEF);
+    if (cu.archetype == CustomerArchetype.grandma) shirt = const Color(0xFF9333EA);
+    if (cu.archetype == CustomerArchetype.athlete) shirt = const Color(0xFFEF4444);
+    if (cu.archetype == CustomerArchetype.student) shirt = const Color(0xFF2563EB);
+    final dark = Color.lerp(shirt, Colors.black, 0.35)!;
+    final hair = cu.archetype == CustomerArchetype.grandma ? const Color(0xFFD8DEE6) : const Color(0xFF3F2A1D);
+    const skin = Color(0xFFE0B08A);
+    const skinD = Color(0xFFB98562);
 
-    final torsoRect = Rect.fromCenter(center: Offset(cx, cy - 22 + breathe * 0.4), width: 112, height: 76);
-    canvas.drawRRect(
-      RRect.fromRectAndCorners(torsoRect, topLeft: const Radius.circular(36), topRight: const Radius.circular(36)),
-      Paint()
-        ..shader = LinearGradient(
-          colors: [shirt, Color.lerp(shirt, Colors.black, 0.35)!],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ).createShader(torsoRect),
-    );
+    // torso
+    final t = Rect.fromLTWH(cx - 56, cy - 60 + bob, 112, 76);
+    _r(c, t.left - u, t.top - u, t.width + u * 2, t.height + u, _ol);
+    _r(c, t.left, t.top, t.width, t.height, shirt);
+    _r(c, t.left, t.top, t.width, u * 2, Color.lerp(shirt, Colors.white, 0.25)!);
+    _r(c, t.left, t.top + t.height - u * 4, t.width, u * 4, dark);
+    _r(c, t.left + 4, t.top + u * 4, u * 2, u * 10, dark); // sleeve shading
+    _r(c, t.right - 4 - u * 2, t.top + u * 4, u * 2, u * 10, dark);
+    // neck
+    _r(c, cx - 12, cy - 66 + bob, 24, 8, skinD);
+    // head
+    final head = Rect.fromLTWH(cx - 32, cy - 124 + bob, 64, 60);
+    _r(c, head.left - u, head.top - u, head.width + u * 2, head.height + u * 2, _ol);
+    _r(c, head.left, head.top, head.width, head.height, skin);
+    _r(c, head.left, head.bottom - u * 2, head.width, u * 2, skinD);
+    // hair
+    _r(c, head.left, head.top - u, head.width, u * 5, hair);
+    _r(c, head.left, head.top, u * 2, u * 8, hair);
+    _r(c, head.right - u * 2, head.top, u * 2, u * 8, hair);
+    // eyes + mouth
+    _r(c, head.left + 14, head.top + 26, u * 2, u * 2, _ol);
+    _r(c, head.right - 22, head.top + 26, u * 2, u * 2, _ol);
+    if (cu.isFullyPacked) {
+      _r(c, head.center.dx - 8, head.bottom - 18, 16, u, const Color(0xFF881337));
+      _r(c, head.center.dx - 12, head.bottom - 22, u, u, const Color(0xFF881337));
+      _r(c, head.center.dx + 8, head.bottom - 22, u, u, const Color(0xFF881337));
+    } else {
+      _r(c, head.center.dx - 6, head.bottom - 18, 12, u, const Color(0xFF881337));
+    }
 
-    final headCenter = Offset(cx, cy - 86 + breathe);
-    canvas.drawCircle(headCenter, 34, Paint()..color = const Color(0xFFFBCFE8));
-    canvas.drawArc(
-      Rect.fromCircle(center: headCenter, radius: 36),
-      pi,
-      pi,
-      true,
-      Paint()..color = customer.archetype == CustomerArchetype.grandma ? const Color(0xFFE2E8F0) : const Color(0xFF3F2A1D),
-    );
-    canvas.drawCircle(Offset(headCenter.dx - 11, headCenter.dy - 2), 4.0, Paint()..color = const Color(0xFF0F172A));
-    canvas.drawCircle(Offset(headCenter.dx + 11, headCenter.dy - 2), 4.0, Paint()..color = const Color(0xFF0F172A));
-    canvas.drawArc(
-      Rect.fromCenter(center: Offset(headCenter.dx, headCenter.dy + 10), width: 18, height: 10),
-      0.1,
-      pi - 0.2,
-      false,
-      Paint()
-        ..color = const Color(0xFF881337)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.4,
-    );
-
-    final msg = customer.isFullyPacked
-        ? '🛍️ Harika, teşekkürler! İşte ödemeniz.'
-        : '🙂 Kolay gelsin! (${customer.basket.length - packedCount} ürün kaldı)';
-    final bubble = Rect.fromCenter(center: Offset(cx + 150, headCenter.dy - 12), width: 220, height: 34);
-    canvas.drawRRect(RRect.fromRectAndRadius(bubble, const Radius.circular(14)), Paint()..color = Colors.white);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bubble, const Radius.circular(14)),
-      Paint()
-        ..color = const Color(0xFF38BDF8)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
-    _drawText(canvas, msg, bubble.center.dx, bubble.center.dy, fontSize: 11, color: const Color(0xFF0F172A), bold: true);
+    // speech bubble
+    final msg = cu.isFullyPacked
+        ? 'Great, thanks! Here is your payment.'
+        : 'Have a nice day! (${cu.basket.length - packedCount} items left)';
+    final bubble = Rect.fromCenter(center: Offset(cx + 160, head.center.dy - 14), width: 244, height: 36);
+    _box(c, bubble, Colors.white, o: 2);
+    _r(c, bubble.left - 8, bubble.center.dy, 8, u, Colors.white); // tail towards the head
+    _text(c, msg, bubble.center.dx, bubble.center.dy, fontSize: 11, color: const Color(0xFF17120F), outline: false);
   }
 
   static final Map<String, TextPainter> _fpTextCache = {};
 
-  void _drawText(Canvas canvas, String text, double x, double y,
-      {double fontSize = 12, Color color = Colors.white, bool bold = false}) {
-    final key = '$text|$fontSize|${color.toARGB32()}|$bold';
+  TextPainter _tp(String text, double fontSize, Color color) {
+    final key = '$text|$fontSize|${color.toARGB32()}';
     var tp = _fpTextCache[key];
     if (tp == null) {
-      if (_fpTextCache.length > 250) _fpTextCache.clear();
+      if (_fpTextCache.length > 300) _fpTextCache.clear();
       tp = TextPainter(
         text: TextSpan(
           text: text,
-          style: TextStyle(color: color, fontSize: fontSize, fontWeight: bold ? FontWeight.bold : FontWeight.normal),
+          style: TextStyle(color: color, fontSize: fontSize, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
         ),
         textDirection: TextDirection.ltr,
         textAlign: TextAlign.center,
       )..layout();
       _fpTextCache[key] = tp;
     }
-    tp.paint(canvas, Offset(x - tp.width / 2, y - tp.height / 2));
+    return tp;
+  }
+
+  void _text(Canvas canvas, String text, double x, double y,
+      {double fontSize = 12, Color color = Colors.white, bool outline = true}) {
+    final tp = _tp(text, fontSize, color);
+    final off = Offset((x - tp.width / 2).roundToDouble(), (y - tp.height / 2).roundToDouble());
+    if (outline) {
+      final o = _tp(text, fontSize, _ol);
+      for (final d in const [Offset(-1, 0), Offset(1, 0), Offset(0, -1), Offset(0, 1)]) {
+        o.paint(canvas, off + d);
+      }
+    }
+    tp.paint(canvas, off);
   }
 
   @override

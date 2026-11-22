@@ -17,7 +17,7 @@ class SimulationEngine with ChangeNotifier {
 
   // DEVAASA HARİTA BOYUTLARI (2000 x 1900 - Geniş Cadde + Büyük Market + 2 Sıralı Devasa Arka Çiftlik Vadisi)
   final double worldWidth = 2000;
-  final double worldHeight = 1900;
+  final double worldHeight = 1060;
 
   // Kamera Takip & Yakınlaştırma (WASD ile hareket ettikçe oyuncuyu yumuşakça takip eder)
   double cameraX = 1000;
@@ -28,14 +28,24 @@ class SimulationEngine with ChangeNotifier {
   // Oyuncu (Geniş marketin orta koridorunda doğar)
   double playerX = 1000;
   double playerY = 480;
-  double playerSpeed = 320; // Büyük haritada akıcı hız
+  double playerSpeed = 215; // top walking speed (smooth acceleration below)
+  double velX = 0;
+  double velY = 0;
+  int playerFacing = 0; // 0 = down, 1 = left, 2 = right, 3 = up
+  double _stepDist = 0;
+  double get playerSpeedNow => sqrt(velX * velX + velY * velY);
+
+  /// Sound effect hook: the screen plugs the audio service in here.
+  void Function(String name)? onSfx;
+  void _sfx(String name) => onSfx?.call(name);
+  void playSfx(String name) => onSfx?.call(name);
   double moveDirX = 0;
   double moveDirY = 0;
   double playerAngle = 0;
   double walkAnimTime = 0;
   CarriedBox? carriedBox;
 
-  // Oyuncunun Elindeki Çiftlik Aleti (🪣 Süt Kovası, 🌾 Hasat Tırpanı, 🪣 Yumurta Kovası)
+  // Oyuncunun Elindeki Çiftlik Aleti (🧺 Süt Kovası, 🌾 Hasat Tırpanı, 🧺 Yumurta Kovası)
   // Sadece çiftliğin içindeyken taşınır; çiftlikten çıkınca otomatik bırakılır!
   FarmToolType? playerTool;
   double playerActionAnimTimer = 0.0;
@@ -61,9 +71,9 @@ class SimulationEngine with ChangeNotifier {
 
   // Sabit Nesneler ve Bölgeler (Sol Üst Kasa Alanı Ferah Bırakıldı; Seviye Atladıkça 3 Kasa Açılır!)
   final List<Rect> checkoutCounters = const [
-    Rect.fromLTWH(145, 290, 180, 110), // 🛎️ 1. Kasa (Seviye 1 - Başlangıçta Açık)
-    Rect.fromLTWH(385, 290, 180, 110), // 🛎️ 2. Kasa (Seviye 2'de Açılır)
-    Rect.fromLTWH(625, 290, 180, 110), // 🛎️ 3. Kasa (Seviye 3'te Açılır)
+    Rect.fromLTWH(520, 290, 180, 110), // Register 1 (open from the start)
+    Rect.fromLTWH(330, 290, 180, 110), // Register 2 (store level 2)
+    Rect.fromLTWH(140, 290, 180, 110), // Register 3 (store level 3)
   ];
   int get unlockedCheckoutCount => storeLevel.clamp(1, 3);
   List<Rect> get unlockedCheckouts => checkoutCounters.take(unlockedCheckoutCount).toList();
@@ -82,10 +92,10 @@ class SimulationEngine with ChangeNotifier {
     return null;
   }
 
-  final Rect computerDesk = const Rect.fromLTWH(1640, 280, 160, 105);   // Yönetim & Sipariş Ofis Masası
-  final Rect trashCan = const Rect.fromLTWH(1790, 875, 64, 64);         // Geri Dönüşüm & Çöp Kutusu
+  final Rect computerDesk = const Rect.fromLTWH(1170, 285, 150, 105);   // Yönetim & Sipariş Ofis Masası
+  final Rect trashCan = const Rect.fromLTWH(1400, 890, 64, 64);         // Geri Dönüşüm & Çöp Kutusu
   final Rect courierStation = const Rect.fromLTWH(1285, 148, 215, 74);  // 🛵 3D Hızlı Kurye & Online Sipariş Durağı
-  final Rect courierPackingDesk = const Rect.fromLTWH(1420, 305, 170, 82); // 📦 3D Kurye Sipariş Paketleme İstasyonu (Kasadan Ayrı!)
+  final Rect courierPackingDesk = const Rect.fromLTWH(1335, 305, 145, 82); // 📦 3D Kurye Sipariş Paketleme İstasyonu (Kasadan Ayrı!)
 
   // 🛵 Motorlu Kurye & Acil Online Sipariş Sistemi
   CourierState courierState = CourierState.arriving;
@@ -127,12 +137,12 @@ class SimulationEngine with ChangeNotifier {
 
   // Müşteriler
   List<SimCustomer> customers = [];
-  double customerSpawnTimer = 2.0;
+  double customerSpawnTimer = 9.0;
 
   // Kamyon Animasyonu
   bool isTruckArriving = false;
   double truckX = -260;
-  double truckTargetX = 450;
+  double truckTargetX = 1000; // stops at the back door
   List<SimProductType> incomingShipment = [];
 
   // Parçacıklar
@@ -146,13 +156,18 @@ class SimulationEngine with ChangeNotifier {
     _initStore();
   }
 
-  bool get isCheeseUnlocked =>
-      shelves.any((s) => s.assignedProduct == SimProductType.cheese && s.isUnlocked);
+  // The farm and the cheese machine were scrapped: everything is ordered from the computer.
+  bool get isCheeseUnlocked => false;
+
+  // The store grows with the store level. Outside this range the floor is roped off.
+  double get storeMinX => storeLevel <= 1 ? 500.0 : (storeLevel == 2 ? 300.0 : 90.0);
+  double get storeMaxX => storeLevel <= 1 ? 1500.0 : (storeLevel == 2 ? 1700.0 : worldWidth - 90.0);
+  List<String> dawnUnlocks = [];
 
   double get nextLevelUpgradeCost {
-    if (storeLevel == 1) return 300.0;
-    if (storeLevel == 2) return 450.0;
-    return 600.0;
+    if (storeLevel == 1) return 500.0;
+    if (storeLevel == 2) return 900.0;
+    return 1500.0;
   }
 
   // Kamera Ölçek ve Koordinat Hesaplaması (%50'ye kadar küçültme destekli!)
@@ -191,273 +206,128 @@ class SimulationEngine with ChangeNotifier {
 
   void _initStore() {
     shelves = [
-      // ===============================================================
-      // BAŞLANGIÇTA AÇIK REYONLAR (Sol Üst Kasa Alanından Uzak, Ferah ve Dağınık!)
-      // ===============================================================
+      // Store layout: the starting store is small (x 500..1500). Buying store levels
+      // opens the side strips. One product is available at the start; the others
+      // open one by one as the days pass (see unlockDay / zoneLevel).
       StoreShelf(
         id: 'shelf_milk',
-        name: 'Taze Köy Sütü Dolabı',
+        name: 'Fresh Village Milk Cabinet',
         assignedProduct: SimProductType.milk,
-        rect: const Rect.fromLTWH(145, 610, 145, 175),
+        rect: const Rect.fromLTWH(540, 540, 145, 175),
         currentStock: 12,
         maxCapacity: 16,
         isUnlocked: true,
-        unlockCost: 0,
+        unlockDay: 1,
+        zoneLevel: 1,
       ),
       StoreShelf(
         id: 'shelf_flour',
-        name: 'Doğal Değirmen Unu',
+        name: 'Natural Mill Flour',
         assignedProduct: SimProductType.flour,
-        rect: const Rect.fromLTWH(510, 555, 210, 120),
-        currentStock: 12,
+        rect: const Rect.fromLTWH(1150, 560, 210, 120),
+        currentStock: 0,
         maxCapacity: 16,
-        isUnlocked: true,
-        unlockCost: 0,
+        isUnlocked: false,
+        unlockDay: 2,
+        zoneLevel: 1,
       ),
       StoreShelf(
         id: 'shelf_egg',
-        name: 'Köy Yumurtası Standı',
+        name: 'Fresh Egg Shelf',
         assignedProduct: SimProductType.egg,
-        rect: const Rect.fromLTWH(1195, 335, 155, 155),
-        currentStock: 16,
-        maxCapacity: 20,
-        isUnlocked: true,
-        unlockCost: 0,
-      ),
-
-      // ===============================================================
-      // SONRADAN KADEMELİ OLARAK AÇILACAK REYONLAR (Açılana Kadar Sadece Yazı Görünür!)
-      // ===============================================================
-      StoreShelf(
-        id: 'shelf_tomato',
-        name: 'Tarla Domatesi',
-        assignedProduct: SimProductType.tomato,
-        rect: const Rect.fromLTWH(1580, 480, 210, 125),
-        currentStock: 0,
-        maxCapacity: 18,
-        isUnlocked: false,
-        unlockCost: 200,
-      ),
-      StoreShelf(
-        id: 'shelf_pepper',
-        name: 'Taze Köy Biberi',
-        assignedProduct: SimProductType.pepper,
-        rect: const Rect.fromLTWH(1165, 600, 210, 120),
-        currentStock: 0,
-        maxCapacity: 18,
-        isUnlocked: false,
-        unlockCost: 350,
-      ),
-      StoreShelf(
-        id: 'shelf_cheese',
-        name: 'Tulum Peyniri',
-        assignedProduct: SimProductType.cheese,
-        rect: const Rect.fromLTWH(440, 795, 205, 120),
-        currentStock: 0,
-        maxCapacity: 14,
-        isUnlocked: false,
-        unlockCost: 500,
-      ),
-      StoreShelf(
-        id: 'shelf_apple',
-        name: 'Amasya Elması',
-        assignedProduct: SimProductType.apple,
-        rect: const Rect.fromLTWH(1565, 750, 210, 125),
-        currentStock: 0,
-        maxCapacity: 18,
-        isUnlocked: false,
-        unlockCost: 650,
-      ),
-      StoreShelf(
-        id: 'shelf_bread',
-        name: 'Taş Fırın Ekmeği',
-        assignedProduct: SimProductType.bread,
-        rect: const Rect.fromLTWH(1165, 825, 210, 115),
+        rect: const Rect.fromLTWH(540, 780, 155, 155),
         currentStock: 0,
         maxCapacity: 16,
         isUnlocked: false,
-        unlockCost: 800,
+        unlockDay: 3,
+        zoneLevel: 1,
+      ),
+      StoreShelf(
+        id: 'shelf_bread',
+        name: 'Bakery Bread Shelf',
+        assignedProduct: SimProductType.bread,
+        rect: const Rect.fromLTWH(1150, 770, 210, 115),
+        currentStock: 0,
+        maxCapacity: 16,
+        isUnlocked: false,
+        unlockDay: 4,
+        zoneLevel: 1,
+      ),
+      StoreShelf(
+        id: 'shelf_tomato',
+        name: 'Tomato Stand',
+        assignedProduct: SimProductType.tomato,
+        rect: const Rect.fromLTWH(310, 560, 180, 125),
+        currentStock: 0,
+        maxCapacity: 16,
+        isUnlocked: false,
+        unlockDay: 5,
+        zoneLevel: 2,
+      ),
+      StoreShelf(
+        id: 'shelf_pepper',
+        name: 'Pepper Stand',
+        assignedProduct: SimProductType.pepper,
+        rect: const Rect.fromLTWH(1510, 560, 180, 120),
+        currentStock: 0,
+        maxCapacity: 16,
+        isUnlocked: false,
+        unlockDay: 6,
+        zoneLevel: 2,
+      ),
+      StoreShelf(
+        id: 'shelf_apple',
+        name: 'Apple Stand',
+        assignedProduct: SimProductType.apple,
+        rect: const Rect.fromLTWH(110, 560, 180, 125),
+        currentStock: 0,
+        maxCapacity: 16,
+        isUnlocked: false,
+        unlockDay: 7,
+        zoneLevel: 3,
+      ),
+      StoreShelf(
+        id: 'shelf_cheese',
+        name: 'Cheese Cabinet',
+        assignedProduct: SimProductType.cheese,
+        rect: const Rect.fromLTWH(1710, 560, 180, 120),
+        currentStock: 0,
+        maxCapacity: 16,
+        isUnlocked: false,
+        unlockDay: 8,
+        zoneLevel: 3,
       ),
     ];
 
-    // ===============================================================
-    // ARKA BAHÇE DEVASA 3D ÇİFTLİK TESİSLERİ
-    // 1. Sıra: Başlangıçta Açık (Ahır, Buğday Tarlası, Kümes)
-    // 2. Sıra: Marketten Meyve/Sebze/Ekmek Reyonu Açıldıkça Otomatik Açılan Tarlalar!
-    // ===============================================================
-    farmProducers = [
-      FarmProducer(
-        id: 'farm_barn',
-        name: 'İnek Merası & Mandıra',
-        emoji: '🐄',
-        zoneType: FarmZoneType.barn,
-        rect: const Rect.fromLTWH(140, 1160, 440, 290),
-        solidBuildingRect: Rect.zero,
-        gateMinX: 310,
-        gateMaxX: 420,
-        toolStandPos: const Offset(255, 1126),
-        requiredTool: FarmToolType.milkBucket,
-        primaryProduct: SimProductType.milk,
-        isUnlocked: true,
-        spots: [
-          FarmHarvestSpot(id: 'cow_0', index: 0, x: 215, y: 1248, productType: SimProductType.milk, regrowDuration: 5.2),
-          FarmHarvestSpot(id: 'cow_1', index: 1, x: 465, y: 1255, productType: SimProductType.milk, regrowDuration: 6.4),
-          FarmHarvestSpot(id: 'cow_2', index: 2, x: 230, y: 1372, productType: SimProductType.milk, regrowDuration: 7.6),
-          FarmHarvestSpot(id: 'cow_3', index: 3, x: 475, y: 1378, productType: SimProductType.milk, regrowDuration: 8.8),
-        ],
-        readyBoxes: 4,
-        maxBoxes: 4,
-        productionDuration: 6.5,
-      ),
-      FarmProducer(
-        id: 'farm_field',
-        name: 'Değirmen & Buğday Tarlası',
-        emoji: '🌾',
-        zoneType: FarmZoneType.field,
-        rect: const Rect.fromLTWH(780, 1160, 440, 290),
-        solidBuildingRect: const Rect.fromLTWH(805, 1245, 88, 102),
-        gateMinX: 995,
-        gateMaxX: 1105,
-        toolStandPos: const Offset(945, 1126),
-        requiredTool: FarmToolType.scythe,
-        primaryProduct: SimProductType.flour,
-        isUnlocked: true,
-        spots: [
-          FarmHarvestSpot(id: 'crop_0', index: 0, x: 960, y: 1242, productType: SimProductType.flour, regrowDuration: 4.8),
-          FarmHarvestSpot(id: 'crop_1', index: 1, x: 1062, y: 1248, productType: SimProductType.flour, regrowDuration: 5.7),
-          FarmHarvestSpot(id: 'crop_2', index: 2, x: 1162, y: 1242, productType: SimProductType.flour, regrowDuration: 6.6),
-          FarmHarvestSpot(id: 'crop_3', index: 3, x: 960, y: 1362, productType: SimProductType.flour, regrowDuration: 7.5),
-          FarmHarvestSpot(id: 'crop_4', index: 4, x: 1062, y: 1368, productType: SimProductType.flour, regrowDuration: 8.4),
-          FarmHarvestSpot(id: 'crop_5', index: 5, x: 1162, y: 1362, productType: SimProductType.flour, regrowDuration: 9.2),
-        ],
-        readyBoxes: 6,
-        maxBoxes: 6,
-        productionDuration: 6.0,
-      ),
-      FarmProducer(
-        id: 'farm_coop',
-        name: 'Tavuk Çiftliği & Kümes',
-        emoji: '🐔',
-        zoneType: FarmZoneType.coop,
-        rect: const Rect.fromLTWH(1420, 1160, 440, 290),
-        solidBuildingRect: const Rect.fromLTWH(1700, 1205, 140, 205),
-        gateMinX: 1500,
-        gateMaxX: 1605,
-        toolStandPos: const Offset(1455, 1126),
-        requiredTool: FarmToolType.eggBucket,
-        primaryProduct: SimProductType.egg,
-        isUnlocked: true,
-        spots: [
-          FarmHarvestSpot(id: 'nest_0', index: 0, x: 1475, y: 1242, productType: SimProductType.egg, regrowDuration: 4.5),
-          FarmHarvestSpot(id: 'nest_1', index: 1, x: 1615, y: 1255, productType: SimProductType.egg, regrowDuration: 5.8),
-          FarmHarvestSpot(id: 'nest_2', index: 2, x: 1480, y: 1368, productType: SimProductType.egg, regrowDuration: 7.1),
-          FarmHarvestSpot(id: 'nest_3', index: 3, x: 1620, y: 1380, productType: SimProductType.egg, regrowDuration: 8.4),
-        ],
-        readyBoxes: 4,
-        maxBoxes: 4,
-        productionDuration: 5.5,
-      ),
-
-      // ===============================================================
-      // MEYVE / SEBZE / EKMEK REYONU AÇILDIĞINDA OTOMATİK AÇILAN TARLALAR!
-      // ===============================================================
-      FarmProducer(
-        id: 'farm_tomato',
-        name: 'Domates Tarlası',
-        emoji: '🍅',
-        zoneType: FarmZoneType.field,
-        rect: const Rect.fromLTWH(120, 1565, 390, 260),
-        solidBuildingRect: Rect.zero,
-        gateMinX: 260,
-        gateMaxX: 360,
-        toolStandPos: const Offset(215, 1532),
-        requiredTool: FarmToolType.scythe,
-        primaryProduct: SimProductType.tomato,
-        isUnlocked: false,
-        spots: [
-          FarmHarvestSpot(id: 'tom_0', index: 0, x: 215, y: 1645, productType: SimProductType.tomato, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'tom_1', index: 1, x: 395, y: 1645, productType: SimProductType.tomato, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'tom_2', index: 2, x: 215, y: 1745, productType: SimProductType.tomato, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'tom_3', index: 3, x: 395, y: 1745, productType: SimProductType.tomato, regrowDuration: 5.5),
-        ],
-        readyBoxes: 4,
-        maxBoxes: 4,
-        productionDuration: 5.5,
-      ),
-      FarmProducer(
-        id: 'farm_pepper',
-        name: 'Köy Biberi Tarlası',
-        emoji: '🫑',
-        zoneType: FarmZoneType.field,
-        rect: const Rect.fromLTWH(580, 1565, 390, 260),
-        solidBuildingRect: Rect.zero,
-        gateMinX: 720,
-        gateMaxX: 820,
-        toolStandPos: const Offset(675, 1532),
-        requiredTool: FarmToolType.scythe,
-        primaryProduct: SimProductType.pepper,
-        isUnlocked: false,
-        spots: [
-          FarmHarvestSpot(id: 'pep_0', index: 0, x: 675, y: 1645, productType: SimProductType.pepper, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'pep_1', index: 1, x: 855, y: 1645, productType: SimProductType.pepper, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'pep_2', index: 2, x: 675, y: 1745, productType: SimProductType.pepper, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'pep_3', index: 3, x: 855, y: 1745, productType: SimProductType.pepper, regrowDuration: 5.5),
-        ],
-        readyBoxes: 4,
-        maxBoxes: 4,
-        productionDuration: 5.5,
-      ),
-      FarmProducer(
-        id: 'farm_apple',
-        name: 'Amasya Elması Bahçesi',
-        emoji: '🍎',
-        zoneType: FarmZoneType.field,
-        rect: const Rect.fromLTWH(1040, 1565, 390, 260),
-        solidBuildingRect: Rect.zero,
-        gateMinX: 1180,
-        gateMaxX: 1280,
-        toolStandPos: const Offset(1135, 1532),
-        requiredTool: FarmToolType.scythe,
-        primaryProduct: SimProductType.apple,
-        isUnlocked: false,
-        spots: [
-          FarmHarvestSpot(id: 'app_0', index: 0, x: 1135, y: 1645, productType: SimProductType.apple, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'app_1', index: 1, x: 1315, y: 1645, productType: SimProductType.apple, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'app_2', index: 2, x: 1135, y: 1745, productType: SimProductType.apple, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'app_3', index: 3, x: 1315, y: 1745, productType: SimProductType.apple, regrowDuration: 5.5),
-        ],
-        readyBoxes: 4,
-        maxBoxes: 4,
-        productionDuration: 5.5,
-      ),
-      FarmProducer(
-        id: 'farm_bread',
-        name: 'Taş Fırın & Başak Tarlası',
-        emoji: '🥖',
-        zoneType: FarmZoneType.field,
-        rect: const Rect.fromLTWH(1500, 1565, 390, 260),
-        solidBuildingRect: Rect.zero,
-        gateMinX: 1640,
-        gateMaxX: 1740,
-        toolStandPos: const Offset(1595, 1532),
-        requiredTool: FarmToolType.scythe,
-        primaryProduct: SimProductType.bread,
-        isUnlocked: false,
-        spots: [
-          FarmHarvestSpot(id: 'brd_0', index: 0, x: 1595, y: 1645, productType: SimProductType.bread, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'brd_1', index: 1, x: 1775, y: 1645, productType: SimProductType.bread, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'brd_2', index: 2, x: 1595, y: 1745, productType: SimProductType.bread, regrowDuration: 5.5),
-          FarmHarvestSpot(id: 'brd_3', index: 3, x: 1775, y: 1745, productType: SimProductType.bread, regrowDuration: 5.5),
-        ],
-        readyBoxes: 4,
-        maxBoxes: 4,
-        productionDuration: 5.5,
-      ),
-    ];
+    // The farm is scrapped for now.
+    farmProducers = [];
   }
 
   List<SimProductType> get unlockedProducts {
     return shelves.where((s) => s.isUnlocked).map((s) => s.assignedProduct).toList();
+  }
+
+  /// Opens every shelf whose day has come and whose area of the store is open.
+  /// Returns the names of the products that were opened.
+  List<String> refreshShelfUnlocks() {
+    final opened = <String>[];
+    for (final s in shelves) {
+      if (s.isUnlocked) continue;
+      if (day >= s.unlockDay && storeLevel >= s.zoneLevel) {
+        if (unlockShelf(s)) {
+          final def = productCatalog[s.assignedProduct]!;
+          opened.add('${def.emoji} ${def.name}');
+        }
+      }
+    }
+    return opened;
+  }
+
+  /// Short text explaining why a shelf is still closed.
+  String shelfLockReason(StoreShelf s) {
+    if (day < s.unlockDay) return 'Opens on Day ${s.unlockDay}';
+    if (storeLevel < s.zoneLevel) return 'Needs Store Level ${s.zoneLevel}';
+    return 'Opening soon';
   }
 
   bool unlockShelf(StoreShelf shelf) {
@@ -490,7 +360,7 @@ class SimulationEngine with ChangeNotifier {
     spawnParticle(
       shelf.rect.center.dx,
       shelf.rect.top - 10,
-      '🔓 ${def.emoji} ${shelf.name} Açıldı!',
+      '🔓 ${def.emoji} ${shelf.name} Unlocked!',
       Colors.greenAccent,
       size: 18,
     );
@@ -502,14 +372,14 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           shelf.rect.center.dx,
           shelf.rect.top - 34,
-          '🌱 ${def.emoji} ${farm.name} Çiftlikte Açıldı!',
+          '🌱 ${def.emoji} ${farm.name} Unlocked at the Farm!',
           Colors.amberAccent,
           size: 17,
         );
         spawnParticle(
           farm.rect.center.dx,
           farm.rect.top - 18,
-          '🌱 ${def.emoji} ${farm.name} Açıldı!',
+          '🌱 ${def.emoji} ${farm.name} Unlocked!',
           Colors.greenAccent,
           size: 19,
         );
@@ -521,7 +391,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         cheeseMachineRect.center.dx,
         cheeseMachineRect.top - 18,
-        '🧀 3D Peynir Yapma Makinesi Kuruldu!',
+        '🧀 3D Cheese Making Machine Installed!',
         Colors.amberAccent,
         size: 19,
       );
@@ -599,7 +469,441 @@ class SimulationEngine with ChangeNotifier {
     );
   }
 
+  // ===============================================================
+  // 🌙 DAY / NIGHT CYCLE, THIEVES & STICK
+  // ===============================================================
+  DayPhase phase = DayPhase.day;
+  double phaseTimer = 0.0;
+  final double dayLength = 120.0;   // seconds of daylight
+  final double nightLength = 50.0;  // seconds of night
+  List<Thief> thieves = [];
+  double thiefSpawnTimer = 3.0;
+  int nightThievesSpawned = 0;
+  int nightThievesPlanned = 0;
+  int nightStolenItems = 0;
+  int nightRecoveredItems = 0;
+  int nightThievesRepelled = 0;
+  double nightStolenValue = 0.0;
+  double nightBounty = 0.0;
+  bool dawnReportPending = false;
+  int reportDay = 1;
+  double stickSwingTimer = 0.0; // 1.0 -> 0.0
+  double stickCooldown = 0.0;
+  double stickHitDirX = 1.0;
+  bool tutorialFreeze = false;  // true while a tutorial card is open
+  int nightsSurvived = 0;
+  int totalThiefHits = 0;
+  int _thiefCounter = 0;
+
+  bool get isNight => phase == DayPhase.night;
+
+  /// Day timer hit 0:00 but shoppers are still inside: wait for them to leave
+  /// before the night (and the thieves) begin. No new customers come in.
+  bool closingTime = false;
+
+  // Small HUD toasts ("customer waiting", "delivery at the back door")
+  String? toastText;
+  double toastTimer = 0.0;
+  int toastKind = 0; // 0 = register, 1 = delivery
+  void showToast(String text, {int kind = 0, double seconds = 3.2}) {
+    toastText = text;
+    toastKind = kind;
+    toastTimer = seconds;
+  }
+  double _closingTimer = 0.0;
+  bool restockerAtHome = false;
+  bool get staffOnDuty => !isNight;
+
+  /// 0.0 = full daylight, 1.0 = deep night (used by the painter overlay & HUD).
+  double get nightDarkness {
+    if (phase == DayPhase.day) {
+      final left = dayLength - phaseTimer;
+      return (1.0 - left / 12.0).clamp(0.0, 1.0).toDouble();
+    }
+    final left = nightLength - phaseTimer;
+    return (left / 8.0).clamp(0.0, 1.0).toDouble();
+  }
+
+  double get phaseTimeLeft =>
+      (phase == DayPhase.day ? dayLength : nightLength) - phaseTimer;
+
+  void _updateDayNight(double dt) {
+    phaseTimer += dt;
+    if (stickSwingTimer > 0) {
+      stickSwingTimer = (stickSwingTimer - dt * 4.2).clamp(0.0, 1.0).toDouble();
+    }
+    if (stickCooldown > 0) stickCooldown -= dt;
+
+    if (phase == DayPhase.day) {
+      if (phaseTimer >= dayLength) {
+        phaseTimer = dayLength; // clock waits at 0.00
+        if (customers.isEmpty) {
+          _startNight();
+        } else {
+          closingTime = true;
+          _closingTimer += dt;
+          // Stragglers who are still browsing head for the exit after a while
+          if (_closingTimer > 6.0) {
+            for (final c in customers) {
+              if (c.state == CustomerState.walkingToEntrance ||
+                  c.state == CustomerState.shopping) {
+                c.state = CustomerState.leavingSad;
+              }
+            }
+          }
+        }
+      }
+    } else {
+      if (phaseTimer >= nightLength) {
+        _endNight();
+      }
+    }
+  }
+
+  void _startNight() {
+    phase = DayPhase.night;
+    phaseTimer = 0.0;
+    closingTime = false;
+    _closingTimer = 0.0;
+    _sfx('night');
+    customers.clear(); // (already empty: we waited for everyone to leave)
+    _courierGoHome();
+    thieves.clear();
+    nightThievesSpawned = 0;
+    nightStolenItems = 0;
+    nightRecoveredItems = 0;
+    nightThievesRepelled = 0;
+    nightStolenValue = 0.0;
+    nightBounty = 0.0;
+    nightThievesPlanned = min(1 + day ~/ 2, 8);
+    thiefSpawnTimer = 3.0;
+    spawnParticle(playerX, playerY - 40, '🌙 Night falls! Guard the shelves!', Colors.lightBlueAccent, size: 18);
+  }
+
+  void _endNight() {
+    // Anyone still inside escapes with whatever they are holding.
+    for (final t in thieves) {
+      if (t.carried > 0 && t.loot != null) {
+        final def = productCatalog[t.loot!];
+        nightStolenItems += t.carried;
+        nightStolenValue += t.carried * (def?.retailPrice ?? 0.0);
+      }
+    }
+    thieves.clear();
+    phase = DayPhase.day;
+    phaseTimer = 0.0;
+    closingTime = false;
+    _closingTimer = 0.0;
+    nightsSurvived++;
+    _sfx('dawn');
+    reportDay = day;
+    day++;
+    customerSpawnTimer = 5.0;
+    dawnUnlocks = refreshShelfUnlocks();
+    dawnReportPending = true;
+    spawnParticle(playerX, playerY - 40, '☀️ A new day begins!', Colors.amberAccent, size: 18);
+  }
+
+  void _updateThieves(double dt) {
+    if (!isNight) return;
+
+    // Spawn thieves spread across the first part of the night
+    if (nightThievesSpawned < nightThievesPlanned && phaseTimer < nightLength - 10) {
+      thiefSpawnTimer -= dt;
+      if (thiefSpawnTimer <= 0) {
+        _spawnThief();
+        thiefSpawnTimer = max(3.0, (nightLength - 14) / max(1, nightThievesPlanned));
+      }
+    }
+
+    for (int i = thieves.length - 1; i >= 0; i--) {
+      final t = thieves[i];
+      if (t.hitFlash > 0) t.hitFlash = (t.hitFlash - dt * 4.0).clamp(0.0, 1.0).toDouble();
+
+      switch (t.state) {
+        case ThiefState.sneaking:
+          _thiefSneak(t, dt);
+          break;
+        case ThiefState.stealing:
+          _thiefSteal(t, dt);
+          break;
+        case ThiefState.stunned:
+          t.stunTimer -= dt;
+          final knx = t.x + t.knockX * dt;
+          final kny = t.y + t.knockY * dt;
+          if (_thiefPosOk(t.x, t.y, knx, kny)) {
+            t.x = knx;
+            t.y = kny;
+          } else {
+            t.knockX = 0;
+            t.knockY = 0;
+          }
+          t.knockX *= 0.86;
+          t.knockY *= 0.86;
+          if (t.stunTimer <= 0) {
+            t.state = ThiefState.fleeing;
+          }
+          break;
+        case ThiefState.fleeing:
+          _moveThiefTowards(t, worldWidth / 2, 232, t.speed * 1.25, dt, isExit: true);
+          break;
+      }
+
+      // Made it out of the door
+      if (t.state == ThiefState.fleeing && t.y <= 60) {
+        if (t.carried > 0 && t.loot != null) {
+          final def = productCatalog[t.loot!];
+          nightStolenItems += t.carried;
+          nightStolenValue += t.carried * (def?.retailPrice ?? 0.0);
+          spawnParticle(t.x, t.y, '🦹 Escaped with ${t.carried} ${def?.emoji ?? ''}!', Colors.redAccent, size: 15);
+        }
+        thieves.removeAt(i);
+      }
+    }
+  }
+
+  void _spawnThief() {
+    final r = Random();
+    final hp = 2 + (day ~/ 4).clamp(0, 3).toInt();
+    _thiefCounter++;
+    final t = Thief(
+      id: 'thief_$_thiefCounter',
+      x: worldWidth / 2 + (r.nextDouble() - 0.5) * 160,
+      y: 25,
+      hp: hp,
+      speed: 105 + r.nextDouble() * 35 + min(day, 10) * 4.0,
+    );
+    final target = _pickThiefTarget();
+    if (target == null) {
+      t.state = ThiefState.fleeing;
+    } else {
+      t.targetShelfId = target.id;
+      t.loot = target.assignedProduct;
+    }
+    thieves.add(t);
+    nightThievesSpawned++;
+  }
+
+  StoreShelf? _pickThiefTarget() {
+    final candidates = shelves.where((s) => s.isUnlocked && s.currentStock > 0).toList();
+    if (candidates.isEmpty) return null;
+    return candidates[Random().nextInt(candidates.length)];
+  }
+
+  StoreShelf? _shelfById(String? id) {
+    if (id == null) return null;
+    for (final s in shelves) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
+  void _thiefSneak(Thief t, double dt) {
+    var shelf = _shelfById(t.targetShelfId);
+    if (shelf == null || shelf.currentStock <= 0) {
+      shelf = _pickThiefTarget();
+      if (shelf == null) {
+        t.state = ThiefState.fleeing;
+        return;
+      }
+      t.targetShelfId = shelf.id;
+      t.loot = shelf.assignedProduct;
+    }
+    final tx = shelf.rect.center.dx;
+    final ty = shelf.rect.bottom + 30;
+    if (shelf.rect.inflate(48).contains(Offset(t.x, t.y))) {
+      t.state = ThiefState.stealing;
+      t.stealTimer = 0.6;
+      return;
+    }
+    _moveThiefTowards(t, tx, ty, t.speed, dt);
+  }
+
+  void _thiefSteal(Thief t, double dt) {
+    final shelf = _shelfById(t.targetShelfId);
+    if (shelf == null) {
+      t.state = ThiefState.fleeing;
+      return;
+    }
+    t.stealTimer -= dt;
+    if (t.stealTimer <= 0) {
+      if (shelf.currentStock > 0 && t.carried < 3) {
+        shelf.currentStock--;
+        t.carried++;
+        _sfx('steal');
+        t.loot = shelf.assignedProduct;
+        t.stealTimer = 1.0;
+        spawnParticle(t.x, t.y - 26, '🦹 -1 ${productCatalog[shelf.assignedProduct]?.emoji ?? ''}', Colors.redAccent, size: 14);
+      } else {
+        t.state = ThiefState.fleeing;
+      }
+    }
+  }
+
+  void _moveThiefTowards(Thief t, double targetX, double targetY, double speed, double dt, {bool isExit = false}) {
+    // Once outside the shop the thief just runs straight up the street.
+    double gx = targetX;
+    double gy = targetY;
+    if (isExit && t.y <= 235) {
+      gx = worldWidth / 2;
+      gy = -40;
+    }
+    final doorCenter = worldWidth / 2;
+    Offset wp;
+    if (t.y < 235 && gy >= 225 && (t.x - doorCenter).abs() > 100) {
+      // Outside: walk to the door first, never through the front wall
+      wp = Offset(doorCenter, 28);
+    } else if (t.y < 235 && gy >= 225) {
+      wp = Offset((t.x).clamp(doorCenter - 100, doorCenter + 100).toDouble(), 255.0);
+    } else {
+      wp = _getStoreSmartWaypoint(t.x, t.y, gx, gy);
+    }
+    final dx = wp.dx - t.x;
+    final dy = wp.dy - t.y;
+    final dist = sqrt(dx * dx + dy * dy);
+    if (dist > 0.5) {
+      final step = speed * dt;
+      double nx, ny;
+      if (step >= dist) {
+        nx = wp.dx;
+        ny = wp.dy;
+      } else {
+        nx = t.x + (dx / dist) * step;
+        ny = t.y + (dy / dist) * step;
+      }
+      if (_thiefPosOk(t.x, t.y, nx, ny)) {
+        t.x = nx;
+        t.y = ny;
+      } else if (_thiefPosOk(t.x, t.y, nx, t.y)) {
+        t.x = nx; // slide along walls / shelves
+      } else if (_thiefPosOk(t.x, t.y, t.x, ny)) {
+        t.y = ny;
+      }
+      t.walkAngle = atan2(dy, dx);
+      t.walkAnim += dt * 10;
+    }
+  }
+
+  /// Walls, shelves and desks block thieves just like they block the player.
+  bool _thiefPosOk(double ox, double oy, double nx, double ny) {
+    final doorCenter = worldWidth / 2;
+    if (ny >= 225) {
+      if (nx < storeMinX || nx > storeMaxX || ny > 975) return false;
+    }
+    if ((oy < 230 && ny >= 230) || (oy >= 230 && ny < 230)) {
+      if ((nx - doorCenter).abs() > 130) return false;
+    }
+    if (ny >= 232) {
+      final r = Rect.fromCircle(center: Offset(nx, ny), radius: 10);
+      for (final obs in _getStoreObstacleRects()) {
+        if (r.overlaps(obs.deflate(4))) {
+          // allow stepping out of an obstacle we are already touching
+          final cur = Rect.fromCircle(center: Offset(ox, oy), radius: 10);
+          if (cur.overlaps(obs.deflate(4))) continue;
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /// Swing the stick. Hits every thief close to the player.
+  void swingStick() {
+    if (stickCooldown > 0) return;
+    stickCooldown = 0.42;
+    stickSwingTimer = 1.0;
+    _sfx('swish');
+
+    // Face the nearest thief in reach so the swing looks right
+    Thief? nearest;
+    double best = 150;
+    for (final t in thieves) {
+      final d = sqrt(pow(t.x - playerX, 2) + pow(t.y - playerY, 2)).toDouble();
+      if (d < best) {
+        best = d;
+        nearest = t;
+      }
+    }
+    if (nearest != null) {
+      playerAngle = atan2(nearest.y - playerY, nearest.x - playerX);
+    }
+    stickHitDirX = cos(playerAngle) >= 0 ? 1.0 : -1.0;
+
+    bool hitAny = false;
+    for (final t in List<Thief>.from(thieves)) {
+      final d = sqrt(pow(t.x - playerX, 2) + pow(t.y - playerY, 2)).toDouble();
+      if (d <= 92) {
+        _hitThief(t);
+        hitAny = true;
+      }
+    }
+    if (!hitAny) {
+      spawnParticle(playerX + stickHitDirX * 36, playerY - 10, 'swish', Colors.white70, size: 11);
+    }
+  }
+
+  /// Called when the player taps on a thief: swing if close, otherwise run at it.
+  void attackThiefAt(Thief t) {
+    final d = sqrt(pow(t.x - playerX, 2) + pow(t.y - playerY, 2)).toDouble();
+    if (d <= 92) {
+      swingStick();
+    } else {
+      setTargetMove(t.x, t.y + 20);
+    }
+  }
+
+  Thief? thiefNear(double wx, double wy, {double radius = 40}) {
+    Thief? best;
+    double bestD = radius;
+    for (final t in thieves) {
+      final d = sqrt(pow(t.x - wx, 2) + pow(t.y - 6 - wy, 2)).toDouble();
+      if (d < bestD) {
+        bestD = d;
+        best = t;
+      }
+    }
+    return best;
+  }
+
+  void _hitThief(Thief t) {
+    totalThiefHits++;
+    _sfx('hit');
+    t.hp--;
+    t.hitFlash = 1.0;
+    var kx = t.x - playerX;
+    var ky = t.y - playerY;
+    final len = max(1.0, sqrt(kx * kx + ky * ky));
+    kx /= len;
+    ky /= len;
+    t.knockX = kx * 340;
+    t.knockY = ky * 340;
+    t.state = ThiefState.stunned;
+    t.stunTimer = 0.45;
+    spawnParticle(t.x, t.y - 30, '💥', Colors.orangeAccent, size: 20);
+
+    if (t.hp <= 0) {
+      // Drops the loot back on the shelf and runs away empty-handed
+      if (t.carried > 0 && t.loot != null) {
+        returnItemsToShelfOrBox(t.loot!, t.carried);
+        nightRecoveredItems += t.carried;
+        t.carried = 0;
+      }
+      nightThievesRepelled++;
+      const bounty = 15.0;
+      cash += bounty;
+      nightBounty += bounty;
+      spawnParticle(t.x, t.y - 46, 'Thief driven off! +\$15', Colors.greenAccent, size: 16);
+      t.state = ThiefState.stunned;
+      t.stunTimer = 0.45;
+      t.hp = 0;
+    }
+  }
+
   void update(double dt) {
+    if (tutorialFreeze) {
+      notifyListeners();
+      return;
+    }
     worldTime += dt;
     if (playerScanAnimTimer > 0) {
       playerScanAnimTimer = (playerScanAnimTimer - dt * 1.65).clamp(0.0, 1.0);
@@ -613,7 +917,7 @@ class SimulationEngine with ChangeNotifier {
     _updateShelvesAndDoors(dt);
 
     // Kamera oyuncuyu yumuşak ve akıcı biçimde takip eder
-    final camLerp = (9.0 * dt).clamp(0.0, 1.0);
+    final camLerp = (4.5 * dt).clamp(0.0, 1.0);
     cameraX += (playerX - cameraX) * camLerp;
     cameraY += (playerY - cameraY) * camLerp;
 
@@ -622,12 +926,26 @@ class SimulationEngine with ChangeNotifier {
     _updateCourier(dt);
     _updateCourierPacking(dt);
     if (hasRestocker && isRestockerHired) {
-      _updateRestocker(dt);
+      if (isNight) {
+        _restockerGoHome(dt);
+      } else {
+        if (restockerAtHome) {
+          restockerAtHome = false;
+          restocker.x = worldWidth / 2;
+          restocker.y = 70;
+          restocker.carriedBox = null;
+          restocker.equippedTool = null;
+        }
+        _updateRestocker(dt);
+      }
     }
-    if (isStoreOpen) {
+    if (isStoreOpen && !isNight) {
       _updateCustomers(dt);
     }
+    _updateDayNight(dt);
+    _updateThieves(dt);
     _updateParticles(dt);
+    if (toastTimer > 0) toastTimer -= dt;
     _checkInteractions();
     notifyListeners();
   }
@@ -656,7 +974,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           cheeseMachineRect.center.dx,
           cheeseMachineRect.top - 16,
-          '🧀 Tulum Peyniri Hazır! ($cheeseMachineReadyBoxes/$cheeseMachineMaxBoxes)',
+          '🧀 Tulum Cheese Ready! (${cheeseMachineReadyBoxes}/${cheeseMachineMaxBoxes})',
           Colors.greenAccent,
           size: 16,
         );
@@ -697,7 +1015,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         cheeseMachineRect.center.dx,
         cheeseMachineRect.top - 15,
-        '🥛 Önce Ahırdan Süt Sağıp Peynir Makinesine Getiriliyor...',
+        '🥛 Milking at the Barn First, Then Bringing It to the Cheese Machine...',
         Colors.lightBlueAccent,
         size: 14,
       );
@@ -713,7 +1031,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           cheeseMachineRect.center.dx,
           cheeseMachineRect.top - 15,
-          '⚠️ Peynir Makinesi Dolu!',
+          '⚠️ Cheese Machine Is Full!',
           Colors.orangeAccent,
         );
         return false;
@@ -724,7 +1042,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         cheeseMachineRect.center.dx,
         cheeseMachineRect.top - 18,
-        '🥛➔🧀 Süt Peynir Makinesine Döküldü!',
+        '🥛➔🧀 Milk Poured into the Cheese Machine!',
         Colors.cyanAccent,
         size: 16,
       );
@@ -746,7 +1064,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         cheeseMachineRect.center.dx,
         cheeseMachineRect.top - 18,
-        '🧀 +${def.boxSize} Tulum Peyniri Alındı!',
+        '🧀 +${def.boxSize} Tulum Cheese Collected!',
         Colors.amberAccent,
         size: 16,
       );
@@ -766,7 +1084,7 @@ class SimulationEngine with ChangeNotifier {
   }
 
   // ===============================================================
-  // 🪣🌾 ÇİFTLİK EKİPMAN & İÇERİ GİRİP HASAT / SAĞIM / TOPLAMA SİSTEMİ
+  // 🧺🌾 ÇİFTLİK EKİPMAN & İÇERİ GİRİP HASAT / SAĞIM / TOPLAMA SİSTEMİ
   // Çiftlikten çıkınca Tırpan ve Kova otomatik bırakılır!
   // ===============================================================
 
@@ -776,7 +1094,7 @@ class SimulationEngine with ChangeNotifier {
     spawnParticle(
       playerX,
       playerY - 38,
-      '${farm.requiredTool.emoji} ${farm.requiredTool.name} Alındı!',
+      '${farm.requiredTool.emoji} ${farm.requiredTool.name} Picked Up!',
       Colors.amberAccent,
       size: 16,
     );
@@ -809,7 +1127,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           playerX,
           playerY - 35,
-          '⚠️ Önce elindekini marketteki rafa diz!',
+          '⚠️ Put what you are holding on the store shelf first!',
           Colors.orangeAccent,
           size: 15,
         );
@@ -831,7 +1149,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           farm.toolStandPos.dx,
           farm.toolStandPos.dy - 20,
-          '${farm.requiredTool.emoji} Önce ${farm.requiredTool.name} Alınıyor...',
+          '${farm.requiredTool.emoji} Picking Up ${farm.requiredTool.name} First...',
           Colors.cyanAccent,
           size: 14,
         );
@@ -853,7 +1171,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         farm.gateCenter.dx,
         farm.rect.top + 30,
-        '⏳ Yeni mahsul/süt hazırlanıyor...',
+        '⏳ New crops/milk are being prepared...',
         Colors.amberAccent,
         size: 14,
       );
@@ -936,7 +1254,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         playerX,
         playerY - 24,
-        '${droppedTool.emoji} ${droppedTool.name} Çiftlik Girişine Bırakıldı',
+        '${droppedTool.emoji} ${droppedTool.name} Left at the Farm Entrance',
         Colors.white70,
         size: 13,
       );
@@ -999,13 +1317,13 @@ class SimulationEngine with ChangeNotifier {
             pendingAutoFarmId = null;
             playerTool = null;
 
-            String msg = '${def.emoji} ${def.name} Toplandı! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+            String msg = '${def.emoji} ${def.name} Collected! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             if (farm.zoneType == FarmZoneType.barn) {
-              msg = '🥛 Süt Sağıldı, Kova Bırakıldı! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+              msg = '🥛 Cow Milked, Bucket Dropped! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             } else if (farm.primaryProduct == SimProductType.flour) {
-              msg = '🌾 Tırpan Bırakıldı, Buğdaylar Elde! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+              msg = '🌾 Scythe Dropped, Wheat in Hand! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             } else if (farm.zoneType == FarmZoneType.coop) {
-              msg = '🥚 Yumurtalar Toplandı, Kova Bırakıldı! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
+              msg = '🥚 Eggs Collected, Bucket Dropped! (${carriedBox!.currentCount}/${carriedBox!.maxCount})';
             }
             spawnParticle(playerX, playerY - 40, msg, Colors.greenAccent, size: 15);
 
@@ -1039,9 +1357,29 @@ class SimulationEngine with ChangeNotifier {
   // ===============================================================
   // 🛵 MOTORLU KURYE & ACİL ONLİNE SİPARİŞ DÖNGÜSÜ
   // ===============================================================
+  /// Courier clocks out for the night: drops the current order and rides off.
+  void _courierGoHome() {
+    if (courierState == CourierState.arriving ||
+        courierState == CourierState.waitingForOrder) {
+      activeCourierOrder = null;
+      courierStagedCount = 0;
+      courierStagedProduct = null;
+      courierPackingProgress = 0.0;
+      pendingPackForCourier = false;
+      pendingDeliverToCourier = false;
+      shouldOpenCourierPackingDialog = false;
+      _warnedExcessAtDesk = false;
+      courierState = CourierState.departing;
+    }
+  }
+
   void _updateCourier(double dt) {
+    if (isNight && (courierState == CourierState.arriving || courierState == CourierState.waitingForOrder)) {
+      _courierGoHome();
+    }
     switch (courierState) {
       case CourierState.away:
+        if (isNight) break; // off duty until morning
         courierCooldown -= dt;
         if (courierCooldown <= 0) {
           courierX = worldWidth + 140;
@@ -1072,7 +1410,7 @@ class SimulationEngine with ChangeNotifier {
           spawnParticle(
             courierStation.center.dx,
             courierStation.top - 15,
-            '⏰ Kurye Süresi Doldu!',
+            '⏰ Courier Time Is Up!',
             Colors.redAccent,
             size: 16,
           );
@@ -1111,7 +1449,7 @@ class SimulationEngine with ChangeNotifier {
     final qty = 3 + random.nextInt(4);
     final reward = (def.retailPrice * qty * 2.2).roundToDouble();
 
-    final onlineNames = ['GetirYemek #402', 'HızlıMarket #108', 'Bölge Kurye #85', 'Acil Paket #219', 'VIP Sipariş #77'];
+    final onlineNames = ['QuickBite #402', 'FastMarket #108', 'Local Courier #85', 'Urgent Parcel #219', 'VIP Order #77'];
     activeCourierOrder = CourierOrder(
       id: 'ord_${DateTime.now().millisecondsSinceEpoch}',
       customerName: onlineNames[random.nextInt(onlineNames.length)],
@@ -1131,7 +1469,7 @@ class SimulationEngine with ChangeNotifier {
     spawnParticle(
       courierStation.center.dx,
       courierStation.top - 20,
-      '🛵 Yeni Kurye Siparişi: ${qty}x ${def.emoji} (Dolaptan Tek Tek Al & 📦 Paketle!)',
+      '🛵 New Courier Order: ${qty}x ${def.emoji} (Grab One by One from the Cabinet & 📦 Pack!)',
       Colors.amberAccent,
       size: 17,
     );
@@ -1168,7 +1506,7 @@ class SimulationEngine with ChangeNotifier {
             spawnParticle(
               courierPackingDesk.center.dx,
               courierPackingDesk.top - 22,
-              '⚠️ Bu fazla! Kurye $needed ${def.emoji} istiyor ($excess fazla)!',
+              '⚠️ Too many! The courier wants ${needed} ${def.emoji} (${excess} extra)!',
               Colors.orangeAccent,
               size: 16,
             );
@@ -1191,7 +1529,7 @@ class SimulationEngine with ChangeNotifier {
           spawnParticle(
             courierPackingDesk.center.dx,
             courierPackingDesk.top - 18,
-            '❌ Yanlış Ürün! Kurye ${order.requiredQty}x ${def.emoji} ${def.name} istiyor!',
+            '❌ Wrong Item! The courier wants ${order.requiredQty}x ${def.emoji} ${def.name}!',
             Colors.redAccent,
             size: 15,
           );
@@ -1231,7 +1569,7 @@ class SimulationEngine with ChangeNotifier {
           spawnParticle(
             courierPackingDesk.center.dx,
             courierPackingDesk.top - 22,
-            '📦 ${def.emoji} Kurye Paketi Hazır! Motora Götür! ($packedQty/${order.requiredQty})',
+            '📦 ${def.emoji} Courier Package Ready! Take It to the Bike! (${packedQty}/${order.requiredQty})',
             Colors.greenAccent,
             size: 16,
           );
@@ -1265,14 +1603,11 @@ class SimulationEngine with ChangeNotifier {
   /// Dolaptan / raftan HER BASIŞTA TAM 1 ADET ürün alır (Yumurta, Un, Süt vb.)
   bool takeOneFromShelf(StoreShelf shelf) {
     if (!shelf.isUnlocked) {
-      if (cash >= shelf.unlockCost) {
-        return unlockShelf(shelf);
-      }
       final def = productCatalog[shelf.assignedProduct]!;
       spawnParticle(
         shelf.rect.center.dx,
         shelf.rect.top - 14,
-        '🔒 Kilitli (${def.emoji} ₺${shelf.unlockCost.toStringAsFixed(0)})',
+        '🔒 ${def.emoji} ${shelfLockReason(shelf)}',
         Colors.redAccent,
         size: 14,
       );
@@ -1285,7 +1620,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           playerX,
           playerY - 32,
-          '🛵 Önce elindeki Kurye Paketini motora teslim et!',
+          '🛵 Hand the Courier Package you are holding to the bike first!',
           Colors.orangeAccent,
           size: 14,
         );
@@ -1295,7 +1630,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           playerX,
           playerY - 32,
-          '⚠️ Elinde başka ürün var! Önce bırak veya paketle.',
+          '⚠️ You are holding another item! Drop it or pack it first.',
           Colors.orangeAccent,
           size: 14,
         );
@@ -1310,7 +1645,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           playerX,
           playerY - 32,
-          '⚠️ Ellerin dolu! (En fazla ${carriedBox!.maxCount} adet)',
+          '⚠️ Your hands are full! (Max ${carriedBox!.maxCount} items)',
           Colors.orangeAccent,
           size: 14,
         );
@@ -1322,7 +1657,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         shelf.rect.center.dx,
         shelf.rect.top - 14,
-        '❌ ${def.emoji} ${def.name} Dolapta Kalmamış!',
+        '❌ ${def.emoji} ${def.name} Out of Stock in the Cabinet!',
         Colors.redAccent,
         size: 15,
       );
@@ -1357,16 +1692,16 @@ class SimulationEngine with ChangeNotifier {
       ),
     );
 
-    String msg = '+1 ${def.emoji} Alındı (Elinde: ${carriedBox!.currentCount})';
+    String msg = '+1 ${def.emoji} Picked (In Hand: ${carriedBox!.currentCount})';
     if (courierState == CourierState.waitingForOrder &&
         activeCourierOrder != null &&
         activeCourierOrder!.productType == shelf.assignedProduct) {
       final needed = activeCourierOrder!.remainingQty;
       final total = courierStagedCount + carriedBox!.currentCount;
       if (total > needed) {
-        msg = '+1 ${def.emoji} (Elinde: ${carriedBox!.currentCount} • ⚠️ Kurye için ${total - needed} fazla!)';
+        msg = '+1 ${def.emoji} (In Hand: ${carriedBox!.currentCount} • ⚠️ ${total - needed} extra for the courier!)';
       } else {
-        msg = '+1 ${def.emoji} Alındı ($total/$needed kurye için)';
+        msg = '+1 ${def.emoji} Picked (${total}/${needed} for the courier)';
       }
     }
 
@@ -1463,8 +1798,8 @@ class SimulationEngine with ChangeNotifier {
       courierPackingDesk.center.dx,
       courierPackingDesk.top - 14,
       remAfter > 0
-          ? '📦 +$take ${def.emoji} Masaya Konuldu ($courierStagedCount/${order.requiredQty}) — $remAfter adet daha getir!'
-          : '📦 +$take ${def.emoji} Tamamlandı! Paket Bantlanıyor...',
+          ? '📦 +${take} ${def.emoji} Placed on the Table (${courierStagedCount}/${order.requiredQty}) — bring ${remAfter} more!'
+          : '📦 +${take} ${def.emoji} Complete! Taping the Package...',
       Colors.amberAccent,
       size: 15,
     );
@@ -1484,7 +1819,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         courierPackingDesk.left - 18,
         courierPackingDesk.top - 12,
-        '↩️ $excessReturned fazla ${def.emoji} rafa geri konuldu',
+        '↩️ ${excessReturned} extra ${def.emoji} returned to the shelf',
         Colors.lightBlueAccent,
         size: 14,
       );
@@ -1507,7 +1842,7 @@ class SimulationEngine with ChangeNotifier {
     spawnParticle(
       courierPackingDesk.center.dx,
       courierPackingDesk.top - 22,
-      '📦 ${def.emoji} Kurye Paketi Hazır! ($packCount/${order.requiredQty}) Motora Götür!',
+      '📦 ${def.emoji} Courier Package Ready! (${packCount}/${order.requiredQty}) Take It to the Bike!',
       Colors.greenAccent,
       size: 16,
     );
@@ -1531,7 +1866,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         courierPackingDesk.center.dx,
         courierPackingDesk.top - 16,
-        '📦 Masada $stageCount/${order.remainingQty} ${def.emoji} bekliyor!',
+        '📦 ${stageCount}/${order.remainingQty} ${def.emoji} waiting on the table!',
         Colors.amberAccent,
         size: 14,
       );
@@ -1544,7 +1879,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         courierPackingDesk.center.dx,
         courierPackingDesk.top - 14,
-        '📦 Şu an aktif kurye siparişi bekleniyor...',
+        '📦 Waiting for an active courier order...',
         Colors.white70,
         size: 14,
       );
@@ -1562,7 +1897,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         playerX,
         playerY - 30,
-        '🛵 Hazır Kurye Paketi Motora Götürülüyor!',
+        '🛵 Taking the Ready Courier Package to the Bike!',
         Colors.greenAccent,
         size: 15,
       );
@@ -1575,7 +1910,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           courierPackingDesk.center.dx,
           courierPackingDesk.top - 16,
-          '❌ Yanlış Ürün! Kurye ${order.requiredQty}x ${def.emoji} ${def.name} istiyor!',
+          '❌ Wrong Item! The courier wants ${order.requiredQty}x ${def.emoji} ${def.name}!',
           Colors.redAccent,
           size: 15,
         );
@@ -1589,7 +1924,7 @@ class SimulationEngine with ChangeNotifier {
           spawnParticle(
             courierPackingDesk.center.dx,
             courierPackingDesk.top - 18,
-            '⚠️ Bu fazla! Kurye ${order.remainingQty} ${def.emoji} istiyor ($excess fazla)!',
+            '⚠️ Too many! The courier wants ${order.remainingQty} ${def.emoji} (${excess} extra)!',
             Colors.orangeAccent,
             size: 16,
           );
@@ -1608,7 +1943,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         courierPackingDesk.center.dx,
         courierPackingDesk.top - 16,
-        '📦 Kurye Paketleme İstasyonuna Gidiliyor...',
+        '📦 Heading to the Courier Packing Station...',
         Colors.amberAccent,
         size: 15,
       );
@@ -1616,7 +1951,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         courierPackingDesk.center.dx,
         courierPackingDesk.top - 16,
-        '📦 Önce Dolaptan Tek Tek ${order.requiredQty}x ${def.emoji} Al & Buraya Getir!',
+        '📦 First Take ${order.requiredQty}x ${def.emoji} One by One from the Cabinet & Bring Them Here!',
         Colors.cyanAccent,
         size: 15,
       );
@@ -1641,8 +1976,8 @@ class SimulationEngine with ChangeNotifier {
       if (carriedBox!.productType == order.productType) {
         final total = courierStagedCount + carriedBox!.currentCount;
         final warnText = total > needed
-            ? '⚠️ Kurye Açık Almıyor & Elindeki Fazla! Paketleme İstasyonunda Ayarla!'
-            : '⚠️ Kurye Açık Ürün Almıyor! Önce Paketleme İstasyonunda 📦 Paketle!';
+            ? '⚠️ The Courier Will Not Take Open Items & You Are Holding Extra! Fix It at the Packing Station!'
+            : '⚠️ The Courier Will Not Take Open Items! Pack 📦 at the Packing Station First!';
         spawnParticle(
           courierStation.center.dx,
           courierStation.top - 18,
@@ -1660,7 +1995,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           courierStation.center.dx,
           courierStation.top - 16,
-          '❌ Kurye ${def.emoji} ${def.name} Paketi Bekliyor!',
+          '❌ The Courier Is Waiting for a ${def.emoji} ${def.name} Package!',
           Colors.redAccent,
           size: 15,
         );
@@ -1682,7 +2017,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           playerX,
           playerY - 30,
-          '🛵 Kurye Paketi Motora Götürülüyor...',
+          '🛵 Taking the Courier Package to the Bike...',
           Colors.lightGreenAccent,
           size: 15,
         );
@@ -1708,12 +2043,13 @@ class SimulationEngine with ChangeNotifier {
 
       if (order.isCompleted) {
         cash += order.rewardAmount;
+        _sfx('cash');
         totalRevenue += order.rewardAmount;
         completedCourierOrders++;
         spawnParticle(
           courierStation.center.dx,
           courierStation.top - 25,
-          '🛵 KURYE PAKETİ TESLİM! +₺${order.rewardAmount.toStringAsFixed(0)} 🌟',
+          '🛵 COURIER PACKAGE DELIVERED! +\$${order.rewardAmount.toStringAsFixed(0)} 🌟',
           Colors.greenAccent,
           size: 21,
         );
@@ -1727,7 +2063,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           courierStation.center.dx,
           courierStation.top - 15,
-          '📦 +$take ${def.emoji} Paketi Kuryeye Yüklendi (${order.deliveredQty}/${order.requiredQty})',
+          '📦 +${take} ${def.emoji} Package Loaded to the Courier (${order.deliveredQty}/${order.requiredQty})',
           Colors.lightBlueAccent,
           size: 15,
         );
@@ -1746,6 +2082,30 @@ class SimulationEngine with ChangeNotifier {
   // 👷 3D OTOMATİK REYON & ÇİFTLİK GÖREVLİSİ (STOKÇU ALİ - Seviye 3'te Açılır)
   // Tarladan çıkınca tırpanı/kovayı bırakır; Peynir için sütü Peynir Makinesine götürür!
   // ===============================================================
+  /// At night the restocker walks out of the front door and goes home.
+  void _restockerGoHome(double dt) {
+    if (restockerAtHome) return;
+    restocker.carriedBox = null;
+    restocker.equippedTool = null;
+    restocker.statusText = 'Going home';
+    final wp = _getStoreSmartWaypoint(restocker.x, restocker.y, worldWidth / 2, 20);
+    final dx = wp.dx - restocker.x;
+    final dy = wp.dy - restocker.y;
+    final dist = sqrt(dx * dx + dy * dy);
+    if (dist > 0.5) {
+      final step = 150.0 * dt;
+      restocker.walkTimer += dt * 10.0;
+      if (step >= dist) {
+        restocker.x = wp.dx;
+        restocker.y = wp.dy;
+      } else {
+        restocker.x += dx / dist * step;
+        restocker.y += dy / dist * step;
+      }
+    }
+    if (restocker.y <= 40) restockerAtHome = true;
+  }
+
   void _updateRestocker(double dt) {
     const double workerSpeed = 165.0;
     final doorCenter = worldWidth / 2;
@@ -1774,7 +2134,7 @@ class SimulationEngine with ChangeNotifier {
       for (final f in farmProducers) {
         if (f.rect.inflate(8).contains(Offset(restocker.x, restocker.y))) {
           _moveWorkerTowards(f.gateCenter.dx, f.rect.top - 24, workerSpeed, dt);
-          restocker.statusText = '🥛 Sütü Peynir Makinesine Götürüyor';
+          restocker.statusText = '🥛 Taking Milk to the Cheese Machine';
           return;
         }
       }
@@ -1782,12 +2142,12 @@ class SimulationEngine with ChangeNotifier {
       final mx = cheeseMachineRect.center.dx;
       final my = cheeseMachineRect.bottom + 18;
       _moveWorkerTowards(mx, my, workerSpeed, dt);
-      restocker.statusText = '🥛➔🧀 Sütü Peynir Makinesine Döküyor';
+      restocker.statusText = '🥛➔🧀 Pouring Milk into the Cheese Machine';
 
       if ((restocker.x - mx).abs() < 26 && (restocker.y - my).abs() < 26) {
         restocker.carriedBox = null;
         cheeseMachineMilkInput++;
-        spawnParticle(mx, cheeseMachineRect.top - 14, '👷 🥛➔🧀 Süt Makineye Eklendi', Colors.cyanAccent, size: 13);
+        spawnParticle(mx, cheeseMachineRect.top - 14, '👷 🥛➔🧀 Milk Added to the Machine', Colors.cyanAccent, size: 13);
       }
       return;
     }
@@ -1808,7 +2168,7 @@ class SimulationEngine with ChangeNotifier {
         if (!f.isUnlocked) continue;
         if (f.rect.inflate(8).contains(Offset(restocker.x, restocker.y))) {
           _moveWorkerTowards(f.gateCenter.dx, f.rect.top - 24, workerSpeed, dt);
-          restocker.statusText = '${box.containerEmoji} Çiftlikten Çıkıyor';
+          restocker.statusText = '${box.containerEmoji} Leaving the Farm';
           return;
         }
       }
@@ -1818,17 +2178,17 @@ class SimulationEngine with ChangeNotifier {
         final corridorX = (restocker.x - 680).abs() < (restocker.x - 1320).abs() ? 680.0 : 1320.0;
         if ((restocker.x - corridorX).abs() > 45) {
           _moveWorkerTowards(corridorX, 1505, workerSpeed, dt);
-          restocker.statusText = '${box.containerEmoji} Bahçe Koridoruna Yürüyor';
+          restocker.statusText = '${box.containerEmoji} Walking the Garden Corridor';
           return;
         }
         _moveWorkerTowards(corridorX, 1100, workerSpeed, dt);
-        restocker.statusText = '${box.containerEmoji} Markete Çıkıyor';
+        restocker.statusText = '${box.containerEmoji} Heading to the Store';
         return;
       }
 
       if (restocker.y > 995 && (restocker.x - doorCenter).abs() > 90) {
         _moveWorkerTowards(doorCenter, 975, workerSpeed, dt);
-        restocker.statusText = '${box.containerEmoji} Markete Götürüyor';
+        restocker.statusText = '${box.containerEmoji} Carrying to the Store';
         return;
       }
 
@@ -1836,13 +2196,13 @@ class SimulationEngine with ChangeNotifier {
       final ty = targetShelf.rect.bottom + 24;
       _moveWorkerTowards(tx, ty, workerSpeed, dt);
       final def = productCatalog[box.productType]!;
-      restocker.statusText = '${box.containerEmoji} ${def.emoji} ${def.name} Tek Tek Diziyor';
+      restocker.statusText = '${box.containerEmoji} Stacking ${def.emoji} ${def.name} One by One';
 
       if ((restocker.x - tx).abs() < 24 && (restocker.y - ty).abs() < 24) {
         final space = targetShelf.maxCapacity - targetShelf.currentStock;
         if (space <= 0) {
           restocker.carriedBox = null;
-          restocker.statusText = '✅ Raf Dolduruldu';
+          restocker.statusText = '✅ Shelf Filled';
           return;
         }
         targetShelf.doorOpenProgress = (targetShelf.doorOpenProgress + dt * 4.5).clamp(0.0, 1.0);
@@ -1866,7 +2226,7 @@ class SimulationEngine with ChangeNotifier {
           spawnParticle(dest.dx, dest.dy - 8, '👷 +1 ${def.emoji}', Colors.cyanAccent, size: 12);
           if (box.currentCount <= 0 || targetShelf.currentStock >= targetShelf.maxCapacity) {
             restocker.carriedBox = null;
-            restocker.statusText = '✅ Raf Dolduruldu';
+            restocker.statusText = '✅ Shelf Filled';
           }
         }
       }
@@ -1882,7 +2242,7 @@ class SimulationEngine with ChangeNotifier {
         }
       }
       _moveWorkerTowards(1160, 620, workerSpeed * 0.7, dt);
-      restocker.statusText = '👍 Tüm Raflar Dolu';
+      restocker.statusText = '👍 All Shelves Are Full';
       return;
     }
 
@@ -1901,12 +2261,8 @@ class SimulationEngine with ChangeNotifier {
 
       if (matchingBox != null) {
         restocker.equippedTool = null;
-        if (restocker.y > 240 && (restocker.x - doorCenter).abs() > 110) {
-          _moveWorkerTowards(doorCenter, 225, workerSpeed, dt);
-          return;
-        }
         _moveWorkerTowards(matchingBox.x, matchingBox.y, workerSpeed, dt);
-        restocker.statusText = '📦 ${def.emoji} Koli Almaya Gidiyor';
+        restocker.statusText = '📦 Going to Get a ${def.emoji} Box';
         if ((restocker.x - matchingBox.x).abs() < 24 && (restocker.y - matchingBox.y).abs() < 24) {
           restocker.carriedBox = CarriedBox(
             productType: matchingBox.productType,
@@ -1930,7 +2286,7 @@ class SimulationEngine with ChangeNotifier {
         final mx = cheeseMachineRect.center.dx;
         final my = cheeseMachineRect.bottom + 18;
         _moveWorkerTowards(mx, my, workerSpeed, dt);
-        restocker.statusText = '🧀 Peynir Makinesinden Peynir Alıyor';
+        restocker.statusText = '🧀 Taking Cheese from the Cheese Machine';
         if ((restocker.x - mx).abs() < 26 && (restocker.y - my).abs() < 26) {
           cheeseMachineReadyBoxes--;
           restocker.carriedBox = CarriedBox(
@@ -1939,7 +2295,7 @@ class SimulationEngine with ChangeNotifier {
             maxCount: def.boxSize,
             isFromFarm: true,
           );
-          spawnParticle(mx, cheeseMachineRect.top - 14, '👷 +${def.boxSize} 🧀 Aldı', Colors.amberAccent, size: 13);
+          spawnParticle(mx, cheeseMachineRect.top - 14, '👷 +${def.boxSize} 🧀 Taken', Colors.amberAccent, size: 13);
         }
         return;
       } else if (cheeseMachineMilkInput > 0 && restocker.carriedBox == null) {
@@ -1947,7 +2303,7 @@ class SimulationEngine with ChangeNotifier {
         final mx = cheeseMachineRect.center.dx;
         final my = cheeseMachineRect.bottom + 18;
         _moveWorkerTowards(mx, my, workerSpeed * 0.7, dt);
-        restocker.statusText = '⏳ Peynirin Hazırlanmasını Bekliyor';
+        restocker.statusText = '⏳ Waiting for the Cheese to Be Ready';
         return;
       } else {
         // Peynir makinesine dökmek için önce Ahırdan Süt sağsın!
@@ -1978,7 +2334,7 @@ class SimulationEngine with ChangeNotifier {
         return;
       }
       _moveWorkerTowards(1160, 620, workerSpeed * 0.6, dt);
-      restocker.statusText = '⏳ Mahsul Yetişmesi Bekleniyor';
+      restocker.statusText = '⏳ Waiting for a Delivery';
       return;
     }
 
@@ -1992,7 +2348,7 @@ class SimulationEngine with ChangeNotifier {
 
     if (restocker.y < 980 && (restocker.x - doorCenter).abs() > 95) {
       _moveWorkerTowards(doorCenter, 1010, workerSpeed, dt);
-      restocker.statusText = '🚜 Çiftliğe İniyor';
+      restocker.statusText = '🚜 Heading Down to the Farm';
       return;
     }
 
@@ -2003,11 +2359,11 @@ class SimulationEngine with ChangeNotifier {
           : 1320.0;
       if (restocker.y < 1150 && (restocker.x - corridorX).abs() > 45) {
         _moveWorkerTowards(corridorX, 1110, workerSpeed, dt);
-        restocker.statusText = '🚜 ${targetFarm.name} Yolunda';
+        restocker.statusText = '🚜 On the Way to ${targetFarm.name}';
         return;
       }
       _moveWorkerTowards(corridorX, 1500, workerSpeed, dt);
-      restocker.statusText = '🚜 ${targetFarm.name} Koridorundan İniyor';
+      restocker.statusText = '🚜 Coming Down the ${targetFarm.name} Corridor';
       return;
     }
 
@@ -2026,13 +2382,13 @@ class SimulationEngine with ChangeNotifier {
     if (restocker.equippedTool != targetFarm.requiredTool) {
       final stand = targetFarm.toolStandPos;
       _moveWorkerTowards(stand.dx, stand.dy + 10, workerSpeed, dt);
-      restocker.statusText = '${targetFarm.requiredTool.emoji} ${targetFarm.requiredTool.name} Alıyor';
+      restocker.statusText = '${targetFarm.requiredTool.emoji} ${targetFarm.requiredTool.name} Picking Up';
       if ((restocker.x - stand.dx).abs() < 26 && (restocker.y - (stand.dy + 10)).abs() < 26) {
         restocker.equippedTool = targetFarm.requiredTool;
         spawnParticle(
           stand.dx,
           stand.dy - 18,
-          '👷 ${targetFarm.requiredTool.emoji} ${targetFarm.requiredTool.name} Aldı',
+          '👷 ${targetFarm.requiredTool.emoji} ${targetFarm.requiredTool.name} Picked Up',
           Colors.cyanAccent,
           size: 13,
         );
@@ -2044,7 +2400,7 @@ class SimulationEngine with ChangeNotifier {
     final isInsideTargetFarm = targetFarm.rect.contains(Offset(restocker.x, restocker.y));
     if (!isInsideTargetFarm) {
       _moveWorkerTowards(targetFarm.gateCenter.dx, targetFarm.rect.top + 28, workerSpeed, dt);
-      restocker.statusText = '${targetFarm.requiredTool.emoji} ${targetFarm.name} İçine Giriyor';
+      restocker.statusText = '${targetFarm.requiredTool.emoji} Going Into ${targetFarm.name}';
       return;
     }
 
@@ -2096,7 +2452,7 @@ class SimulationEngine with ChangeNotifier {
         );
       }
     } else {
-      restocker.statusText = '${targetFarm.requiredTool.emoji} ${def.emoji} Toplamaya Yürüyor';
+      restocker.statusText = '${targetFarm.requiredTool.emoji} ${def.emoji} Walking to Collect';
     }
   }
 
@@ -2142,13 +2498,13 @@ class SimulationEngine with ChangeNotifier {
             spot.justProducedTimer = 1.0;
 
             final def = productCatalog[spot.productType]!;
-            String popText = '✨ +1 ${def.emoji} Hazır!';
+            String popText = '✨ +1 ${def.emoji} Ready!';
             if (farm.zoneType == FarmZoneType.coop) {
-              popText = '🐔 Yumurtladı! +1 🥚';
+              popText = '🐔 Laid an Egg! +1 🥚';
             } else if (farm.zoneType == FarmZoneType.barn) {
-              popText = '🐄 Süt Doldu! +1 🥛';
+              popText = '🐄 Milk Refilled! +1 🥛';
             } else {
-              popText = '🌱 ${def.emoji} Yetişti!';
+              popText = '🌱 ${def.emoji} Grew!';
             }
             spawnParticle(spot.x, spot.y - 22, popText, Colors.amberAccent, size: 13);
           }
@@ -2160,7 +2516,10 @@ class SimulationEngine with ChangeNotifier {
   }
 
   bool _canMoveTo(double nx, double ny) {
-    if (nx < 90 || nx > (worldWidth - 90) || ny < 60 || ny > (worldHeight - 40)) {
+    final bool insideStore = ny >= 225;
+    final double minX = insideStore ? storeMinX : 90.0;
+    final double maxX = insideStore ? storeMaxX : (worldWidth - 90);
+    if (nx < minX || nx > maxX || ny < 60 || ny > 975) {
       return false;
     }
 
@@ -2304,9 +2663,9 @@ class SimulationEngine with ChangeNotifier {
         courierPackingDesk.bottom + 14,
       ),
       // Sağ üst bilgisayar masası
-      const Rect.fromLTRB(1620, 248, 1915, 398),
-      // Sağ alt çöp kutusu
-      const Rect.fromLTRB(1776, 862, 1915, 952),
+      computerDesk.inflate(10),
+      // Trash can
+      trashCan.inflate(12),
     ];
 
     // Sadece seviyesi açılmış kasalar fiziksel engel oluşturur (kilitli kasa alanları boş kalır!)
@@ -2314,7 +2673,7 @@ class SimulationEngine with ChangeNotifier {
       final cRect = unlockedCheckouts[i];
       obstacles.add(
         Rect.fromLTRB(
-          i == 0 ? 85.0 : cRect.left - 24.0,
+          cRect.left - 24.0,
           248.0,
           cRect.right + 20.0,
           410.0,
@@ -2595,23 +2954,62 @@ class SimulationEngine with ChangeNotifier {
       }
     }
 
-    if (dx == 0 && dy == 0) return;
+    // Smooth walking: accelerate / decelerate instead of instant start & stop
+    double speedScale = 1.0;
+    if (targetMoveX != null && targetMoveY != null) {
+      final remaining = sqrt(pow(targetMoveX! - playerX, 2) + pow(targetMoveY! - playerY, 2)).toDouble();
+      speedScale = (remaining / 70.0).clamp(0.4, 1.0).toDouble();
+    }
+    final wantVX = dx * playerSpeed * speedScale;
+    final wantVY = dy * playerSpeed * speedScale;
+    final bool wantsMove = dx != 0 || dy != 0;
+    final double accel = (wantsMove ? 1250.0 : 1700.0) * dt;
+    velX += (wantVX - velX).clamp(-accel, accel).toDouble();
+    velY += (wantVY - velY).clamp(-accel, accel).toDouble();
+    if (!wantsMove && playerSpeedNow < 8) {
+      velX = 0;
+      velY = 0;
+    }
+    if (velX == 0 && velY == 0) return;
 
-    walkAnimTime += dt * 11;
-    playerAngle = atan2(dy, dx);
-
-    double stepX = dx * playerSpeed * dt;
-    double stepY = dy * playerSpeed * dt;
-
+    final double stepX = velX * dt;
+    final double stepY = velY * dt;
     bool moved = false;
 
     if (_canMoveTo(playerX + stepX, playerY)) {
       playerX += stepX;
       moved = true;
+    } else {
+      velX = 0;
     }
     if (_canMoveTo(playerX, playerY + stepY)) {
       playerY += stepY;
       moved = true;
+    } else {
+      velY = 0;
+    }
+
+    final double travelled = sqrt(stepX * stepX + stepY * stepY);
+    if (moved && travelled > 0) {
+      walkAnimTime += travelled * 0.055;
+      _stepDist += travelled;
+      if (_stepDist >= 36) {
+        _stepDist = 0;
+        _sfx('step');
+      }
+      if (playerSpeedNow > 25) {
+        playerAngle = atan2(velY, velX);
+        // 4-way facing with hysteresis so diagonal walking does not flicker
+        final ax = velX.abs();
+        final ay = velY.abs();
+        final bool horizontalNow = playerFacing == 1 || playerFacing == 2;
+        final bool goHorizontal = horizontalNow ? ax * 1.3 > ay : ax > ay * 1.3;
+        if (goHorizontal) {
+          playerFacing = velX < 0 ? 1 : 2;
+        } else {
+          playerFacing = velY < 0 ? 3 : 0;
+        }
+      }
     }
 
     if (!moved && targetMoveX != null) {
@@ -2626,13 +3024,15 @@ class SimulationEngine with ChangeNotifier {
     if (truckX < truckTargetX) {
       truckX += 380 * dt;
       if (Random().nextDouble() < 0.3) {
-        spawnParticle(truckX - 10, 80, '💨', Colors.white54, size: 12);
+        spawnParticle(truckX - 10, 1030, '💨', Colors.white54, size: 12);
       }
     } else {
       for (int i = 0; i < incomingShipment.length; i++) {
         final pType = incomingShipment[i];
         final def = productCatalog[pType]!;
-        final boxX = 240.0 + (i * 58.0);
+        final boxX = worldWidth / 2 - 116 + (i % 5) * 58.0;
+        final boxY = 925.0 - (i ~/ 5) * 46.0;
+        _sfx('truck');
         deliveryBoxes.add(
           DeliveryBox(
             id: 'box_${DateTime.now().microsecondsSinceEpoch}_$i',
@@ -2640,11 +3040,12 @@ class SimulationEngine with ChangeNotifier {
             currentCount: def.boxSize,
             maxCount: def.boxSize,
             x: boxX,
-            y: 165,
+            y: boxY,
           ),
         );
-        spawnParticle(boxX, 165, '📦', Colors.amberAccent, size: 16);
+        spawnParticle(boxX, boxY - 20, 'Delivery!', Colors.amberAccent, size: 14);
       }
+      showToast('Delivery arrived at the BACK DOOR (south)!', kind: 1, seconds: 5.0);
       incomingShipment.clear();
       isTruckArriving = false;
       truckX = -260;
@@ -2665,9 +3066,13 @@ class SimulationEngine with ChangeNotifier {
 
   void _updateCustomers(double dt) {
     customerSpawnTimer -= dt;
-    if (customerSpawnTimer <= 0 && customers.length < (5 + storeLevel)) {
+    if (customerSpawnTimer <= 0 &&
+        customers.length < min(2 + storeLevel + (day ~/ 4), 7) &&
+        phaseTimeLeft > 12) {
       _spawnCustomer();
-      customerSpawnTimer = 3.5 + Random().nextInt(3);
+      // Relaxed at the start, a bit busier every day
+      customerSpawnTimer = max(8.0, 16.0 - day * 0.6) + Random().nextInt(7);
+      _sfx('bell');
     }
 
     for (int i = customers.length - 1; i >= 0; i--) {
@@ -2696,43 +3101,43 @@ class SimulationEngine with ChangeNotifier {
     if (roll < 0.14) {
       archetype = CustomerArchetype.vip;
       isVip = true;
-      const vipNames = ['👑 Gurme Vedat', '👑 VIP Elif', '👑 İş İnsanı Bora', '👑 Koleksiyoner Selim'];
+      const vipNames = ['👑 Gourmet Vedat', '👑 VIP Elif', '👑 Businessman Bora', '👑 Collector Selim'];
       name = vipNames[random.nextInt(vipNames.length)];
       avatar = '👑';
       desiredCount = 3;
     } else if (roll < 0.30) {
       archetype = CustomerArchetype.chef;
-      const chefNames = ['👨‍🍳 Şef Danilo', '👩‍🍳 Pasta Şefi Seda', '👨‍🍳 Aşçı Murat Usta', '👩‍🍳 Gurme Şef Zeynep'];
+      const chefNames = ['👨‍🍳 Chef Danilo', '👩‍🍳 Pastry Chef Seda', '👨‍🍳 Master Cook Murat', '👩‍🍳 Gourmet Chef Zeynep'];
       name = chefNames[random.nextInt(chefNames.length)];
       avatar = '👨‍🍳';
       desiredCount = 3;
     } else if (roll < 0.46) {
       archetype = CustomerArchetype.grandma;
-      const elderNames = ['👵 Tonton Hayriye Nine', '👴 Emekli İhsan Dede', '👵 Şefkatli Fatma Nine', '👴 Rıza Amca'];
+      const elderNames = ['👵 Granny Hayriye', '👴 Retired Grandpa İhsan', '👵 Kind Granny Fatma', '👴 Uncle Rıza'];
       name = elderNames[random.nextInt(elderNames.length)];
       avatar = name.startsWith('👴') ? '👴' : '👵';
       desiredCount = 2;
     } else if (roll < 0.62) {
       archetype = CustomerArchetype.athlete;
-      const athleteNames = ['🏃 Sporcu Berk', '🏃‍♀️ Koşucu Pelin', '🏋️‍♂️ Antrenör Kaan', '🚴‍♀️ Tenisçi Ece'];
+      const athleteNames = ['🏃 Athlete Berk', '🏃 Runner Pelin', '🏋️ Trainer Kaan', '🚴 Cyclist Ece'];
       name = athleteNames[random.nextInt(athleteNames.length)];
       avatar = '🏃';
       desiredCount = 2;
     } else if (roll < 0.78) {
       archetype = CustomerArchetype.student;
-      const studentNames = ['🎒 Öğrenci Emre', '🎧 Üniversiteli Doğa', '📚 Stajyer Mert', '🎒 Öğrenci Sıla'];
+      const studentNames = ['🎒 Student Emre', '🎧 College Student Doğa', '📚 Intern Mert', '🎒 Student Sıla'];
       name = studentNames[random.nextInt(studentNames.length)];
       avatar = '🎒';
       desiredCount = 1 + random.nextInt(2);
     } else if (roll < 0.90) {
       archetype = CustomerArchetype.family;
-      const familyNames = ['👩‍👧 Ayşe Anne & Efe', '👨‍👩‍👧 Yılmaz Ailesi', '👩‍👦 Sevgi Hanım', '👨‍👧 Kemal Bey & Kızı'];
+      const familyNames = ['👩‍👧 Mom Ayşe & Efe', '👨‍👩‍👧 The Yılmaz Family', '👩‍👦 Ms. Sevgi', '👨‍👧 Mr. Kemal & Daughter'];
       name = familyNames[random.nextInt(familyNames.length)];
       avatar = '👩‍👧';
       desiredCount = 3;
     } else {
       archetype = CustomerArchetype.regular;
-      const regNames = ['👩 Selin Hanım', '👨 Mehmet Bey', '🧔 Ali Dayı', '👩‍🦰 Zeynep Hoca'];
+      const regNames = ['👩 Ms. Selin', '👨 Mr. Mehmet', '🧔 Uncle Ali', '👩‍🦰 Teacher Zeynep'];
       name = regNames[random.nextInt(regNames.length)];
       avatar = '🛒';
       desiredCount = 1 + random.nextInt(3);
@@ -2775,7 +3180,7 @@ class SimulationEngine with ChangeNotifier {
   }
 
   void _processCustomerAI(SimCustomer c, double dt) {
-    final double speed = 135.0 * c.speedMultiplier;
+    final double speed = 78.0 * c.speedMultiplier;
     final doorCenter = worldWidth / 2;
 
     switch (c.state) {
@@ -2845,7 +3250,7 @@ class SimulationEngine with ChangeNotifier {
                 );
                 spawnParticle(targetX, targetY - 25, '-1 ${productCatalog[wanted]!.emoji}', Colors.orangeAccent);
               } else {
-                spawnParticle(targetX, targetY - 25, '❌ Kalmamış', Colors.redAccent);
+                spawnParticle(targetX, targetY - 25, '❌ Out of Stock', Colors.redAccent);
               }
             }
 
@@ -2855,7 +3260,7 @@ class SimulationEngine with ChangeNotifier {
             }
           } else {
             c.shelfGrabTimer = 0.0;
-            spawnParticle(targetX, targetY - 25, '❌ Kalmamış', Colors.redAccent);
+            spawnParticle(targetX, targetY - 25, '❌ Out of Stock', Colors.redAccent);
             c.currentShoppingIndex++;
           }
         } else {
@@ -2881,6 +3286,9 @@ class SimulationEngine with ChangeNotifier {
         if ((c.x - targetX).abs() < 18 && (c.y - targetY).abs() < 18) {
           c.state = CustomerState.waitingAtCheckout;
           c.waitTimer = 0.0;
+          final regNo = c.checkoutIndex + 1;
+          showToast('Customer waiting at Register $regNo!', kind: 0);
+          spawnParticle(c.x, c.y - 56, 'Waiting!', Colors.amberAccent, size: 14);
         }
         break;
 
@@ -2888,6 +3296,22 @@ class SimulationEngine with ChangeNotifier {
         if (c.basket.isEmpty) {
           c.state = CustomerState.leavingSad;
           break;
+        }
+
+        // Patience: the longer they wait at the register, the angrier they get
+        final bool beingServed = hasAutoCashier && customers
+                .where((o) =>
+                    o.state == CustomerState.waitingAtCheckout &&
+                    o.checkoutIndex == c.checkoutIndex)
+                .firstOrNull == c;
+        if (!beingServed) {
+          c.patience -= dt;
+          if (c.patience <= 0) {
+            c.state = CustomerState.leavingSad;
+            spawnParticle(c.x, c.y - 50, 'Too slow! Leaving...', Colors.redAccent, size: 13);
+            _sfx('error');
+            break;
+          }
         }
 
         // Poşete ürün koyma uçuş animasyonunu ilerlet
@@ -2972,19 +3396,19 @@ class SimulationEngine with ChangeNotifier {
         final def = productCatalog[order.productType]!;
         if (carriedBox != null && carriedBox!.isCourierPackage && carriedBox!.productType == order.productType) {
           activeInteractionText =
-              '🛵 📦 Kurye Paketini Teslim Et: ${order.deliveredQty}/${order.requiredQty} ${def.emoji} (+₺${order.rewardAmount.toStringAsFixed(0)}) [E / Tıkla]';
+              '🛵 📦 Deliver Courier Package: ${order.deliveredQty}/${order.requiredQty} ${def.emoji} (+\$${order.rewardAmount.toStringAsFixed(0)}) [E / Click]';
         } else if (carriedBox != null && !carriedBox!.isCourierPackage && carriedBox!.productType == order.productType) {
           activeInteractionText =
-              '⚠️ Kurye Açık Ürün Almıyor! Önce Paketleme Masasında 📦 Kurye Paketi Yap! [E / Tıkla]';
+              '⚠️ The Courier Will Not Take Open Items! Make a 📦 Courier Package at the Packing Table First! [E / Click]';
         } else {
           activeInteractionText =
-              '🛵 Kurye Siparişi: ${order.requiredQty}x ${def.emoji} ${def.name} (Önce 📦 Paketle & Getir! Ödül: +₺${order.rewardAmount.toStringAsFixed(0)}) [E / Tıkla]';
+              '🛵 Courier Order: ${order.requiredQty}x ${def.emoji} ${def.name} (Pack & Bring First! Reward: +\$${order.rewardAmount.toStringAsFixed(0)}) [E / Click]';
         }
         activeInteractionAction = () {
           deliverToCourier();
         };
       } else {
-        activeInteractionText = '🛵 Hızlı Kurye Durağı (Yeni Sipariş Yolda...)';
+        activeInteractionText = '🛵 Express Courier Stop (New Order on the Way...)';
       }
       return;
     }
@@ -2996,7 +3420,7 @@ class SimulationEngine with ChangeNotifier {
         final def = productCatalog[order.productType]!;
         if (carriedBox != null && carriedBox!.isCourierPackage && carriedBox!.productType == order.productType) {
           activeInteractionText =
-              '✅ 📦 Kurye Paketi Elinde! Motora Götürüp Teslim Et! [E / Tıkla]';
+              '✅ 📦 Courier Package in Hand! Take It to the Bike & Deliver! [E / Click]';
           activeInteractionAction = () {
             deliverToCourier();
           };
@@ -3005,10 +3429,10 @@ class SimulationEngine with ChangeNotifier {
           if (total > order.remainingQty) {
             final excess = total - order.remainingQty;
             activeInteractionText =
-                '⚠️ Bu fazla! Kurye ${order.remainingQty} ${def.emoji} istiyor ($excess fazla!) — Paketlemeyi Aç [E / Tıkla]';
+                '⚠️ Too many! The courier wants ${order.remainingQty} ${def.emoji} (${excess} extra!) — Open Packing [E / Click]';
           } else {
             activeInteractionText =
-                '📦 ${def.emoji} ${def.name} Paketleme ($total/${order.remainingQty}) [E / Tıkla]';
+                '📦 ${def.emoji} ${def.name} Packing (${total}/${order.remainingQty}) [E / Click]';
           }
           activeInteractionAction = () {
             handleCourierPackingDeskClick();
@@ -3017,30 +3441,30 @@ class SimulationEngine with ChangeNotifier {
           if (courierStagedCount >= order.remainingQty) {
             final pct = (courierPackingProgress * 100).toInt().clamp(0, 100);
             activeInteractionText =
-                '📦 ${def.emoji} ${def.name} Kurye Paketi Bantlanıyor... %$pct ($courierStagedCount/${order.requiredQty})';
+                '📦 ${def.emoji} ${def.name} Courier Package Being Taped... ${pct}% (${courierStagedCount}/${order.requiredQty})';
           } else {
             final rem = order.remainingQty - courierStagedCount;
             activeInteractionText =
-                '📦 Masada $courierStagedCount/${order.remainingQty} ${def.emoji} Hazır ($rem adet daha getir!) [E / Tıkla]';
+                '📦 On the Table ${courierStagedCount}/${order.remainingQty} ${def.emoji} Ready (bring ${rem} more!) [E / Click]';
             activeInteractionAction = () {
               handleCourierPackingDeskClick();
             };
           }
         } else {
           activeInteractionText =
-              '📦 Kurye Paketleme İstasyonu: ${order.requiredQty}x ${def.emoji} ${def.name} Dolaptan Al & Paketle [E / Tıkla]';
+              '📦 Courier Packing Station: ${order.requiredQty}x ${def.emoji} ${def.name} Take from the Cabinet & Pack [E / Click]';
           activeInteractionAction = () {
             handleCourierPackingDeskClick();
           };
         }
       } else {
-        activeInteractionText = '📦 Kurye Paketleme İstasyonu (Kurye Siparişi Geldiğinde Burada Paketle)';
+        activeInteractionText = '📦 Courier Packing Station (Pack Here When a Courier Order Arrives)';
       }
       return;
     }
 
     if ((playerPos - computerDesk.center).distance < 110) {
-      activeInteractionText = '💻 Sipariş & Yeni Ürün Kilit Açma Bilgisayarı';
+      activeInteractionText = '💻 Store Computer (Order Stock)';
       activeInteractionAction = () {};
       return;
     }
@@ -3050,7 +3474,7 @@ class SimulationEngine with ChangeNotifier {
       final cRect = checkoutCounters[i];
       if ((playerPos - cRect.center).distance < 125) {
         if (i >= unlockedCheckoutCount) {
-          activeInteractionText = '🔒 🛎️ Kasa ${i + 1} Kilitli (Mağaza Seviye ${i + 1} Olunca Açılır)';
+          activeInteractionText = '🔒 🛎️ Register ${i + 1} Locked (Unlocks at Store Level ${i + 1})';
           return;
         }
         activePlayerCheckoutIndex = i;
@@ -3065,10 +3489,10 @@ class SimulationEngine with ChangeNotifier {
           if (!cust.isFullyPacked) {
             final nextProd = productCatalog[cust.basket[cust.packedCount]]!;
             activeInteractionText =
-                '🔊 Kasa ${i + 1}: ${nextProd.emoji} ${nextProd.name} Barkodu Okut & Poşetle (${cust.packedCount}/${cust.basket.length}) [E / Tıkla]';
+                '🔊 Register ${i + 1}: Scan & Bag ${nextProd.emoji} ${nextProd.name} (${cust.packedCount}/${cust.basket.length}) [E / Click]';
           } else {
             activeInteractionText =
-                '💵 Kasa ${i + 1}: Paketi Ver & Ödeme Al (${cust.name}) [E / Tıkla]';
+                '💵 Register ${i + 1}: Hand Over Package & Take Payment (${cust.name}) [E / Click]';
           }
           activeInteractionAction = () {
             packNextItemOrCheckout(cust);
@@ -3079,12 +3503,12 @@ class SimulationEngine with ChangeNotifier {
             !carriedBox!.isCourierPackage &&
             carriedBox!.productType == activeCourierOrder!.productType) {
           activeInteractionText =
-              '🚫 Kasa ${i + 1}: Kasada kurye paketi yapılmaz! Sağdaki 📦 Kurye Paketleme İstasyonuna git!';
+              '🚫 Register ${i + 1}: No courier packages at the register! Go to the 📦 Courier Packing Station on the right!';
           activeInteractionAction = null;
         } else {
           activeInteractionText = hasAutoCashier
-              ? '🛎️ Kasa ${i + 1} Tezgahı (Kasiyer Görevde - $unlockedCheckoutCount/3 Kasa Açık)'
-              : '🛎️ Kasa ${i + 1} Tezgahı (Müşteri Geldiğinde Ürünleri Barkoddan Okut)';
+              ? '🛎️ Register ${i + 1} Counter (Cashier on Duty - ${unlockedCheckoutCount}/3 Registers Open)'
+              : '🛎️ Register ${i + 1} Counter (Scan Items at the Barcode When a Customer Arrives)';
           activeInteractionAction = null;
         }
         return;
@@ -3092,9 +3516,9 @@ class SimulationEngine with ChangeNotifier {
     }
 
     if ((playerPos - trashCan.center).distance < 80 && (carriedBox != null || playerTool != null)) {
-      activeInteractionText = carriedBox != null ? '🗑️ Eldeki Ürünü Boşalt / Bırak' : '🗑️ Eldeki Ekipmanı Bırak';
+      activeInteractionText = carriedBox != null ? '🗑️ Empty / Drop Held Item' : '🗑️ Drop Held Equipment';
       activeInteractionAction = () {
-        spawnParticle(trashCan.center.dx, trashCan.center.dy, '🗑️ Bırakıldı', Colors.grey);
+        spawnParticle(trashCan.center.dx, trashCan.center.dy, '🗑️ Dropped', Colors.grey);
         carriedBox = null;
         playerTool = null;
       };
@@ -3111,9 +3535,9 @@ class SimulationEngine with ChangeNotifier {
         return;
       } else if (cheeseMachineMilkInput > 0) {
         final pct = ((cheeseMachineTimer / cheeseMachineDuration) * 100).toInt().clamp(0, 100);
-        activeInteractionText = '⏳ Peynir Yapma Makinesi Çalışıyor... %$pct';
+        activeInteractionText = '⏳ Cheese Machine Running... ${pct}%';
       } else {
-        activeInteractionText = '🧀 Peynir Makinesi: Ahırdan Süt Getir!';
+        activeInteractionText = '🧀 Cheese Machine: Bring Milk from the Barn!';
         activeInteractionAction = () {
           interactWithCheeseMachine();
         };
@@ -3121,7 +3545,7 @@ class SimulationEngine with ChangeNotifier {
       return;
     }
 
-    // 🪣🌾 Çiftlik Alet Standları (Yaklaşınca Süt Kovası, Tırpan veya Yumurta Kovasını Otomatik Alır!)
+    // 🧺🌾 Çiftlik Alet Standları (Yaklaşınca Süt Kovası, Tırpan veya Yumurta Kovasını Otomatik Alır!)
     for (var farm in farmProducers) {
       if (!farm.isUnlocked) continue;
       if ((playerPos - farm.toolStandPos).distance < 58) {
@@ -3129,7 +3553,7 @@ class SimulationEngine with ChangeNotifier {
           equipToolFromStand(farm);
         }
         activeInteractionText =
-            '✅ ${farm.requiredTool.emoji} ${farm.requiredTool.name} Elinde! İçeri Girip Topla';
+            '✅ ${farm.requiredTool.emoji} ${farm.requiredTool.name} in Hand! Go Inside & Collect';
         activeInteractionAction = () {
           startAutoFarmHarvest(farm);
         };
@@ -3137,7 +3561,7 @@ class SimulationEngine with ChangeNotifier {
       }
     }
 
-    // 🐄🌾🐔🍎🍅🫑🥖 Çiftlik Alanları Etkileşimi
+    // 🐄🌾🐔🍎🍅🌶️🥖 Çiftlik Alanları Etkileşimi
     for (var farm in farmProducers) {
       if (!farm.isUnlocked) continue;
       if (farm.rect.inflate(45).contains(playerPos)) {
@@ -3145,13 +3569,13 @@ class SimulationEngine with ChangeNotifier {
             (!_isProductFromFarm(carriedBox!.productType, farm) ||
                 carriedBox!.currentCount >= carriedBox!.maxCount ||
                 carriedBox!.isCourierPackage)) {
-          activeInteractionText = '⚠️ Elindekiler Tamam! Market Rafına (veya Paketleme Masasına) Götür!';
+          activeInteractionText = '⚠️ You are holding items! Take them to the store shelf (or the Packing Table)!';
           return;
         }
 
         if (playerTool != farm.requiredTool) {
           activeInteractionText =
-              '${farm.requiredTool.emoji} Önce Girişten ${farm.requiredTool.name} Al! (Tıkla / [E])';
+              '${farm.requiredTool.emoji} Take the ${farm.requiredTool.name} at the Entrance First! (Click / [E])';
           activeInteractionAction = () {
             startAutoFarmHarvest(farm);
           };
@@ -3167,19 +3591,19 @@ class SimulationEngine with ChangeNotifier {
 
         if (farm.readySpotCount > 0) {
           final def = productCatalog[farm.primaryProduct]!;
-          String actionDesc = 'İçeri Gir & İnekten Süt Sağ';
+          String actionDesc = 'Go Inside & Milk the Cow';
           if (farm.zoneType == FarmZoneType.field) {
-            actionDesc = 'İçeri Gir & ${def.emoji} ${def.name} Hasat Et';
+            actionDesc = 'Go Inside & Harvest ${def.emoji} ${def.name}';
           } else if (farm.zoneType == FarmZoneType.coop) {
-            actionDesc = 'Kümesin İçine Gir & Kovaya Yumurta Topla';
+            actionDesc = 'Enter the Coop & Collect Eggs in the Bucket';
           }
           activeInteractionText =
-              '${farm.requiredTool.emoji} $actionDesc (${farm.readySpotCount} Hazır Nokta)';
+              '${farm.requiredTool.emoji} ${actionDesc} (${farm.readySpotCount} Ready Spots)';
           activeInteractionAction = () {
             startAutoFarmHarvest(farm);
           };
         } else {
-          activeInteractionText = '⏳ ${farm.name}: Yeniden Yetişiyor...';
+          activeInteractionText = '⏳ ${farm.name}: Growing Back...';
         }
         return;
       }
@@ -3190,53 +3614,46 @@ class SimulationEngine with ChangeNotifier {
         final def = productCatalog[shelf.assignedProduct]!;
 
         if (!shelf.isUnlocked) {
-          if (cash >= shelf.unlockCost) {
-            activeInteractionText = '🔓 ${def.emoji} ${shelf.name} Kilidini Aç (₺${shelf.unlockCost.toStringAsFixed(0)})';
-            activeInteractionAction = () {
-              unlockShelf(shelf);
-            };
-          } else {
-            activeInteractionText = '🔒 ${def.emoji} ${shelf.name} Kilitli (Gereken: ₺${shelf.unlockCost.toStringAsFixed(0)})';
-          }
+          activeInteractionText = '🔒 ${def.emoji} ${shelf.name}: ${shelfLockReason(shelf)}';
           return;
         }
 
         if (carriedBox != null) {
           if (carriedBox!.isCourierPackage) {
-            activeInteractionText = '🛵 Elindeki Kurye Paketini Motora Teslim Et!';
+            activeInteractionText = '🛵 Hand the Courier Package in Your Hand to the Bike!';
           } else if (carriedBox!.productType == shelf.assignedProduct) {
             if (carriedBox!.isPickedFromShelf) {
               if (shelf.currentStock > 0 && carriedBox!.currentCount < carriedBox!.maxCount) {
                 activeInteractionText =
-                    '🖐️ +1 ${def.emoji} ${def.name} Al (Elinde: ${carriedBox!.currentCount}/${carriedBox!.maxCount}) • Stok: ${shelf.currentStock} [E / Tıkla]';
+                    '🖐️ Take +1 ${def.emoji} ${def.name} (In Hand: ${carriedBox!.currentCount}/${carriedBox!.maxCount}) • Stock: ${shelf.currentStock} [E / Click]';
                 activeInteractionAction = () {
                   takeOneFromShelf(shelf);
                 };
               } else {
                 activeInteractionText =
-                    '🖐️ Elinde ${carriedBox!.currentCount}x ${def.emoji} ${def.name} Var';
+                    '🖐️ You Are Holding ${carriedBox!.currentCount}x ${def.emoji} ${def.name}';
               }
             } else if (shelf.currentStock < shelf.maxCapacity) {
               activeInteractionText =
-                  '✨ ${def.emoji} ${def.name} Tek Tek Rafa Diziliyor... (${shelf.currentStock}/${shelf.maxCapacity})';
+                  '✨ Stacking ${def.emoji} ${def.name} on the Shelf One by One... (${shelf.currentStock}/${shelf.maxCapacity})';
               activeInteractionAction = () {
                 _stockShelf(shelf);
               };
             } else {
-              activeInteractionText = '✅ ${def.name} Rafı Tamamen Dolu!';
+              activeInteractionText = '✅ ${def.name} Shelf Is Completely Full!';
             }
           } else {
-            activeInteractionText = '❌ Yanlış Reyon! Bu Raf: ${def.emoji} ${def.name}';
+            activeInteractionText = '❌ Wrong Shelf! This Shelf: ${def.emoji} ${def.name}';
           }
         } else {
           if (shelf.currentStock > 0) {
             activeInteractionText =
-                '🖐️ ${def.emoji} ${shelf.name} (1 Adet Al) • Stok: ${shelf.currentStock}/${shelf.maxCapacity} [E / Tıkla]';
+                '🖐️ ${def.emoji} ${shelf.name} (Take 1) • Stock: ${shelf.currentStock}/${shelf.maxCapacity} [E / Click]';
             activeInteractionAction = () {
               takeOneFromShelf(shelf);
             };
           } else {
-            activeInteractionText = '❌ ${def.emoji} ${shelf.name}: Stokta Yok (0/${shelf.maxCapacity})';
+            activeInteractionText = '❌ ${def.emoji} ${shelf.name}: Out of Stock (0/${shelf.maxCapacity})';
           }
         }
         return;
@@ -3251,14 +3668,15 @@ class SimulationEngine with ChangeNotifier {
             currentCount: box.currentCount,
             maxCount: box.maxCount,
           );
-          spawnParticle(playerX, playerY - 35, '📦 Koli Alındı', Colors.amberAccent);
+          _sfx('pickup');
+          spawnParticle(playerX, playerY - 35, 'Box picked up', Colors.amberAccent);
           deliveryBoxes.remove(box);
           return;
         }
       }
     } else if (!carriedBox!.isCourierPackage) {
       if (playerY < 230) {
-        activeInteractionText = '⬇️ Koliyi Kaldırıma Bırak';
+        activeInteractionText = '⬇️ Drop the Box on the Sidewalk';
         activeInteractionAction = () {
           deliveryBoxes.add(
             DeliveryBox(
@@ -3270,7 +3688,7 @@ class SimulationEngine with ChangeNotifier {
               y: playerY,
             ),
           );
-          spawnParticle(playerX, playerY, '⬇️ Bırakıldı', Colors.amberAccent);
+          spawnParticle(playerX, playerY, '⬇️ Dropped', Colors.amberAccent);
           carriedBox = null;
         };
       }
@@ -3415,10 +3833,10 @@ class SimulationEngine with ChangeNotifier {
     spawnParticle(dest.dx, dest.dy - 8, '+1 ${def.emoji}', Colors.greenAccent, size: 13);
 
     if (carriedBox!.currentCount <= 0) {
-      spawnParticle(playerX, playerY - 28, '✅ Tek Tek Rafa Dizildi!', Colors.orangeAccent, size: 15);
+      spawnParticle(playerX, playerY - 28, '✅ Stacked One by One!', Colors.orangeAccent, size: 15);
       carriedBox = null;
     } else if (shelf.currentStock >= shelf.maxCapacity) {
-      spawnParticle(shelf.rect.center.dx, shelf.rect.top - 16, '✅ Raf Tamamen Doldu!', Colors.greenAccent, size: 15);
+      spawnParticle(shelf.rect.center.dx, shelf.rect.top - 16, '✅ Shelf Completely Full!', Colors.greenAccent, size: 15);
     }
   }
 
@@ -3443,10 +3861,11 @@ class SimulationEngine with ChangeNotifier {
     if (totalCost == 0 || cash < totalCost) return false;
 
     cash -= totalCost;
-    spawnParticle(computerDesk.center.dx, computerDesk.center.dy - 35, '-₺${totalCost.toStringAsFixed(0)} 🚚', Colors.redAccent);
+    spawnParticle(computerDesk.center.dx, computerDesk.center.dy - 35, '-\$${totalCost.toStringAsFixed(0)} 🚚', Colors.redAccent);
     incomingShipment.addAll(items);
     isTruckArriving = true;
     truckX = -260;
+    _sfx('order');
     notifyListeners();
     return true;
   }
@@ -3468,13 +3887,14 @@ class SimulationEngine with ChangeNotifier {
     customer.packedCount = customer.basket.length;
     cash += total;
     totalRevenue += total;
+    _sfx('cash');
     customer.state = CustomerState.leavingHappy;
 
-    String paymentText = '🛍️ PAKET TESLİM! +₺${total.toStringAsFixed(0)} 💵';
+    String paymentText = '🛍️ PACKAGE DELIVERED! +\$${total.toStringAsFixed(0)} 💵';
     if (customer.isVip) {
-      paymentText = '👑 VIP PAKET & BAHŞİŞ! +₺${total.toStringAsFixed(0)} 🌟';
+      paymentText = '👑 VIP PACKAGE & TIP! +\$${total.toStringAsFixed(0)} 🌟';
     } else if (customer.archetype == CustomerArchetype.chef) {
-      paymentText = '👨‍🍳 ŞEF BAHŞİŞİ! +₺${total.toStringAsFixed(0)} 🛍️';
+      paymentText = '👨‍🍳 CHEF TIP! +\$${total.toStringAsFixed(0)} 🛍️';
     }
 
     spawnParticle(
@@ -3508,6 +3928,7 @@ class SimulationEngine with ChangeNotifier {
       activePlayerCheckoutIndex = idx;
       currentScanningProduct = itemType;
       playerScanAnimTimer = 1.0;
+      _sfx('scan');
       playerActionAnimTimer += 2.2;
       if ((Offset(playerX, playerY) - counterRect.center).distance < 145) {
         playerAngle = pi / 2;
@@ -3516,7 +3937,7 @@ class SimulationEngine with ChangeNotifier {
       spawnParticle(
         counterRect.center.dx,
         counterRect.top - 22,
-        '🔊 BİİP! ${def.emoji} ${def.name} Okutuldu • ₺${def.retailPrice.toStringAsFixed(0)} (${cust.packedCount}/${cust.basket.length})',
+        '🔊 BEEP! ${def.emoji} ${def.name} Scanned • \$${def.retailPrice.toStringAsFixed(0)} (${cust.packedCount}/${cust.basket.length})',
         const Color(0xFF4ADE80),
         size: 15,
       );
@@ -3524,7 +3945,7 @@ class SimulationEngine with ChangeNotifier {
         spawnParticle(
           counterRect.center.dx,
           counterRect.top - 42,
-          '✅ Tüm Ürünler Okutuldu! Paketi Teslim Et!',
+          '✅ All Items Scanned! Hand Over the Package!',
           Colors.amberAccent,
           size: 16,
         );
