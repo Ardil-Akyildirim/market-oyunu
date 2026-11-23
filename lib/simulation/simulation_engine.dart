@@ -1,8 +1,12 @@
 import 'dart:math';
 import 'package:material_ui/material_ui.dart';
 import 'simulation_models.dart';
+import 'game_rules.dart';
 
 class SimulationEngine with ChangeNotifier {
+  /// Campaign rules: reputation, Mega Mart deadline, events, bosses, upgrades.
+  late final GameRules rules = GameRules(this);
+
   // Para & Market Durumu
   double cash = 400.0;
   double totalRevenue = 0.0;
@@ -11,7 +15,9 @@ class SimulationEngine with ChangeNotifier {
   bool isStoreOpen = true;
 
   // Kasiyer ve Stokçu başlangıçta kapalıdır; market seviyesi arttıkça açılır ve işe alınır!
-  bool hasAutoCashier = false;
+  int cashierCount = 0; // one cashier per register (max 3)
+  bool get hasAutoCashier => cashierCount > 0;
+  bool cashierFor(int i) => i < cashierCount && i < unlockedCheckoutCount;
   bool hasRestocker = false;
   bool isRestockerHired = false;
 
@@ -101,7 +107,7 @@ class SimulationEngine with ChangeNotifier {
   final Rect courierPackingDesk = const Rect.fromLTWH(1335, 305, 145, 82); // 📦 3D Kurye Sipariş Paketleme İstasyonu (Kasadan Ayrı!)
 
   // 🛵 Motorlu Kurye & Acil Online Sipariş Sistemi
-  CourierState courierState = CourierState.arriving;
+  CourierState courierState = CourierState.away;
   double courierX = 2120;
   final double courierParkX = 1365;
   double courierCooldown = 2.0;
@@ -117,6 +123,7 @@ class SimulationEngine with ChangeNotifier {
   bool pendingPackForCourier = false;
   bool pendingDeliverToCourier = false;
   bool shouldOpenCourierPackingDialog = false;
+  bool shouldOpenCrateDialog = false;
   bool _warnedExcessAtDesk = false;
   String? pendingTakeOneShelfId;
 
@@ -157,6 +164,8 @@ class SimulationEngine with ChangeNotifier {
 
   SimulationEngine() {
     _initStore();
+    rules.applyFarmOwnership();
+    rules.applyShelfCaps();
   }
 
   // The farm and the cheese machine were scrapped: everything is ordered from the computer.
@@ -540,8 +549,8 @@ class SimulationEngine with ChangeNotifier {
       size: 18,
     );
 
-    // İlgili meyve/sebze/ekmek tarlasını çiftlikte otomatik olarak aç!
-    for (final farm in farmProducers) {
+    // Farms are bought separately now (Manager > Store).
+    for (final farm in <FarmProducer>[]) {
       if (farm.primaryProduct == shelf.assignedProduct && !farm.isUnlocked) {
         farm.isUnlocked = true;
         spawnParticle(
@@ -751,46 +760,48 @@ class SimulationEngine with ChangeNotifier {
     nightBounty = 0.0;
     nightThievesPlanned = min(3 + day, 10); // thieves show up about as often as customers
     thiefSpawnTimer = 3.0;
+    rules.onNightStart();
     spawnParticle(playerX, playerY - 40, '🌙 Night falls! Guard the shelves!', Colors.lightBlueAccent, size: 18);
   }
 
   // ---- Difficulty -------------------------------------------------------
   /// 0 on day 1 (gentle start); from day 2 it jumps to 0.3 and climbs to 1.0 by day 10.
-  double get difficulty => day <= 1 ? 0.0 : 0.3 + 0.7 * ((day - 2) / 8.0).clamp(0.0, 1.0).toDouble();
+  double get difficulty => day <= 1 ? 0.0 : (0.3 + 0.7 * ((day - 2) / 6.0)).clamp(0.0, 1.4).toDouble();
 
   /// Wholesale prices creep up as the days go by (up to +40%).
-  double boxPrice(SimProductDef def) => (def.boxCost * (1.0 + 0.4 * difficulty)).roundToDouble();
+  double boxPrice(SimProductDef def) => (def.boxCost * (1.0 + 0.55 * difficulty) * rules.wholesaleMul).roundToDouble();
 
   // ---- Daily wages ------------------------------------------------------
-  static const double wageCashier = 30.0;
-  static const double wageRestocker = 40.0;
+  static const double wageCashier = 70.0;
+  static const double wageRestocker = 45.0;
   static const double wageCourier = 20.0;
   double lastWageTotal = 0.0;
   final List<String> lastWageLines = [];
 
   /// What the staff will cost at the next dawn (used by the Manager screen).
   double get dailyWages {
-    double t = 0;
-    if (hasAutoCashier) t += wageCashier;
+    double t = cashierCount * wageCashier;
     if (hasRestocker && isRestockerHired) t += wageRestocker;
-    if (day >= 2) t += wageCourier;
+    for (final w in rules.staffWages()) {
+      t += w.value;
+    }
     return t;
   }
 
   void _payWages() {
     lastWageLines.clear();
     lastWageTotal = 0.0;
-    if (hasAutoCashier) {
-      lastWageLines.add('Cashier: \$${wageCashier.toStringAsFixed(0)}');
-      lastWageTotal += wageCashier;
+    if (cashierCount > 0) {
+      lastWageLines.add('Cashiers x$cashierCount: \$${(cashierCount * wageCashier).toStringAsFixed(0)}');
+      lastWageTotal += cashierCount * wageCashier;
     }
     if (hasRestocker && isRestockerHired) {
       lastWageLines.add('Stocker: \$${wageRestocker.toStringAsFixed(0)}');
       lastWageTotal += wageRestocker;
     }
-    if (day >= 2) {
-      lastWageLines.add('Courier: \$${wageCourier.toStringAsFixed(0)}');
-      lastWageTotal += wageCourier;
+    for (final w in rules.staffWages()) {
+      lastWageLines.add('${w.key}: \$${w.value.toStringAsFixed(0)}');
+      lastWageTotal += w.value;
     }
     cash -= lastWageTotal;
   }
@@ -830,10 +841,11 @@ class SimulationEngine with ChangeNotifier {
         'cash': cash,
         'totalRevenue': totalRevenue,
         'storeLevel': storeLevel,
-        'hasAutoCashier': hasAutoCashier,
+        'cashierCount': cashierCount,
         'hasRestocker': hasRestocker,
         'isRestockerHired': isRestockerHired,
         'nightsSurvived': nightsSurvived,
+        'rules': rules.toJson(),
         'shelves': {
           for (final s in shelves) s.id: {'unlocked': s.isUnlocked, 'stock': s.currentStock},
         },
@@ -844,10 +856,12 @@ class SimulationEngine with ChangeNotifier {
     cash = (m['cash'] as num?)?.toDouble() ?? cash;
     totalRevenue = (m['totalRevenue'] as num?)?.toDouble() ?? 0.0;
     storeLevel = ((m['storeLevel'] as num?)?.toInt() ?? 1).clamp(1, 99);
-    hasAutoCashier = m['hasAutoCashier'] == true;
+    cashierCount = ((m['cashierCount'] as num?)?.toInt() ?? (m['hasAutoCashier'] == true ? 1 : 0)).clamp(0, 3).toInt();
     hasRestocker = m['hasRestocker'] == true;
     isRestockerHired = m['isRestockerHired'] == true;
     nightsSurvived = (m['nightsSurvived'] as num?)?.toInt() ?? 0;
+    final rm = m['rules'];
+    if (rm is Map<String, dynamic>) rules.fromJson(rm);
     final sh = m['shelves'];
     if (sh is Map) {
       for (final s in shelves) {
@@ -860,7 +874,7 @@ class SimulationEngine with ChangeNotifier {
     }
     for (final f in farmProducers) {
       final s = shelfForProduct(f.primaryProduct);
-      if (s != null) f.isUnlocked = s.isUnlocked;
+      if (s != null) f.isUnlocked = rules.farmsOwned.contains(f.id);
     }
     phase = DayPhase.day;
     phaseTimer = 0.0;
@@ -880,6 +894,7 @@ class SimulationEngine with ChangeNotifier {
         nightStolenItems += t.carried;
         nightStolenValue += t.carried * (def?.retailPrice ?? 0.0);
       }
+      rules.onThiefEscaped(t);
     }
     thieves.clear();
     phase = DayPhase.day;
@@ -893,7 +908,8 @@ class SimulationEngine with ChangeNotifier {
     customerSpawnTimer = 5.0;
     dawnUnlocks = refreshShelfUnlocks();
     _payWages();
-    dawnReportPending = true;
+    rules.onDawn();
+    dawnReportPending = rules.outcome != GameOutcome.lost;
     spawnParticle(playerX, playerY - 40, '☀️ A new day begins!', Colors.amberAccent, size: 18);
     onAutosave?.call();
   }
@@ -902,7 +918,7 @@ class SimulationEngine with ChangeNotifier {
     if (!isNight) return;
 
     // Spawn thieves spread across the first part of the night
-    if (nightThievesSpawned < nightThievesPlanned && phaseTimer < nightLength - 10) {
+    if (nightThievesSpawned < nightThievesPlanned && phaseTimer < nightLength - 10 && !rules.bossBlocksSpawns) {
       thiefSpawnTimer -= dt;
       if (thiefSpawnTimer <= 0) {
         _spawnThief();
@@ -912,6 +928,7 @@ class SimulationEngine with ChangeNotifier {
 
     for (int i = thieves.length - 1; i >= 0; i--) {
       final t = thieves[i];
+      if (t.isBoss) rules.updateBoss(t, dt);
       if (t.hitFlash > 0) t.hitFlash = (t.hitFlash - dt * 4.0).clamp(0.0, 1.0).toDouble();
 
       switch (t.state) {
@@ -935,7 +952,7 @@ class SimulationEngine with ChangeNotifier {
           t.knockX *= 0.86;
           t.knockY *= 0.86;
           if (t.stunTimer <= 0) {
-            t.state = ThiefState.fleeing;
+            t.state = (t.isBoss && t.hp > 0 && t.carried < 6) ? ThiefState.sneaking : ThiefState.fleeing;
           }
           break;
         case ThiefState.fleeing:
@@ -951,6 +968,7 @@ class SimulationEngine with ChangeNotifier {
           nightStolenValue += t.carried * (def?.retailPrice ?? 0.0);
           spawnParticle(t.x, t.y, '🦹 Escaped with ${t.carried} ${def?.emoji ?? ''}!', Colors.redAccent, size: 15);
         }
+        rules.onThiefEscaped(t);
         thieves.removeAt(i);
       }
     }
@@ -958,7 +976,9 @@ class SimulationEngine with ChangeNotifier {
 
   void _spawnThief() {
     final r = Random();
-    final hp = 2 + (day >= 2 ? 1 : 0) + (day ~/ 4).clamp(0, 3).toInt();
+    final bool isBoss = rules.takeBoss();
+    final int bossKind = rules.bossType;
+    final hp = isBoss ? rules.bossHp : rules.thiefHp(2 + (day >= 2 ? 1 : 0) + (day ~/ 4).clamp(0, 3).toInt());
     _thiefCounter++;
     // About 40% of the thieves sneak in through the back door (south alley)
     final fromBack = r.nextDouble() < 0.4;
@@ -967,8 +987,11 @@ class SimulationEngine with ChangeNotifier {
       x: worldWidth / 2 + (r.nextDouble() - 0.5) * (fromBack ? 160 : 160),
       y: fromBack ? 1035 : 25,
       hp: hp,
-      speed: 105 + r.nextDouble() * 35 + min(day, 10) * 4.0 + difficulty * 25.0,
+      speed: isBoss ? rules.bossSpeed * rules.alarmSlow : (105 + r.nextDouble() * 35 + min(day, 10) * 4.0 + difficulty * 25.0) * rules.thiefSpeedMul,
     );
+    t.isBoss = isBoss;
+    t.bossType = bossKind;
+    t.kind = isBoss ? (bossKind == 3 ? 1 : (bossKind == 2 ? 2 : 0)) : rules.thiefKind;
     t.fromBack = fromBack;
     final target = _pickThiefTarget();
     if (target == null) {
@@ -979,6 +1002,20 @@ class SimulationEngine with ChangeNotifier {
     }
     thieves.add(t);
     nightThievesSpawned++;
+  }
+
+  void spawnMinionThief({required double x, required double y, int hp = 2, int kind = 1}) {
+    _thiefCounter++;
+    final t = Thief(id: 'thief_$_thiefCounter', x: x, y: y, hp: hp, speed: 100.0 * rules.alarmSlow);
+    t.kind = kind;
+    final target = _pickThiefTarget();
+    if (target == null) {
+      t.state = ThiefState.fleeing;
+    } else {
+      t.targetShelfId = target.id;
+      t.loot = target.assignedProduct;
+    }
+    thieves.add(t);
   }
 
   StoreShelf? _pickThiefTarget() {
@@ -1024,12 +1061,12 @@ class SimulationEngine with ChangeNotifier {
     }
     t.stealTimer -= dt;
     if (t.stealTimer <= 0) {
-      if (shelf.currentStock > 0 && t.carried < 3) {
+      if (shelf.currentStock > 0 && t.carried < rules.carryFor(t)) {
         shelf.currentStock--;
         t.carried++;
         _sfx('steal');
         t.loot = shelf.assignedProduct;
-        t.stealTimer = 1.0 - 0.35 * difficulty;
+        t.stealTimer = (t.isBoss ? 0.6 : (1.0 - 0.35 * difficulty) * rules.stealSlow);
         spawnParticle(t.x, t.y - 26, '🦹 -1 ${productCatalog[shelf.assignedProduct]?.emoji ?? ''}', Colors.redAccent, size: 14);
       } else {
         t.state = ThiefState.fleeing;
@@ -1191,19 +1228,24 @@ class SimulationEngine with ChangeNotifier {
   void _hitThief(Thief t) {
     // A thief that was already driven off can't be hit again (no bounty farming)
     if (t.hp <= 0) return;
+    if (t.phased > 0) {
+      spawnParticle(t.x, t.y - 40, 'Phased out!', Colors.lightBlueAccent, size: 15);
+      return;
+    }
     totalThiefHits++;
     _sfx('hit');
-    t.hp--;
+    t.hp -= rules.stickDamageFor(t);
+    if (t.hp < 0) t.hp = 0;
     t.hitFlash = 1.0;
     var kx = t.x - playerX;
     var ky = t.y - playerY;
     final len = max(1.0, sqrt(kx * kx + ky * ky));
     kx /= len;
     ky /= len;
-    t.knockX = kx * 340;
-    t.knockY = ky * 340;
+    t.knockX = kx * (t.isBoss ? 110 : 340);
+    t.knockY = ky * (t.isBoss ? 110 : 340);
     t.state = ThiefState.stunned;
-    t.stunTimer = 0.45;
+    t.stunTimer = (t.isBoss ? 0.12 : 0.45) + (t.isBoss ? rules.stunBonus * 0.3 : rules.stunBonus);
     spawnParticle(t.x, t.y - 30, '💥', Colors.orangeAccent, size: 20);
 
     if (t.hp <= 0) {
@@ -1214,13 +1256,14 @@ class SimulationEngine with ChangeNotifier {
         t.carried = 0;
       }
       nightThievesRepelled++;
-      const bounty = 15.0;
+      final bounty = (15.0 * rules.bountyMul).roundToDouble();
       cash += bounty;
       nightBounty += bounty;
-      spawnParticle(t.x, t.y - 46, 'Thief driven off! +\$15', Colors.greenAccent, size: 16);
+      spawnParticle(t.x, t.y - 46, 'Thief driven off! +\$${bounty.toStringAsFixed(0)}', Colors.greenAccent, size: 16);
       t.state = ThiefState.stunned;
       t.stunTimer = 0.45;
       t.hp = 0;
+      rules.onThiefRepelled(t);
     }
   }
 
@@ -1269,6 +1312,7 @@ class SimulationEngine with ChangeNotifier {
     }
     _updateDayNight(dt);
     _updateThieves(dt);
+    rules.update(dt);
     _updateParticles(dt);
     if (toastTimer > 0) toastTimer -= dt;
     _checkInteractions();
@@ -1430,10 +1474,7 @@ class SimulationEngine with ChangeNotifier {
   /// Tıklanan veya [E] basılan çiftlik alanında: kilitliyse seviye yetiyorsa açar, açıksa ekipmanı alıp toplama başlatır
   void handleFarmZoneOrToolClick(FarmProducer farm, Offset clickWorldPos) {
     if (!farm.isUnlocked) {
-      final shelf = shelfForProduct(farm.primaryProduct);
-      if (shelf != null) {
-        tryUnlockShelfOrFarm(shelf, feedbackPos: farm.rect.center);
-      }
+      rules.tryBuyFarm(farm);
       return;
     }
     startAutoFarmHarvest(farm, preferredPos: clickWorldPos);
@@ -1710,13 +1751,45 @@ class SimulationEngine with ChangeNotifier {
     }
   }
 
+  /// A hired courier rider fulfils the waiting order from the shelf stock (65% of the reward).
+  bool courierRiderTry() {
+    final o = activeCourierOrder;
+    if (o == null || courierState != CourierState.waitingForOrder) return false;
+    final sh = shelfForProduct(o.productType);
+    if (sh == null || !sh.isUnlocked || sh.currentStock < o.requiredQty) return false;
+    sh.currentStock -= o.requiredQty;
+    final pay = (o.rewardAmount * 0.65).roundToDouble();
+    cash += pay;
+    totalRevenue += pay;
+    completedCourierOrders++;
+    _sfx('cash');
+    spawnParticle(courierStation.center.dx, courierStation.top - 25, 'Rider delivered the package! +\$${pay.toStringAsFixed(0)}', Colors.greenAccent, size: 17);
+    activeCourierOrder = null;
+    courierStagedCount = 0;
+    courierStagedProduct = null;
+    courierPackingProgress = 0.0;
+    _warnedExcessAtDesk = false;
+    courierState = CourierState.departing;
+    return true;
+  }
+
+  /// The night guard hits a thief (uses the normal hit code, from the guard's position).
+  void guardStrike(Thief t, double gx, double gy) {
+    final ox = playerX, oy = playerY;
+    playerX = gx;
+    playerY = gy;
+    _hitThief(t);
+    playerX = ox;
+    playerY = oy;
+  }
+
   void _updateCourier(double dt) {
     if (isNight && (courierState == CourierState.arriving || courierState == CourierState.waitingForOrder)) {
       _courierGoHome();
     }
     switch (courierState) {
       case CourierState.away:
-        if (isNight) break; // off duty until morning
+        if (isNight || !rules.courierService) break; // off duty until morning / service not bought yet
         courierCooldown -= dt;
         if (courierCooldown <= 0) {
           courierX = worldWidth + 140;
@@ -2453,7 +2526,7 @@ class SimulationEngine with ChangeNotifier {
 
     // En çok stoğa ihtiyacı olan açık rafı bul
     StoreShelf? needyShelf;
-    double lowestRatio = 0.88;
+    double lowestRatio = 0.999; // any shelf with a free slot is worth a trip
     for (final s in shelves) {
       if (!s.isUnlocked) continue;
       final ratio = s.currentStock / s.maxCapacity;
@@ -2616,6 +2689,21 @@ class SimulationEngine with ChangeNotifier {
       }
     }
 
+    // The farm crate by the back door: grab what the shelf needs.
+    if (restocker.carriedBox == null && rules.crateCount(wantedProd) > 0) {
+      restocker.equippedTool = null;
+      final cp = rules.crateSpot;
+      _moveWorkerTowards(cp.dx, cp.dy + 24, workerSpeed, dt);
+      restocker.statusText = '📦 Getting ${def.emoji} from the Farm Crate';
+      if ((restocker.x - cp.dx).abs() < 36 && (restocker.y - (cp.dy + 24)).abs() < 36) {
+        final n = rules.crateTake(wantedProd, def.boxSize);
+        if (n > 0) {
+          restocker.carriedBox = CarriedBox(productType: wantedProd, currentCount: n, maxCount: def.boxSize);
+        }
+      }
+      return;
+    }
+
     // 🧀 Eğer Tulum Peyniri gerekiyorsa Peynir Makinesini kontrol et!
     if (wantedProd == SimProductType.cheese && isCheeseUnlocked) {
       if (cheeseMachineReadyBoxes > 0 && restocker.carriedBox == null) {
@@ -2654,16 +2742,8 @@ class SimulationEngine with ChangeNotifier {
     }
 
     // Yoksa arka bahçedeki uygun çiftlik tesisine (Ahır, Tarlalar, Elma Bahçesi, Kümes) gitsin
-    FarmProducer? targetFarm;
-    for (final f in farmProducers) {
-      if (!f.isUnlocked || f.readySpotCount <= 0) continue;
-      if (f.primaryProduct == wantedProd) {
-        targetFarm = f;
-        break;
-      }
-    }
-
-    if (targetFarm == null) {
+    // The stocker never touches the farm: the Farmer drops the harvest at the back door.
+    {
       restocker.equippedTool = null;
       if (restocker.carriedBox != null && restocker.carriedBox!.currentCount > 0) {
         restocker.carriedBox = CarriedBox(
@@ -2677,123 +2757,6 @@ class SimulationEngine with ChangeNotifier {
       _moveWorkerTowards(1160, 620, workerSpeed * 0.6, dt);
       restocker.statusText = '⏳ Waiting for a Delivery';
       return;
-    }
-
-    for (final f in farmProducers) {
-      if (!f.isUnlocked) continue;
-      if (f != targetFarm && f.rect.inflate(8).contains(Offset(restocker.x, restocker.y))) {
-        _moveWorkerTowards(f.gateCenter.dx, f.rect.top - 24, workerSpeed, dt);
-        return;
-      }
-    }
-
-    if (restocker.y < 980 && (restocker.x - doorCenter).abs() > 95) {
-      _moveWorkerTowards(doorCenter, 1010, workerSpeed, dt);
-      restocker.statusText = '🚜 Heading Down to the Farm';
-      return;
-    }
-
-    // Hedef tarla 2. sıradaysa (y > 1500) ve Ali henüz 1. sıra çiftliklerin üstündeyse koridordan aşağı insin
-    if (targetFarm.rect.top > 1500 && restocker.y < 1465) {
-      final corridorX = (targetFarm.gateCenter.dx - 680).abs() < (targetFarm.gateCenter.dx - 1320).abs()
-          ? 680.0
-          : 1320.0;
-      if (restocker.y < 1150 && (restocker.x - corridorX).abs() > 45) {
-        _moveWorkerTowards(corridorX, 1110, workerSpeed, dt);
-        restocker.statusText = '🚜 On the Way to ${targetFarm.name}';
-        return;
-      }
-      _moveWorkerTowards(corridorX, 1500, workerSpeed, dt);
-      restocker.statusText = '🚜 Coming Down the ${targetFarm.name} Corridor';
-      return;
-    }
-
-    // Hedef tarla 1. sıradaysa (y < 1500) ve Ali 2. sıradaysa (y > 1465) koridordan yukarı çıksın
-    if (targetFarm.rect.top < 1500 && restocker.y > 1465) {
-      final corridorX = (restocker.x - 680).abs() < (restocker.x - 1320).abs() ? 680.0 : 1320.0;
-      if ((restocker.x - corridorX).abs() > 45) {
-        _moveWorkerTowards(corridorX, 1500, workerSpeed, dt);
-        return;
-      }
-      _moveWorkerTowards(corridorX, 1110, workerSpeed, dt);
-      return;
-    }
-
-    // ADIM 1: Elinde doğru Kova / Tırpan yoksa önce o çiftliğin Alet Standına gidip Kova / Tırpan alsın!
-    if (restocker.equippedTool != targetFarm.requiredTool) {
-      final stand = targetFarm.toolStandPos;
-      _moveWorkerTowards(stand.dx, stand.dy + 10, workerSpeed, dt);
-      restocker.statusText = '${targetFarm.requiredTool.emoji} ${targetFarm.requiredTool.name} Picking Up';
-      if ((restocker.x - stand.dx).abs() < 26 && (restocker.y - (stand.dy + 10)).abs() < 26) {
-        restocker.equippedTool = targetFarm.requiredTool;
-        spawnParticle(
-          stand.dx,
-          stand.dy - 18,
-          '👷 ${targetFarm.requiredTool.emoji} ${targetFarm.requiredTool.name} Picked Up',
-          Colors.cyanAccent,
-          size: 13,
-        );
-      }
-      return;
-    }
-
-    // ADIM 2: Çiftliğin dışındaysa önce açık kapıdan İÇERİ girsin
-    final isInsideTargetFarm = targetFarm.rect.contains(Offset(restocker.x, restocker.y));
-    if (!isInsideTargetFarm) {
-      _moveWorkerTowards(targetFarm.gateCenter.dx, targetFarm.rect.top + 28, workerSpeed, dt);
-      restocker.statusText = '${targetFarm.requiredTool.emoji} Going Into ${targetFarm.name}';
-      return;
-    }
-
-    // ADIM 3: İçerideki hazır ineğe / buğday öbeğine / yumurta folluğuna yürüsün ve toplasın!
-    final spot = _findBestReadySpot(targetFarm, Offset(restocker.x, restocker.y));
-    if (spot == null) return;
-
-    _moveWorkerTowards(spot.x, spot.y, workerSpeed, dt);
-    if ((restocker.x - spot.x).abs() < 24 && (restocker.y - spot.y).abs() < 24) {
-      restocker.actionAnimTimer += dt * 15.0;
-      spot.harvestProgress += dt / 1.25;
-      restocker.statusText = '${targetFarm.requiredTool.emoji} ${targetFarm.requiredTool.actionVerb}...';
-
-      if (Random().nextDouble() < 0.18) {
-        final pEmoji = targetFarm.zoneType == FarmZoneType.field
-            ? '🌾'
-            : (targetFarm.zoneType == FarmZoneType.barn ? '🥛' : '🥚');
-        spawnParticle(spot.x, spot.y - 12, pEmoji, Colors.amberAccent, size: 12);
-      }
-
-      if (spot.harvestProgress >= 1.0) {
-        spot.harvestProgress = 0.0;
-        spot.isReady = false;
-        spot.regrowTimer = 0.0;
-
-        final gain = (def.boxSize / 2).ceil();
-        if (restocker.carriedBox == null) {
-          restocker.carriedBox = CarriedBox(
-            productType: wantedProd,
-            currentCount: gain,
-            maxCount: def.boxSize,
-            isFromFarm: true,
-          );
-        } else {
-          restocker.carriedBox!.currentCount =
-              min(def.boxSize, restocker.carriedBox!.currentCount + gain);
-        }
-
-        if (restocker.carriedBox!.currentCount >= def.boxSize) {
-          restocker.equippedTool = null; // Tamamlanınca tırpanı/kovayı bırak!
-        }
-
-        spawnParticle(
-          spot.x,
-          spot.y - 20,
-          '👷 +$gain ${def.emoji} (${restocker.carriedBox!.currentCount}/${def.boxSize})',
-          Colors.cyanAccent,
-          size: 13,
-        );
-      }
-    } else {
-      restocker.statusText = '${targetFarm.requiredTool.emoji} ${def.emoji} Walking to Collect';
     }
   }
 
@@ -2885,7 +2848,7 @@ class SimulationEngine with ChangeNotifier {
 
     final playerRect = Rect.fromCircle(center: Offset(nx, ny), radius: 14);
     if (playerRect.overlaps(computerDesk.deflate(6))) return false;
-    if (playerRect.overlaps(courierPackingDesk.deflate(6))) return false;
+    if (rules.courierService && playerRect.overlaps(courierPackingDesk.deflate(6))) return false;
     for (final cRect in unlockedCheckouts) {
       if (playerRect.overlaps(cRect.deflate(6))) return false;
     }
@@ -3376,8 +3339,8 @@ class SimulationEngine with ChangeNotifier {
       final remaining = sqrt(pow(targetMoveX! - playerX, 2) + pow(targetMoveY! - playerY, 2)).toDouble();
       speedScale = (remaining / 70.0).clamp(0.4, 1.0).toDouble();
     }
-    final wantVX = dx * playerSpeed * speedScale;
-    final wantVY = dy * playerSpeed * speedScale;
+    final wantVX = dx * playerSpeed * rules.playerSpeedMul * speedScale;
+    final wantVY = dy * playerSpeed * rules.playerSpeedMul * speedScale;
     final bool wantsMove = dx != 0 || dy != 0;
     final double accel = (wantsMove ? 1250.0 : 1700.0) * dt;
     velX += (wantVX - velX).clamp(-accel, accel).toDouble();
@@ -3483,11 +3446,11 @@ class SimulationEngine with ChangeNotifier {
   void _updateCustomers(double dt) {
     customerSpawnTimer -= dt;
     if (customerSpawnTimer <= 0 &&
-        customers.length < min(2 + storeLevel + (day ~/ 4), 7) &&
+        customers.length < min(2 + storeLevel + (day ~/ 4), 7) + rules.extraCustomerCap &&
         phaseTimeLeft > 12) {
       _spawnCustomer();
       // Relaxed at the start, a bit busier every day
-      customerSpawnTimer = max(8.0, 16.0 - day * 0.6) + Random().nextInt(7);
+      customerSpawnTimer = (max(8.0, 16.0 - day * 0.6) + Random().nextInt(7)) * rules.intervalMul;
       _sfx('bell');
     }
 
@@ -3592,13 +3555,13 @@ class SimulationEngine with ChangeNotifier {
         checkoutIndex: bestCheckout,
       );
     // customers get less patient as the days go by
-    newCustomer.maxPatience *= 1.0 - 0.35 * difficulty;
+    newCustomer.maxPatience *= (1.0 - 0.35 * difficulty) * rules.patienceMul;
     newCustomer.patience = newCustomer.maxPatience;
     customers.add(newCustomer);
   }
 
   void _processCustomerAI(SimCustomer c, double dt) {
-    final double speed = 78.0 * c.speedMultiplier;
+    final double speed = 78.0 * c.speedMultiplier * (1.0 + min(0.12, day * 0.006));
     final doorCenter = worldWidth / 2;
 
     switch (c.state) {
@@ -3707,8 +3670,8 @@ class SimulationEngine with ChangeNotifier {
           c.state = CustomerState.waitingAtCheckout;
           c.waitTimer = 0.0;
           final regNo = c.checkoutIndex + 1;
-          showToast('Customer waiting at Register $regNo!', kind: 0);
-          spawnParticle(c.x, c.y - 56, 'Waiting!', Colors.amberAccent, size: 14);
+          if (!cashierFor(c.checkoutIndex)) showToast('Customer waiting at Register $regNo!', kind: 0);
+          if (!cashierFor(c.checkoutIndex)) spawnParticle(c.x, c.y - 56, 'Waiting!', Colors.amberAccent, size: 14);
         }
         break;
 
@@ -3719,7 +3682,7 @@ class SimulationEngine with ChangeNotifier {
         }
 
         // Patience: the longer they wait at the register, the angrier they get
-        final bool beingServed = hasAutoCashier && customers
+        final bool beingServed = cashierFor(c.checkoutIndex) && customers
                 .where((o) =>
                     o.state == CustomerState.waitingAtCheckout &&
                     o.checkoutIndex == c.checkoutIndex)
@@ -3728,6 +3691,7 @@ class SimulationEngine with ChangeNotifier {
           c.patience -= dt;
           if (c.patience <= 0) {
             c.state = CustomerState.leavingSad;
+            rules.onCustomerLost();
             spawnParticle(c.x, c.y - 50, 'Too slow! Leaving...', Colors.redAccent, size: 13);
             _sfx('error');
             break;
@@ -3760,9 +3724,9 @@ class SimulationEngine with ChangeNotifier {
         }
 
         // Kasiyer Ayşe işe alınmışsa sadece sıranın en önündeki (queueIndex == 0) müşterinin ürünlerini tek tek poşetler
-        if (hasAutoCashier && queueIndex == 0) {
+        if (cashierFor(c.checkoutIndex) && queueIndex == 0) {
           c.waitTimer += dt;
-          if (c.waitTimer >= 0.75) {
+          if (c.waitTimer >= rules.cashierInterval) {
             c.waitTimer = 0.0;
             packNextItemOrCheckout(c);
           }
@@ -3845,7 +3809,7 @@ class SimulationEngine with ChangeNotifier {
     final playerPos = Offset(playerX, playerY);
 
     // 🛵 Kurye Durağı Etkileşimi
-    if (courierStation.inflate(65).contains(playerPos)) {
+    if (rules.courierService && courierStation.inflate(65).contains(playerPos)) {
       if (courierState == CourierState.waitingForOrder && activeCourierOrder != null) {
         final order = activeCourierOrder!;
         final def = productCatalog[order.productType]!;
@@ -3869,7 +3833,7 @@ class SimulationEngine with ChangeNotifier {
     }
 
     // 📦 Kurye Sipariş Paketleme İstasyonu Etkileşimi
-    if (courierPackingDesk.inflate(62).contains(playerPos)) {
+    if (rules.courierService && courierPackingDesk.inflate(62).contains(playerPos)) {
       if (courierState == CourierState.waitingForOrder && activeCourierOrder != null) {
         final order = activeCourierOrder!;
         final def = productCatalog[order.productType]!;
@@ -3918,6 +3882,16 @@ class SimulationEngine with ChangeNotifier {
       return;
     }
 
+    if (rules.crateVisible && (playerPos - rules.crateSpot).distance < 80) {
+      activeInteractionText = rules.crateTotal > 0
+          ? '📦 Farm Crate (${rules.crateTotal} items) [E / Click]'
+          : '📦 Farm Crate (empty: the Farmer fills it)';
+      activeInteractionAction = () {
+        shouldOpenCrateDialog = true;
+      };
+      return;
+    }
+
     if ((playerPos - computerDesk.center).distance < 110) {
       activeInteractionText = '💻 Store Computer (Order Stock)';
       activeInteractionAction = () {};
@@ -3961,7 +3935,7 @@ class SimulationEngine with ChangeNotifier {
               '🚫 Register ${i + 1}: No courier packages at the register! Go to the 📦 Courier Packing Station on the right!';
           activeInteractionAction = null;
         } else {
-          activeInteractionText = hasAutoCashier
+          activeInteractionText = cashierFor(i)
               ? '🛎️ Register ${i + 1} Counter (Cashier on Duty - $unlockedCheckoutCount/3 Registers Open)'
               : '🛎️ Register ${i + 1} Counter (Scan Items at the Barcode When a Customer Arrives)';
           activeInteractionAction = null;
@@ -4017,13 +3991,10 @@ class SimulationEngine with ChangeNotifier {
     for (var farm in farmProducers) {
       if (farm.rect.inflate(45).contains(playerPos)) {
         if (!farm.isUnlocked) {
-          final shelf = shelfForProduct(farm.primaryProduct);
-          if (shelf != null) {
-            activeInteractionText = '🔒 ${farm.name}: ${shelfLockReason(shelf)} [E / Click]';
-            activeInteractionAction = () {
-              tryUnlockShelfOrFarm(shelf, feedbackPos: farm.rect.center);
-            };
-          }
+          activeInteractionText = '🔒 ${farm.name}: ${rules.farmLockReason(farm)} [E / Click]';
+          activeInteractionAction = () {
+            rules.tryBuyFarm(farm);
+          };
           return;
         }
         if (carriedBox != null &&
@@ -4350,6 +4321,8 @@ class SimulationEngine with ChangeNotifier {
     if (customer.bonusMultiplier > 1.0) {
       total = (total * customer.bonusMultiplier).roundToDouble();
     }
+    total = (total * rules.salesMul).roundToDouble();
+    rules.onCustomerServed();
 
     final idx = customer.checkoutIndex.clamp(0, unlockedCheckoutCount - 1);
     final counterRect = checkoutCounters[idx];

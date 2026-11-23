@@ -9,6 +9,7 @@ import '../settings/settings_service.dart';
 import '../widgets/settings_dialog.dart';
 import '../simulation/simulation_engine.dart';
 import '../simulation/simulation_models.dart';
+import '../simulation/game_rules.dart';
 import '../simulation/pixel_painter.dart';
 import '../simulation/dialogs/order_dialog.dart';
 import '../simulation/dialogs/checkout_dialog.dart';
@@ -57,7 +58,8 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
   bool _nightTutorialDone = false;
   bool _dayTutorialDone = false;
   bool _isDawnDialogOpen = false;
-  bool _musicIsNight = false;
+  bool _isEndDialogOpen = false;
+  String _musicTrack = 'day';
 
   @override
   void initState() {
@@ -78,7 +80,9 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     });
 
     _engine.onSfx = AudioService.instance.sfx;
-    AudioService.instance.playMusic('day');
+    _musicTrack = _engine.rules.musicTrack;
+    AudioService.instance.playMusic(_musicTrack);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowIntro());
     _loadTutorialState();
 
     _ticker = createTicker((elapsed) {
@@ -145,14 +149,25 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
 
       _updateTutorials();
 
-      if (_engine.isNight != _musicIsNight) {
-        _musicIsNight = _engine.isNight;
-        AudioService.instance.playMusic(_musicIsNight ? 'night' : 'day');
+      final track = _engine.rules.musicTrack;
+      if (track != _musicTrack) {
+        _musicTrack = track;
+        AudioService.instance.playMusic(track);
       }
 
-      if (_engine.dawnReportPending && !_isDawnDialogOpen && mounted) {
+      if (_engine.rules.outcomePending && !_isEndDialogOpen && !_isDawnDialogOpen && mounted) {
+        _engine.rules.outcomePending = false;
+        _showEndScreen();
+      }
+
+      if (_engine.dawnReportPending && !_isDawnDialogOpen && !_isEndDialogOpen && mounted) {
         _engine.dawnReportPending = false;
         _showDawnReport();
+      }
+
+      if (_engine.shouldOpenCrateDialog && mounted) {
+        _engine.shouldOpenCrateDialog = false;
+        _openCrateDialog();
       }
 
       if (_engine.shouldOpenCourierPackingDialog && !_isPackingDialogOpen && mounted) {
@@ -174,10 +189,11 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
       _engine.cash = 400.0;
       _engine.totalRevenue = 0.0;
       _engine.storeLevel = 1;
-      _engine.hasAutoCashier = false;
+      _engine.cashierCount = 0;
       _engine.hasRestocker = false;
       _engine.isRestockerHired = false;
       _engine.nightsSurvived = 0;
+      _engine.rules.reset();
       _engine.phase = DayPhase.day;
       _engine.phaseTimer = 0.0;
       _engine.closingTime = false;
@@ -194,9 +210,12 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
       }
       for (final f in _engine.farmProducers) {
         final s = _engine.shelfForProduct(f.primaryProduct);
-        if (s != null) f.isUnlocked = s.isUnlocked;
+        if (s != null) f.isUnlocked = false;
       }
+      _engine.rules.applyFarmOwnership();
+      _engine.rules.applyShelfCaps();
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowIntro());
     SaveService.clear();
     _hudRevision.value++;
     showTopToast(context, '{star} Latest version loaded & fresh game started!');
@@ -439,6 +458,27 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                 style: const TextStyle(color: Colors.redAccent)),
             Text('{undo} Items recovered: ${e.nightRecoveredItems}',
                 style: const TextStyle(color: Colors.lightBlueAccent)),
+            if (e.rules.dawnNotes.isNotEmpty)
+              for (final n in e.rules.dawnNotes)
+                Text(n, style: const TextStyle(color: Colors.lightGreenAccent)),
+            Text(
+              '{star} Reputation ${e.rules.reputation.round()} (${e.rules.dawnRepChange >= 0 ? '+' : ''}${e.rules.dawnRepChange.toStringAsFixed(1)})',
+              style: TextStyle(color: e.rules.reputation < 20 ? Colors.redAccent : Colors.amberAccent),
+            ),
+            Text(
+              'Mega Mart demolition in ${e.rules.daysLeft} days. Land Deed: \$${e.rules.deedPaid.toStringAsFixed(0)} / \$${e.rules.deedPrice.toStringAsFixed(0)}',
+              style: TextStyle(
+                  color: e.rules.daysLeft <= 5 ? Colors.redAccent : Colors.orangeAccent, fontWeight: FontWeight.bold),
+            ),
+            if (e.rules.dayEvent != null) ...[
+              const SizedBox(height: 6),
+              Text('Today: ${e.rules.dayEvent!.name}',
+                  style: const TextStyle(color: Colors.lightBlueAccent, fontWeight: FontWeight.bold)),
+              Text(e.rules.dayEvent!.desc, style: const TextStyle(color: Colors.white70)),
+            ],
+            if (e.rules.isBossNight)
+              Text('{thief} Tonight a BOSS comes: ${e.rules.bossName()}! ${e.rules.bossBlurb}',
+                  style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
             if (e.lastWageTotal > 0)
               Text('{coin} Wages paid: -\$${e.lastWageTotal.toStringAsFixed(0)} (${e.lastWageLines.join(', ')})',
                   style: const TextStyle(color: Colors.orangeAccent)),
@@ -463,6 +503,112 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     });
   }
 
+  static const String _introText =
+      'For three generations your family\'s little market has fed the village of Pebble Hollow.\n\n'
+      'Then the letter came: the MEGA MART corporation bought the whole street. In 20 days the bulldozers arrive and your store is gone.\n\n'
+      'There is one way out: buy the LAND DEED to your own shop. Sell by day, guard the shelves by night, and earn the money in time.\n\n'
+      'Be careful. Lately, strange things walk the streets after dark, and not all of them are thieves...';
+
+  void _maybeShowIntro() {
+    if (!mounted || _engine.rules.introShown || widget.saveData != null && _engine.day > 1) return;
+    _engine.rules.introShown = true;
+    _showStory('Pebble Hollow, Day 1', _introText, 'Open the shop');
+  }
+
+  void _showStory(String title, String body, String button) {
+    _engine.tutorialFreeze = true;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PixelDialog(
+        backgroundColor: const Color(0xFF2A221C),
+        title: Text(title, style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.w900)),
+        content: Text(body, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.45)),
+        actions: [
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(button)),
+        ],
+      ),
+    ).then((_) {
+      if (_tutorialSteps == null) _engine.tutorialFreeze = false;
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  void _showEndScreen() {
+    final r = _engine.rules;
+    final won = r.outcome == GameOutcome.won;
+    _isEndDialogOpen = true;
+    _engine.tutorialFreeze = true;
+    SaveService.clear();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PixelDialog(
+        backgroundColor: const Color(0xFF2A221C),
+        title: Text(
+          won ? '{star} YOU SAVED THE STORE!' : 'THE MEGA MART WINS',
+          style: TextStyle(color: won ? Colors.amberAccent : Colors.redAccent, fontWeight: FontWeight.w900),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              won
+                  ? 'You bought the Land Deed on day ${_engine.day}. The Mega Mart has to build somewhere else!'
+                  : r.loseReason,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              won
+                  ? 'The Mega Mart\'s owner, who was never entirely human, slinks back into the rift it crawled out of. Pebble Hollow keeps its little market, and on quiet nights people still say you are the reason they sleep well.'
+                  : 'Years later a gleaming Mega Mart stands where your store used to be. Sometimes, late at night, the old shelves are said to creak in the dark.',
+              style: const TextStyle(color: Colors.white70, fontStyle: FontStyle.italic),
+            ),
+            const SizedBox(height: 10),
+            Text('Days played: ${_engine.day}', style: const TextStyle(color: Colors.white70)),
+            Text('Customers served: ${r.customersServed}', style: const TextStyle(color: Colors.white70)),
+            Text('Nights survived: ${_engine.nightsSurvived}', style: const TextStyle(color: Colors.white70)),
+            Text('Bosses defeated: ${r.bossesDefeated}', style: const TextStyle(color: Colors.white70)),
+            Text('Total revenue: \$${_engine.totalRevenue.toStringAsFixed(0)}', style: const TextStyle(color: Colors.greenAccent)),
+            Text('Reputation: ${r.reputation.round()}', style: const TextStyle(color: Colors.amberAccent)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _engine.tutorialFreeze = false;
+              Navigator.of(context).pop();
+            },
+            child: const Text('Main menu'),
+          ),
+          if (won)
+            TextButton(
+              onPressed: () {
+                r.endless = true;
+                Navigator.of(ctx).pop();
+              },
+              child: const Text('Keep playing'),
+            ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _engine.tutorialFreeze = false;
+              _resetCurrentRunToFresh();
+            },
+            child: const Text('New game'),
+          ),
+        ],
+      ),
+    ).then((_) {
+      _isEndDialogOpen = false;
+      if (_tutorialSteps == null) _engine.tutorialFreeze = false;
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
   void _showPauseMenu() {
     _engine.tutorialFreeze = true;
     showDialog(
@@ -481,7 +627,7 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
               ),
               const SizedBox(height: 8),
               Text(
-                'Staff wages: \$${_engine.dailyWages.toStringAsFixed(0)} per day, paid at dawn. The game saves itself at the start of every day.',
+                'Staff wages: \$${_engine.dailyWages.toStringAsFixed(0)} per day, paid at dawn. Goal: pay the Land Deed (Manager > Mega Mart) before day ${GameRules.deadlineDay} ends. The game saves itself at the start of every day.',
                 style: const TextStyle(color: Colors.white70),
               ),
             ],
@@ -523,6 +669,63 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
             child: const Text('Resume'),
           ),
         ],
+      ),
+    ).then((_) {
+      if (_tutorialSteps == null) _engine.tutorialFreeze = false;
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  void _openCrateDialog() {
+    _engine.tutorialFreeze = true;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setLocal) {
+          final r = _engine.rules;
+          final items = r.crate.entries.where((e) => e.value > 0).toList();
+          return PixelDialog(
+            backgroundColor: const Color(0xFF2A221C),
+            title: const Text('Farm Crate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Take a load to carry to a shelf. The stocker also helps himself from here.',
+                    style: TextStyle(color: Colors.white70)),
+                const SizedBox(height: 8),
+                if (items.isEmpty)
+                  const Text('The crate is empty. The Farmer fills it.', style: TextStyle(color: Colors.amberAccent)),
+                for (final en in items)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text('${productCatalog[en.key]!.ico} ${productCatalog[en.key]!.name} x${en.value}',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        FilledButton(
+                          onPressed: () {
+                            if (r.takeFromCrate(en.key)) {
+                              Navigator.of(ctx).pop();
+                            } else {
+                              setLocal(() {});
+                            }
+                          },
+                          child: const Text('Take'),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            actions: [
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
+            ],
+          );
+        },
       ),
     ).then((_) {
       if (_tutorialSteps == null) _engine.tutorialFreeze = false;
@@ -769,13 +972,13 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
                                 }
 
                                 // Tıklanan yer {box} Kurye Paketleme Masası ise
-                                if (_engine.courierPackingDesk.inflate(16).contains(worldPos)) {
+                                if (_engine.rules.courierService && _engine.courierPackingDesk.inflate(16).contains(worldPos)) {
                                   _engine.handleCourierPackingDeskClick();
                                   return;
                                 }
 
                                 // Tıklanan yer {bike} Hızlı Kurye Durağı ise
-                                if (_engine.courierStation.inflate(35).contains(worldPos)) {
+                                if (_engine.rules.courierService && _engine.courierStation.inflate(35).contains(worldPos)) {
                                   _engine.deliverToCourier();
                                   return;
                                 }
@@ -1140,6 +1343,14 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
     return head.isEmpty ? body : '$head: $body';
   }
 
+  Widget _miniPill(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: pixelDeco(const Color(0xFF17120F), border: kInk, bw: 3, shadow: 0),
+      child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 12.5)),
+    );
+  }
+
   Widget _buildTopHUD(bool compact) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 16, vertical: compact ? 5 : 10),
@@ -1189,6 +1400,22 @@ class _SimulationScreenState extends State<SimulationScreen> with SingleTickerPr
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
             ),
           ),
+          const SizedBox(width: 6),
+          _miniPill('{star} ${_engine.rules.reputation.round()}', const Color(0xFFFFD84A)),
+          const SizedBox(width: 6),
+          _miniPill(
+            _engine.rules.outcome == GameOutcome.won || _engine.rules.endless
+                ? 'Deed paid {check}'
+                : 'Mega Mart ${_engine.rules.daysLeft}d',
+            _engine.rules.daysLeft <= 5 ? const Color(0xFFFF6B5A) : const Color(0xFFE8B48A),
+          ),
+          if (_engine.isNight && _engine.rules.bossAlive) ...[
+            const SizedBox(width: 6),
+            _miniPill('{thief} BOSS', const Color(0xFFFF6B5A)),
+          ] else if (_engine.rules.activeEvent != null) ...[
+            const SizedBox(width: 6),
+            _miniPill(_engine.rules.activeEvent!.name, const Color(0xFF9AD7FF)),
+          ],
           const SizedBox(width: 8),
           IconButton(
             tooltip: 'Menu',

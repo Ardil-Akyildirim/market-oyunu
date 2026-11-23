@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:material_ui/material_ui.dart';
 import 'simulation_engine.dart';
 import 'simulation_models.dart';
+import 'game_rules.dart';
 
 /// World units per art pixel. Everything is drawn on this grid with
 /// anti-aliasing off, so the whole game looks like chunky pixel art.
@@ -156,8 +157,10 @@ class PixelPainter extends CustomPainter {
     _paintFarms(canvas);
     _paintSlidingDoors(canvas);
     _paintAlley(canvas);
-    _paintCourierZone(canvas);
+    if (engine.rules.courierService) _paintCourierZone(canvas);
     _paintSorted(canvas);
+    _paintFarmExtras(canvas);
+    _paintWeather(canvas);
     _paintFlyingItems(canvas);
     _paintLighting(canvas);
     _paintLockedExpansion(canvas);
@@ -457,7 +460,7 @@ class PixelPainter extends CustomPainter {
     final r = farm.rect;
     final def = productCatalog[farm.primaryProduct]!;
     final shelf = engine.shelfForProduct(farm.primaryProduct);
-    final canOpenNow = shelf != null && engine.storeLevel >= shelf.zoneLevel;
+    final canOpenNow = shelf != null && shelf.isUnlocked && engine.cash >= engine.rules.farmCost(farm);
 
     // Subtle staked plot border on the grass
     _p.color = farm.isHovered
@@ -500,7 +503,7 @@ class PixelPainter extends CustomPainter {
       plate: false,
     );
 
-    final subText = shelf != null ? engine.shelfLockReason(shelf) : 'Locked';
+    final subText = engine.rules.farmLockReason(farm);
     _text(
       c,
       subText,
@@ -926,17 +929,18 @@ class PixelPainter extends CustomPainter {
       add(r.bottom - 6, () => _drawCheckout(c, r, idx));
     }
     add(engine.computerDesk.bottom - 6, () => _drawComputerDesk(c));
-    add(engine.courierPackingDesk.bottom - 6, () => _drawPackingDesk(c));
+    if (engine.rules.courierService) add(engine.courierPackingDesk.bottom - 6, () => _drawPackingDesk(c));
     add(engine.trashCan.bottom - 4, () => _drawTrash(c));
 
     for (final b in engine.deliveryBoxes) {
       add(b.y, () => _drawDeliveryBox(c, b));
     }
-    if (engine.courierX < engine.worldWidth + 60 && engine.courierState != CourierState.away) {
+    if (engine.rules.courierService && engine.courierX < engine.worldWidth + 60 && engine.courierState != CourierState.away) {
       add(172, () => _drawCourierBike(c));
     }
     if (engine.hasAutoCashier && engine.staffOnDuty) {
       for (int i = 0; i < engine.unlockedCheckoutCount; i++) {
+        if (!engine.cashierFor(i)) continue;
         final r = engine.checkoutCounters[i];
         add(r.top - 6, () {
           _drawPerson(c, r.center.dx - 14, r.top - 14, facing: 0, phase: 0,
@@ -953,6 +957,41 @@ class PixelPainter extends CustomPainter {
     }
     for (final t in engine.thieves) {
       add(t.y, () => _drawThief(c, t));
+    }
+    if (engine.rules.crateVisible) {
+      final cp = engine.rules.crateSpot;
+      add(cp.dy, () => _drawCrate(c, cp));
+    }
+    for (final f in kFurniture) {
+      if (engine.rules.furniture.contains(f.id)) add(_furnitureY(f) - 2, () => _drawFurniture(c, f));
+    }
+    if (engine.rules.farmerVisible) {
+      final h = engine.rules.farmer;
+      add(h.y, () {
+        _drawPerson(c, h.x, h.y,
+            facing: h.facing,
+            phase: h.moving ? sin(h.walk) : 0.0,
+            shirt: const Color(0xFF3F7D3A),
+            pants: const Color(0xFF5A4630),
+            hair: const Color(0xFF8A6A2A),
+            hat: const Color(0xFFD9B04A));
+        _text(c, 'FARMER', h.x, h.y - 31 * kPx, size: 12, color: const Color(0xFFB8F0A0), plate: true);
+        if (h.carryCount > 0) _r(c, _snap(h.x), _snap(h.y), -3, -12, 6, 5, const Color(0xFF9C7A3A));
+      });
+    }
+    if (engine.rules.guardVisible) {
+      final h = engine.rules.guard;
+      add(h.y, () {
+        _drawPerson(c, h.x, h.y,
+            facing: h.facing,
+            phase: h.moving ? sin(h.walk) : 0.0,
+            shirt: const Color(0xFF2F4F9E),
+            pants: const Color(0xFF1E2430),
+            hair: const Color(0xFF14100E),
+            hat: const Color(0xFF1A2A5A));
+        _text(c, 'GUARD', h.x, h.y - 31 * kPx, size: 12, color: const Color(0xFF9AB8FF), plate: true);
+        if (h.hit > 1.3) _r(c, _snap(h.x), _snap(h.y), 4, -6, 8, 2, const Color(0xFFF2CF4A));
+      });
     }
     add(engine.playerY, () => _drawPlayer(c));
 
@@ -1667,18 +1706,105 @@ class PixelPainter extends CustomPainter {
   }
 
   void _drawThief(Canvas c, Thief t) {
+    if (!t.isBoss) {
+      _drawThiefBody(c, t);
+      return;
+    }
+    final pulse = 0.5 + 0.5 * sin(engine.worldTime * 5);
+    _p.color = Color.fromRGBO(220, 30, 40, 0.22 + 0.14 * pulse);
+    c.drawOval(Rect.fromCenter(center: Offset(t.x, t.y + 6), width: 150 + 14 * pulse, height: 54), _p);
+    c.save();
+    c.translate(t.x, t.y);
+    final sc = const [1.5, 1.9, 1.5, 2.1][t.bossType];
+    c.scale(sc);
+    c.translate(-t.x, -t.y);
+    _drawThiefBody(c, t);
+    _r(c, _snap(t.x), _snap(t.y), -3, -17, 8, 2, const Color(0xFFFFD84A));
+    _r(c, _snap(t.x), _snap(t.y), -3, -19, 2, 2, const Color(0xFFFFD84A));
+    _r(c, _snap(t.x), _snap(t.y), 1, -20, 2, 3, const Color(0xFFFFD84A));
+    _r(c, _snap(t.x), _snap(t.y), 4, -19, 2, 2, const Color(0xFFFFD84A));
+    c.restore();
+    const bw = 76.0;
+    final by = t.y - 62 * sc - 20;
+    _wr(c, Rect.fromLTWH(t.x - bw / 2 - 3, by - 3, bw + 6, 12), Pal.outline);
+    _wr(c, Rect.fromLTWH(t.x - bw / 2, by, bw, 6), const Color(0xFF3A1A1A));
+    _wr(c, Rect.fromLTWH(t.x - bw / 2, by, bw * (t.hp / t.maxHp).clamp(0.0, 1.0).toDouble(), 6), const Color(0xFFE03A3A));
+    _text(c, engine.rules.bossName(), t.x, t.y - 62 * const [1.5, 1.9, 1.5, 2.1][t.bossType], size: 12, color: const Color(0xFFFF8A7A), plate: true);
+  }
+
+  void _drawThiefBody(Canvas c, Thief t) {
     final walking = t.state == ThiefState.sneaking || t.state == ThiefState.fleeing;
     final phase = walking ? sin(t.walkAnim) : 0.0;
     final facing = t.state == ThiefState.stealing ? 3 : _facingFromAngle(t.walkAngle);
-    _drawPerson(c, t.x, t.y,
+    if (t.phased > 0 && (engine.worldTime * 14).floor() % 2 == 0) return; // flicker while phased
+    Color shirt = const Color(0xFF23252E);
+    Color pants = const Color(0xFF15161C);
+    Color hair = const Color(0xFF0E0E12);
+    Color hat = const Color(0xFF2B2D3A);
+    Color mask = const Color(0xFF050507);
+    Color skin = Pal.skin;
+    if (t.isBoss) {
+      switch (t.bossType) {
+        case 0:
+          shirt = const Color(0xFFB4442F);
+          hat = const Color(0xFF3A1A14);
+          break;
+        case 1:
+          shirt = const Color(0xFF6B4A2A);
+          pants = const Color(0xFF2A1E14);
+          hat = const Color(0xFF1A1411);
+          break;
+        case 2:
+          shirt = const Color(0xFFD8D0F0);
+          pants = const Color(0xFF8A7AC0);
+          hat = const Color(0xFF5A4A8A);
+          skin = const Color(0xFFCFE3F0);
+          break;
+        default:
+          shirt = const Color(0xFF2A1E3A);
+          pants = const Color(0xFF14101E);
+          hat = const Color(0xFF7A2A9A);
+          skin = const Color(0xFF6FB07A);
+          mask = const Color(0xFF3AF0D0);
+      }
+    } else if (t.kind == 1) {
+      shirt = const Color(0xFF3A1E4A);
+      pants = const Color(0xFF241030);
+      hat = const Color(0xFF5A2A7A);
+      skin = const Color(0xFF6FB07A);
+      mask = const Color(0xFF3AF0D0);
+    } else if (t.kind == 2) {
+      shirt = const Color(0xFFB8D8F0);
+      pants = const Color(0xFF8AB0D0);
+      hat = const Color(0xFF9AC0E0);
+      skin = const Color(0xFFDFF0FA);
+      mask = const Color(0xFF3A4A6A);
+    } else if (t.kind == 3) {
+      shirt = const Color(0xFF6A1818);
+      pants = const Color(0xFF3A0E0E);
+      hat = const Color(0xFF7A1E1E);
+      mask = const Color(0xFF14100E);
+    }
+    if (t.kind == 4) {
+      _drawRaccoon(c, t, facing, phase);
+    } else {
+      _drawPerson(c, t.x, t.y,
         facing: facing,
         phase: phase,
-        shirt: const Color(0xFF23252E),
-        pants: const Color(0xFF15161C),
-        hair: const Color(0xFF0E0E12),
-        hat: const Color(0xFF2B2D3A),
-        mask: const Color(0xFF050507),
+        shirt: shirt,
+        pants: pants,
+        hair: hair,
+        skin: skin,
+        hat: hat,
+        mask: mask,
         flash: t.hitFlash > 0.4);
+    }
+    if (t.kind == 1 || t.kind == 2) {
+      // glowing eyes
+      final glow = t.kind == 1 ? const Color(0xFF3AF0D0) : const Color(0xFFFFFFFF);
+      _r(c, _snap(t.x), _snap(t.y), -3, -14, 2, 1, glow);
+      _r(c, _snap(t.x), _snap(t.y), 1, -14, 2, 1, glow);
+    }
     if (t.carried > 0) {
       _r(c, _snap(t.x), _snap(t.y), 3, -8, 6, 6, Pal.outline);
       _r(c, _snap(t.x), _snap(t.y), 4, -7, 4, 4, const Color(0xFF9C7A3A));
@@ -1696,6 +1822,221 @@ class PixelPainter extends CustomPainter {
         final ang = a + i * 2.1;
         _r(c, _snap(t.x) + cos(ang) * 7 * kPx, _snap(t.y) - 17 * kPx + sin(ang) * 2 * kPx, 0, 0, 1, 1, const Color(0xFFFFE066));
       }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // furniture from the furniture shop + eccentric farm visitors
+  // ---------------------------------------------------------------------------
+  static const List<Offset> _slots = [
+    Offset(545, 972), Offset(625, 972), Offset(705, 972), Offset(1295, 972),
+    Offset(1375, 972), Offset(1455, 972), Offset(545, 300), Offset(1445, 300),
+  ];
+
+  double _furnitureY(FurnitureDef f) => _slots[f.slot % _slots.length].dy;
+
+  void _drawCrate(Canvas c, Offset p) {
+    final x = _snap(p.dx - 24), y = _snap(p.dy);
+    _r(c, x, y, 0, 1, 18, 3, Pal.shadow);
+    _r(c, x, y, 0, -10, 16, 11, Pal.outline);
+    _r(c, x, y, 1, -9, 14, 9, Pal.wood);
+    _r(c, x, y, 1, -9, 14, 2, Pal.woodLight);
+    _r(c, x, y, 1, -5, 14, 1, Pal.woodDark);
+    _r(c, x, y, 3, -9, 1, 9, Pal.woodDark);
+    _r(c, x, y, 12, -9, 1, 9, Pal.woodDark);
+    final n = engine.rules.crateTotal;
+    _text(c, n > 0 ? 'CRATE x$n' : 'CRATE', p.dx, p.dy - 15 * kPx, size: 12,
+        color: n > 0 ? const Color(0xFFFFE08A) : const Color(0xFFB0A890), plate: true);
+  }
+
+  void _drawRaccoon(Canvas c, Thief t, int facing, double phase) {
+    final x = _snap(t.x), y = _snap(t.y);
+    final left = facing == 1 || (facing != 2 && cos(t.walkAngle) < 0);
+    final d = left ? -1 : 1;
+    final flash = t.hitFlash > 0.4;
+    final gray = flash ? Colors.white : const Color(0xFF8C8C96);
+    final dark = flash ? Colors.white : const Color(0xFF2A2A32);
+    final light = flash ? Colors.white : const Color(0xFFD8D8E0);
+    // gx is measured in the facing direction (0 = middle, positive = towards the head)
+    void rr(int gx, int gy, int w, int h, Color col) => _r(c, x, y, d > 0 ? gx : -gx - w, gy, w, h, col);
+    _r(c, x, y, -7, 1, 14, 2, Pal.shadow);
+    for (int i = 0; i < 5; i++) {
+      rr(-7 - i * 2, -6 + (i > 2 ? -1 : 0), 2, 3, i.isEven ? gray : dark);
+    }
+    final lift = sin(phase * 2) > 0 ? 1 : 0;
+    rr(-3, -2 + lift, 2, 3 - lift, dark);
+    rr(2, -2 + (1 - lift), 2, 3 - (1 - lift), dark);
+    rr(-5, -7, 10, 6, gray);
+    rr(-4, -3, 8, 2, light);
+    rr(3, -10, 6, 6, gray);
+    rr(3, -12, 2, 2, dark);
+    rr(7, -12, 2, 2, dark);
+    rr(3, -8, 6, 2, dark);
+    rr(4, -8, 1, 1, Colors.white);
+    rr(7, -8, 1, 1, Colors.white);
+    rr(8, -6, 2, 2, dark);
+  }
+
+  void _drawFurniture(Canvas c, FurnitureDef f) {
+    final p = _slots[f.slot % _slots.length];
+    final x = _snap(p.dx), y = _snap(p.dy);
+    _r(c, x, y, 0, -1, 13, 2, Pal.shadow);
+    switch (f.id) {
+      case 'plant':
+        _r(c, x, y, 2, -5, 7, 5, const Color(0xFF8A4B2A));
+        _r(c, x, y, 1, -11, 9, 6, const Color(0xFF2F8A3C));
+        _r(c, x, y, 3, -14, 5, 4, const Color(0xFF58B84A));
+        break;
+      case 'mat':
+        _r(c, x, y, 0, -3, 12, 3, const Color(0xFFB4442F));
+        _r(c, x, y, 1, -2, 10, 1, const Color(0xFFF2CF4A));
+        break;
+      case 'bench':
+        _r(c, x, y, 0, -9, 13, 2, Pal.woodLight);
+        _r(c, x, y, 0, -6, 13, 2, Pal.wood);
+        _r(c, x, y, 1, -4, 2, 4, Pal.woodDark);
+        _r(c, x, y, 10, -4, 2, 4, Pal.woodDark);
+        break;
+      case 'cat':
+        _r(c, x, y, 2, -10, 7, 10, const Color(0xFFF2F0E8));
+        _r(c, x, y, 2, -13, 2, 3, const Color(0xFFF2F0E8));
+        _r(c, x, y, 7, -13, 2, 3, const Color(0xFFF2F0E8));
+        _r(c, x, y, 4, -8, 1, 1, const Color(0xFF1A1411));
+        _r(c, x, y, 6, -8, 1, 1, const Color(0xFF1A1411));
+        final wave = (sin(engine.worldTime * 4) * 1.5).round();
+        _r(c, x, y, 9, -9 + wave, 2, 4, const Color(0xFFF2CF4A));
+        break;
+      case 'neon':
+        _r(c, x, y, 0, -12, 14, 7, const Color(0xFF1A1411));
+        final on = (engine.worldTime * 2).floor() % 6 != 5;
+        _r(c, x, y, 1, -11, 12, 5, on ? const Color(0xFFFF4FA3) : const Color(0xFF6B2A4A));
+        _r(c, x, y, 5, -5, 1, 5, Pal.woodDark);
+        break;
+      case 'tank':
+        _r(c, x, y, 0, -10, 13, 10, const Color(0xFF1A1411));
+        _r(c, x, y, 1, -9, 11, 8, const Color(0xFF3B8FD0));
+        final fx = 2 + ((engine.worldTime * 3) % 7).floor();
+        _r(c, x, y, fx, -6, 3, 2, const Color(0xFFFF9A3C));
+        _r(c, x, y, 2, -2, 9, 1, const Color(0xFFD9C9A0));
+        break;
+      case 'disco':
+        _r(c, x, y, 5, -16, 1, 7, const Color(0xFF8E989E));
+        _r(c, x, y, 3, -10, 5, 5, const Color(0xFFCFD6DB));
+        final k = (engine.worldTime * 6).floor() % 3;
+        _r(c, x, y, 3 + k, -10 + k, 1, 1, const Color(0xFFFF4FA3));
+        _r(c, x, y, 6 - k, -8, 1, 1, const Color(0xFF4FD0FF));
+        break;
+      case 'cowstatue':
+        _r(c, x, y, 0, -9, 11, 6, const Color(0xFFE8B83A));
+        _r(c, x, y, 10, -11, 4, 4, const Color(0xFFF2CF4A));
+        _r(c, x, y, 1, -3, 2, 3, const Color(0xFFB88A24));
+        _r(c, x, y, 8, -3, 2, 3, const Color(0xFFB88A24));
+        _r(c, x, y, 3, -8, 3, 2, const Color(0xFFB88A24));
+        break;
+    }
+  }
+
+  /// Weather from today's event, drawn only OUTSIDE the store (street and back yard).
+  void _paintWeather(Canvas c) {
+    final ev = engine.rules.activeEvent;
+    if (ev == null) return;
+    final W = engine.worldWidth, H = engine.worldHeight;
+    final areas = [Rect.fromLTWH(0, 0, W, 255), Rect.fromLTWH(0, 992, W, H - 992)];
+    final vis = c.getLocalClipBounds();
+    final t = engine.worldTime;
+    for (final a in areas) {
+      final v = a.intersect(vis);
+      if (v.isEmpty || v.width <= 0 || v.height <= 0) continue;
+      c.save();
+      c.clipRect(v);
+      switch (ev.id) {
+        case 'rain':
+          _p.color = const Color.fromRGBO(30, 50, 90, 0.22);
+          c.drawRect(v, _p);
+          _p.color = const Color.fromRGBO(170, 200, 240, 0.8);
+          for (int i = 0; i < 140; i++) {
+            final x = ((i * 137) % 2000).toDouble() + (t * 60 % 40) - ((a.top + (t * 520 + i * 53) % a.height) * 0.12);
+            final y = a.top + (t * 520 + i * 53) % a.height;
+            if (x < v.left - 10 || x > v.right + 10 || y < v.top - 20 || y > v.bottom + 20) continue;
+            c.drawRect(Rect.fromLTWH(_snap(x), _snap(y), 2, 12), _p);
+          }
+          break;
+        case 'fog':
+        case 'omen':
+          final col = ev.id == 'fog' ? const Color.fromRGBO(200, 210, 215, 0.30) : const Color.fromRGBO(120, 160, 110, 0.26);
+          _p.color = col;
+          c.drawRect(v, _p);
+          _p.color = col.withValues(alpha: 0.22);
+          for (int i = 0; i < 10; i++) {
+            final bx = ((i * 331 + t * (12 + i * 2)) % (W + 400)) - 200;
+            final by = a.top + 30 + (i * 97) % max(60.0, a.height - 60);
+            c.drawOval(Rect.fromCenter(center: Offset(bx, by), width: 420, height: 70), _p);
+          }
+          break;
+        case 'heat':
+          _p.color = const Color.fromRGBO(255, 170, 60, 0.14);
+          c.drawRect(v, _p);
+          _p.color = const Color.fromRGBO(255, 230, 150, 0.18);
+          for (int i = 0; i < 18; i++) {
+            final y = a.top + (i * 53) % max(40.0, a.height);
+            final x = ((i * 211) % 1900).toDouble() + sin(t * 2 + i) * 14;
+            c.drawRect(Rect.fromLTWH(_snap(x), _snap(y), 90, 3), _p);
+          }
+          break;
+        case 'eldritch':
+        case 'bloodmoon':
+        case 'cult':
+        case 'poltergeist':
+          final red = ev.id == 'bloodmoon' || ev.id == 'cult';
+          final pulse = 0.5 + 0.5 * sin(t * 1.6);
+          _p.color = red
+              ? Color.fromRGBO(150, 20, 30, 0.20 + 0.10 * pulse)
+              : (ev.id == 'poltergeist' ? Color.fromRGBO(150, 190, 230, 0.14 + 0.06 * pulse) : Color.fromRGBO(110, 40, 160, 0.22 + 0.10 * pulse));
+          c.drawRect(v, _p);
+          if (ev.id == 'eldritch') {
+            // a violet rift tearing the sky above the street
+            _p.color = const Color.fromRGBO(190, 120, 255, 0.55);
+            c.drawRect(Rect.fromLTWH(W / 2 - 3, 0, 6, 120 + 20 * pulse), _p);
+            _p.color = const Color.fromRGBO(255, 255, 255, 0.5);
+            c.drawRect(Rect.fromLTWH(W / 2 - 1, 0, 2, 100 + 20 * pulse), _p);
+          }
+          break;
+      }
+      c.restore();
+    }
+  }
+
+  void _paintFarmExtras(Canvas c) {
+    final r = engine.rules;
+    final g = r.goldenSpot;
+    if (g != null) {
+      final pulse = 0.5 + 0.5 * sin(engine.worldTime * 6);
+      _p.color = Color.fromRGBO(255, 214, 60, 0.25 + 0.25 * pulse);
+      c.drawOval(Rect.fromCenter(center: Offset(g.x, g.y - 6), width: 120, height: 92), _p);
+      for (int i = 0; i < 4; i++) {
+        final a = engine.worldTime * 3 + i * 1.57;
+        _r(c, _snap(g.x + cos(a) * 44), _snap(g.y - 10 + sin(a) * 30), 0, 0, 2, 2, const Color(0xFFFFF2A0));
+      }
+    }
+    if (r.ufoActive && engine.isNight) {
+      final u = r.ufoPos;
+      final beam = r.ufoTimer > 9.0 && r.ufoTimer < 17.0;
+      if (beam) {
+        _p.color = const Color.fromRGBO(180, 255, 180, 0.28);
+        final path = Path()
+          ..moveTo(u.dx - 14, u.dy + 12)
+          ..lineTo(u.dx + 14, u.dy + 12)
+          ..lineTo(u.dx + 46, u.dy + 100)
+          ..lineTo(u.dx - 46, u.dy + 100)
+          ..close();
+        c.drawPath(path, _p);
+      }
+      _r(c, _snap(u.dx) - 24, _snap(u.dy), 0, 0, 16, 4, const Color(0xFF8E989E));
+      _r(c, _snap(u.dx) - 24, _snap(u.dy), 3, -3, 10, 3, const Color(0xFF7FE0A0));
+      _r(c, _snap(u.dx) - 24, _snap(u.dy), 2, 4, 12, 1, const Color(0xFF454C50));
+      final blink = (engine.worldTime * 5).floor() % 2 == 0;
+      _r(c, _snap(u.dx) - 24, _snap(u.dy), 3, 1, 2, 1, blink ? const Color(0xFFFF4FA3) : const Color(0xFFFFE066));
+      _r(c, _snap(u.dx) - 24, _snap(u.dy), 11, 1, 2, 1, blink ? const Color(0xFFFFE066) : const Color(0xFFFF4FA3));
     }
   }
 

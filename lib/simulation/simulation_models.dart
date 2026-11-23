@@ -334,7 +334,7 @@ class StoreShelf {
   final SimProductType assignedProduct;
   final Rect rect; // Rafların konumu
   int currentStock;
-  final int maxCapacity;
+  int maxCapacity;
   bool isUnlocked;
   final double unlockCost;
   final int unlockDay;  // product becomes available at dawn of this day
@@ -654,6 +654,12 @@ class Thief {
   double knockY;
   double walkAngle;
   double walkAnim;
+  bool isBoss = false;
+  int bossType = 0; // 0 Sneaky Sam, 1 Big Bruno, 2 Madame Shadow, 3 The Mega Boss
+  int kind = 0; // 0 thief, 1 eldritch horror, 2 poltergeist, 3 cultist
+  double phased = 0.0; // > 0: cannot be hit (Madame Shadow)
+  double abilityTimer = 0.0;
+  bool abilityDone = false;
   bool fromBack = false; // sneaked in through the back door
   Offset? wpCache; // cached route point (see _moveThiefTowards)
   double wpTimer = 0;

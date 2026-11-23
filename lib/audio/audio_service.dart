@@ -134,7 +134,8 @@ class AudioService with WidgetsBindingObserver {
       await incoming.stop();
       await incoming.setReleaseMode(ReleaseMode.loop);
       await incoming.setVolume(0.0);
-      await incoming.play(AssetSource('audio/music_$track.wav'));
+      final ext = const {'menu', 'day', 'night', 'boss', 'dusk', 'dread'}.contains(track) ? 'wav' : 'ogg';
+      await incoming.play(AssetSource('audio/music_$track.$ext'));
       final hadMusic = _musicPlaying;
       _cur = incomingIdx;
       _musicPlaying = true;
